@@ -1,0 +1,274 @@
+/**
+ * MCP Todos Styles
+ *
+ * Uses ONLY MCP Apps spec CSS variables provided by the host.
+ * No fallback values - the host provides all variables.
+ *
+ * @see https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/draft/apps.mdx#theming
+ */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+input,
+button,
+textarea,
+select {
+  font-family: inherit;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+/**
+ * Form controls styling using MCP Apps spec input variables.
+ * Ensures proper visibility in both light and dark modes.
+ */
+select {
+  background: var(--color-input-background);
+  color: var(--color-input-text);
+  border: var(--border-width-regular) solid var(--color-input-border);
+  border-radius: var(--border-radius-sm);
+  padding: 4px 8px;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background: var(--color-background-primary);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--font-text-md-size);
+  line-height: var(--font-text-md-line-height);
+}
+
+/* =============================================================================
+   Container
+============================================================================= */
+
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 16px;
+  gap: 16px;
+}
+
+/* =============================================================================
+   Header
+============================================================================= */
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.header h1 {
+  font-size: var(--font-heading-sm-size);
+  line-height: var(--font-heading-sm-line-height);
+  font-weight: var(--font-weight-medium);
+}
+
+.count {
+  color: var(--color-text-secondary);
+  font-size: var(--font-text-sm-size);
+}
+
+/* =============================================================================
+   Add Form
+============================================================================= */
+
+.add-form {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.add-form input {
+  flex: 1;
+  padding: 8px 12px;
+  background: var(--color-background-secondary);
+  border: var(--border-width-regular) solid var(--color-border-primary);
+  border-radius: var(--border-radius-md);
+  color: var(--color-text-primary);
+  font-family: inherit;
+  font-size: var(--font-text-md-size);
+  outline: none;
+}
+
+.add-form input:focus {
+  border-color: var(--color-ring-primary);
+}
+
+.add-form input::placeholder {
+  color: var(--color-text-secondary);
+}
+
+.add-form button {
+  padding: 0 16px;
+  background: var(--color-background-inverse);
+  border: var(--border-width-regular) solid transparent;
+  border-radius: var(--border-radius-md);
+  color: var(--color-text-inverse);
+  font-family: inherit;
+  font-size: var(--font-text-md-size);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.add-form button:hover {
+  opacity: 0.9;
+}
+
+.add-form button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* =============================================================================
+   Todo List
+============================================================================= */
+
+.todo-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.todo-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--color-background-secondary);
+  border: var(--border-width-regular) solid var(--color-border-secondary);
+  border-radius: var(--border-radius-md);
+}
+
+.todo-item.completed .todo-text {
+  text-decoration: line-through;
+  color: var(--color-text-secondary);
+}
+
+/* =============================================================================
+   Checkbox
+============================================================================= */
+
+.todo-checkbox {
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--color-border-primary);
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+
+.todo-checkbox:hover {
+  border-color: var(--color-ring-primary);
+}
+
+.todo-item.completed .todo-checkbox {
+  background: var(--color-background-inverse);
+  border-color: var(--color-background-inverse);
+}
+
+.todo-checkbox svg {
+  width: 10px;
+  height: 10px;
+  stroke: var(--color-text-inverse);
+  stroke-width: 3;
+  fill: none;
+  opacity: 0;
+}
+
+.todo-item.completed .todo-checkbox svg {
+  opacity: 1;
+}
+
+/* =============================================================================
+   Todo Text
+============================================================================= */
+
+.todo-text {
+  flex: 1;
+  word-break: break-word;
+}
+
+/* =============================================================================
+   Delete Button
+============================================================================= */
+
+.todo-delete {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  border-radius: var(--border-radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.todo-delete:hover {
+  background: var(--color-background-tertiary);
+  color: var(--color-text-primary);
+}
+
+/* =============================================================================
+   Empty State
+============================================================================= */
+
+.empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+  gap: 8px;
+}
+
+.empty-state svg {
+  width: 48px;
+  height: 48px;
+  opacity: 0.5;
+}
+
+/* =============================================================================
+   Scrollbar
+============================================================================= */
+
+.todo-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.todo-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.todo-list::-webkit-scrollbar-thumb {
+  background: var(--color-border-primary);
+  border-radius: 4px;
+}
+
+.todo-list::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-secondary);
+}
