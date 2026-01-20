@@ -76,7 +76,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/serverlessinc/creature.git",
-    "directory": "desktop/artifacts/sdk"
+    "url": "https://github.com/creature-run/creature.git",
+    "directory": "sdk"
+  },
+  "homepage": "https://creature.run/docs",
+  "bugs": {
+    "url": "https://github.com/creature-run/creature/issues"
   }
 }

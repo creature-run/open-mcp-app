@@ -24,6 +24,12 @@
     "react-dom": "^19.1.0",
     "zod": "^3.24.4"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/creature-run/creature.git",
+    "directory": "template-todos"
+  },
+  "homepage": "https://creature.run/docs",
   "devDependencies": {
     "@types/node": "^22.15.21",
     "@types/react": "^19.1.6",
