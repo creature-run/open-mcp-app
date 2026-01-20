@@ -12,11 +12,11 @@ The [`@creature-ai/sdk`](https://www.npmjs.com/package/@creature-ai/sdk) package
 
 ### `template-notes/`
 
-A full-featured MCP App template with a rich Markdown editor. Use it as a starting point for building your own apps, or deploy it directly to add note-taking capabilities to Creature.
+A full-featured MCP App template with a rich Markdown editor. Demonstrates Creature's multi-instance functionality, where the AI can open multiple tabs with independent instances of the same MCP App. In this case, each note gets its own tab. Great starting point for apps that manage multiple documents or resources.
 
 ### `template-todos/`
 
-A simple MCP App template demonstrating task management with interactive checkboxes. Great for learning the basics of MCP App development.
+A simple MCP App template demonstrating task management with interactive checkboxes. Uses Creature's single-instance behavior (the default), where the app renders in one persistent tab. Great for learning the basics of MCP App development and building dashboard-style apps.
 
 ### `docs/`
 
