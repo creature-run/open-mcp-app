@@ -1,0 +1,108 @@
+name: Release SDK
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Version bump type (ignored if local version already higher than npm)'
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Install dependencies
+        run: |
+          cd sdk
+          npm ci
+
+      - name: Check version and bump if needed
+        id: version
+        run: |
+          cd sdk
+          LOCAL_VERSION=$(node -p "require('./package.json').version")
+          NPM_VERSION=$(npm view @creature-ai/sdk version 2>/dev/null || echo "0.0.0")
+          
+          echo "Local version: $LOCAL_VERSION"
+          echo "npm version: $NPM_VERSION"
+          
+          # Compare versions using node
+          NEEDS_BUMP=$(node -e "
+            const local = '$LOCAL_VERSION'.split('.').map(Number);
+            const npm = '$NPM_VERSION'.split('.').map(Number);
+            const isHigher = local[0] > npm[0] || 
+              (local[0] === npm[0] && local[1] > npm[1]) ||
+              (local[0] === npm[0] && local[1] === npm[1] && local[2] > npm[2]);
+            console.log(isHigher ? 'false' : 'true');
+          ")
+          
+          if [ "$NEEDS_BUMP" = "true" ]; then
+            echo "Local version not higher than npm, bumping with ${{ inputs.bump }}..."
+            NEW_VERSION=$(npm version ${{ inputs.bump }} --no-git-tag-version)
+          else
+            echo "Local version ($LOCAL_VERSION) already higher than npm ($NPM_VERSION), using as-is"
+            NEW_VERSION="v$LOCAL_VERSION"
+          fi
+          
+          echo "version=${NEW_VERSION}" >> $GITHUB_OUTPUT
+          echo "Publishing ${NEW_VERSION}"
+
+      - name: Build SDK
+        run: |
+          cd sdk
+          npm run build
+
+      - name: Publish to npm
+        run: |
+          cd sdk
+          npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Commit and tag
+        run: |
+          git add sdk/package.json
+          git commit -m "chore(sdk): release ${{ steps.version.outputs.version }}"
+          git tag "sdk-${{ steps.version.outputs.version }}"
+          git push origin main --tags
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: sdk-${{ steps.version.outputs.version }}
+          name: SDK ${{ steps.version.outputs.version }}
+          body: |
+            ## @creature-ai/sdk ${{ steps.version.outputs.version }}
+            
+            Install with:
+            ```bash
+            npm install @creature-ai/sdk@${{ steps.version.outputs.version }}
+            ```
+          draft: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
