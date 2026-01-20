@@ -1,5 +1,7 @@
 # Dependencies
 node_modules/
+template-notes/package-lock.json
+template-todos/package-lock.json
 
 # Build outputs
 dist/
