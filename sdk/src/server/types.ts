@@ -249,10 +249,10 @@ export interface ToolContext {
    */
   instanceId: string;
   /**
-   * Creature App Token for identity retrieval.
-   * ONLY present when:
-   * 1. App opted into Creature-managed auth (`auth: { creatureManaged: true }`)
-   * 2. Tool call originated from Creature host
+   * Creature token for identity retrieval.
+   * Present when either:
+   * 1. Tool call originated from Creature host (injected via `_creatureToken` arg)
+   * 2. Tool call includes OAuth bearer token in Authorization header (ChatGPT/other hosts)
    *
    * Use `getIdentity(context.creatureToken)` to retrieve user identity
    * for multi-tenant data access.

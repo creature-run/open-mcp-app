@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { AsyncLocalStorage } from "node:async_hooks";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Server } from "node:http";
@@ -23,6 +24,36 @@ import { MIME_TYPES } from "./types.js";
 import { svgToDataUri, isInitializeRequest, injectHmrClient, readHmrConfig, htmlLoader } from "./utils.js";
 import { WebSocketManager } from "./websocket.js";
 import type { WebSocketConnection } from "./types.js";
+
+// ============================================================================
+// Request Context (for passing auth headers to tool handlers)
+// ============================================================================
+
+/**
+ * Request context stored in AsyncLocalStorage.
+ * Allows tool handlers to access HTTP request data (e.g., Authorization header).
+ */
+interface RequestContext {
+  authorizationHeader?: string;
+}
+
+/**
+ * AsyncLocalStorage for request context.
+ * Used to pass HTTP request headers to MCP tool handlers.
+ */
+const requestContextStorage = new AsyncLocalStorage<RequestContext>();
+
+/**
+ * Extract bearer token from Authorization header.
+ */
+const extractBearerToken = (authHeader: string | undefined): string | undefined => {
+  if (!authHeader) return undefined;
+  const trimmed = authHeader.trim();
+  if (trimmed.toLowerCase().startsWith("bearer ")) {
+    return trimmed.slice(7).trim();
+  }
+  return undefined;
+};
 
 // ============================================================================
 // App Class
@@ -993,44 +1024,50 @@ export class App {
 
   private async handleMcpPost(req: Request, res: Response): Promise<void> {
     const transportSessionId = req.headers["mcp-session-id"] as string | undefined;
+    const authorizationHeader = req.headers["authorization"] as string | undefined;
 
-    try {
-      let transport: StreamableHTTPServerTransport;
+    // Run MCP handling within request context so tool handlers can access auth
+    const context: RequestContext = { authorizationHeader };
 
-      if (transportSessionId && this.transports.has(transportSessionId)) {
-        transport = this.transports.get(transportSessionId)!;
-      } else if (!transportSessionId && isInitializeRequest(req.body)) {
-        // Detect if host supports multiInstance based on client name
-        // Creature clients support multiInstance, ChatGPT clients don't
-        const clientName = req.body?.params?.clientInfo?.name;
-        this.hostSupportsMultiInstance = clientName === "creature";
-        console.log(`[MCP] Client: ${clientName}, multiInstance support: ${this.hostSupportsMultiInstance}`);
+    await requestContextStorage.run(context, async () => {
+      try {
+        let transport: StreamableHTTPServerTransport;
 
-        transport = this.createTransport();
-        const server = this.createMcpServer();
-        await server.connect(transport);
+        if (transportSessionId && this.transports.has(transportSessionId)) {
+          transport = this.transports.get(transportSessionId)!;
+        } else if (!transportSessionId && isInitializeRequest(req.body)) {
+          // Detect if host supports multiInstance based on client name
+          // Creature clients support multiInstance, ChatGPT clients don't
+          const clientName = req.body?.params?.clientInfo?.name;
+          this.hostSupportsMultiInstance = clientName === "creature";
+          console.log(`[MCP] Client: ${clientName}, multiInstance support: ${this.hostSupportsMultiInstance}`);
+
+          transport = this.createTransport();
+          const server = this.createMcpServer();
+          await server.connect(transport);
+          await transport.handleRequest(req, res, req.body);
+          return;
+        } else {
+          res.status(400).json({
+            jsonrpc: "2.0",
+            error: { code: -32000, message: "Bad Request: No valid transport session ID" },
+            id: null,
+          });
+          return;
+        }
+
         await transport.handleRequest(req, res, req.body);
-        return;
-      } else {
-        res.status(400).json({
-          jsonrpc: "2.0",
-          error: { code: -32000, message: "Bad Request: No valid transport session ID" },
-          id: null,
-        });
-        return;
+      } catch (error) {
+        console.error("Error:", error);
+        if (!res.headersSent) {
+          res.status(500).json({
+            jsonrpc: "2.0",
+            error: { code: -32603, message: "Internal server error" },
+            id: null,
+          });
+        }
       }
-
-      await transport.handleRequest(req, res, req.body);
-    } catch (error) {
-      console.error("Error:", error);
-      if (!res.headersSent) {
-        res.status(500).json({
-          jsonrpc: "2.0",
-          error: { code: -32603, message: "Internal server error" },
-          id: null,
-        });
-      }
-    }
+    });
   }
 
   private async handleMcpGet(req: Request, res: Response): Promise<void> {
@@ -1193,7 +1230,12 @@ export class App {
         async (args: Record<string, unknown>) => {
           try {
             // Extract Creature token from args (injected by Creature host)
-            const creatureToken = args._creatureToken as string | undefined;
+            // or from Authorization header (OAuth bearer token from ChatGPT/other hosts)
+            let creatureToken = args._creatureToken as string | undefined;
+            if (!creatureToken) {
+              const reqContext = requestContextStorage.getStore();
+              creatureToken = extractBearerToken(reqContext?.authorizationHeader);
+            }
             const { _creatureToken: _, ...cleanArgs } = args;
             
             const input = config.input ? config.input.parse(cleanArgs) : cleanArgs;
