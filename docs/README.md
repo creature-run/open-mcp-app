@@ -1,8 +1,8 @@
 <img width="3000" height="1050" alt="creature-github" src="https://github.com/user-attachments/assets/b7e060c5-7df5-4d6a-a474-fb8e5edc2415" />
 
-[Creature](https://creature.run) is a desktop AI assistant that renders rich, interactive UI widgets alongside conversations—transforming how you work with AI agents.
+[Creature](https://creature.run) is a desktop AI assistant powered by MCP Apps. It renders rich, interactive UI widgets alongside conversations, transforming how you work with AI agents.
 
-This repository contains open-source artifacts for building and extending Creature apps.
+This repository contains open-source artifacts for building and extending MCP Apps.
 
 ## What's Inside
 
