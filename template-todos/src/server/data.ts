@@ -17,11 +17,11 @@ import { MongoClient, type Db } from "mongodb";
 
 /**
  * Scope for data isolation.
- * Both orgId and projectId are required for scoped access.
+ * orgId is required; projectId is optional for org-level data (e.g., ChatGPT/OAuth).
  */
 export interface DataScope {
   orgId: string;
-  projectId: string;
+  projectId?: string;
 }
 
 // =============================================================================
@@ -55,12 +55,12 @@ const sharedInMemoryData = new Map<string, unknown>();
 /**
  * In-memory data store using a shared Map.
  * Data persists for the lifetime of the process.
- * Scoped by collection, orgId, and projectId to isolate data.
+ * Scoped by collection, orgId, and optionally projectId to isolate data.
  */
 class InMemoryStore<T> implements DataStore<T> {
   private collection: string;
   private orgId: string;
-  private projectId: string;
+  private projectId?: string;
 
   constructor(collection: string, { orgId, projectId }: DataScope) {
     this.collection = collection;
@@ -70,17 +70,19 @@ class InMemoryStore<T> implements DataStore<T> {
 
   /**
    * Build a composite key that includes collection and scope.
-   * This ensures data isolation between different collections and org+project combinations.
+   * Uses "_org_" placeholder when projectId is absent (org-level data).
    */
   private scopedKey(id: string): string {
-    return `${this.collection}:${this.orgId}:${this.projectId}:${id}`;
+    const projectPart = this.projectId || "_org_";
+    return `${this.collection}:${this.orgId}:${projectPart}:${id}`;
   }
 
   /**
    * Get the prefix for listing items in this collection+scope.
    */
   private scopePrefix(): string {
-    return `${this.collection}:${this.orgId}:${this.projectId}:`;
+    const projectPart = this.projectId || "_org_";
+    return `${this.collection}:${this.orgId}:${projectPart}:`;
   }
 
   async get(id: string) {
@@ -141,11 +143,12 @@ const getDb = async (): Promise<Db> => {
 
 /**
  * MongoDB data store for production.
- * Stores orgId and projectId as separate fields for flexible querying.
+ * Stores orgId and optionally projectId for flexible querying.
+ * When projectId is absent, data is org-level (e.g., ChatGPT/OAuth users).
  */
 class MongoDBStore<T> implements DataStore<T> {
   private orgId: string;
-  private projectId: string;
+  private projectId?: string;
 
   constructor(
     private collectionName: string,
@@ -155,13 +158,37 @@ class MongoDBStore<T> implements DataStore<T> {
     this.projectId = projectId;
   }
 
+  /**
+   * Build query filter based on scope.
+   * Only includes projectId in query when it's defined.
+   */
+  private buildQuery(id?: string): Record<string, unknown> {
+    const query: Record<string, unknown> = { orgId: this.orgId };
+    if (this.projectId) {
+      query.projectId = this.projectId;
+    } else {
+      // Explicitly match documents without projectId (org-level data)
+      query.projectId = { $exists: false };
+    }
+    if (id) query._id = id;
+    return query;
+  }
+
+  /**
+   * Build document fields for storage.
+   * Only includes projectId when it's defined.
+   */
+  private buildDocFields(): Record<string, string> {
+    const fields: Record<string, string> = { orgId: this.orgId };
+    if (this.projectId) {
+      fields.projectId = this.projectId;
+    }
+    return fields;
+  }
+
   async get(id: string): Promise<T | null> {
     const db = await getDb();
-    const doc = await db.collection(this.collectionName).findOne({
-      _id: id as any,
-      orgId: this.orgId,
-      projectId: this.projectId,
-    });
+    const doc = await db.collection(this.collectionName).findOne(this.buildQuery(id));
     if (!doc) return null;
     const { _id, orgId: _o, projectId: _p, ...rest } = doc;
     return { id: _id, ...rest } as T;
@@ -170,20 +197,17 @@ class MongoDBStore<T> implements DataStore<T> {
   async set(id: string, value: T): Promise<void> {
     const db = await getDb();
     const { id: _ignoredId, ...rest } = value as any;
+    const docFields = this.buildDocFields();
     await db.collection(this.collectionName).replaceOne(
-      { _id: id as any, orgId: this.orgId, projectId: this.projectId },
-      { ...rest, orgId: this.orgId, projectId: this.projectId },
+      this.buildQuery(id),
+      { ...rest, ...docFields },
       { upsert: true }
     );
   }
 
   async delete(id: string): Promise<boolean> {
     const db = await getDb();
-    const result = await db.collection(this.collectionName).deleteOne({
-      _id: id as any,
-      orgId: this.orgId,
-      projectId: this.projectId,
-    });
+    const result = await db.collection(this.collectionName).deleteOne(this.buildQuery(id));
     return result.deletedCount > 0;
   }
 
@@ -191,7 +215,7 @@ class MongoDBStore<T> implements DataStore<T> {
     const db = await getDb();
     const docs = await db
       .collection(this.collectionName)
-      .find({ orgId: this.orgId, projectId: this.projectId })
+      .find(this.buildQuery())
       .toArray();
     return docs.map(({ _id, orgId: _o, projectId: _p, ...rest }) => ({
       id: _id,

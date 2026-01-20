@@ -39,8 +39,12 @@ const getAllTodos = async (store: DataStore<Todo>) => {
 
 /**
  * Extract scope from Creature identity token.
- * Returns orgId and projectId for data isolation.
- * Throws if token is missing, invalid, or lacks org/project context.
+ * Returns orgId and optionally projectId for data isolation.
+ * 
+ * - Creature with project: Returns { orgId, projectId }
+ * - ChatGPT/OAuth: Returns { orgId } only (org-level data via personal org)
+ * 
+ * Throws if token is missing or invalid.
  */
 const extractScope = async (creatureToken?: string): Promise<DataScope> => {
   console.log(`[Todos] extractScope called with creatureToken: ${creatureToken ? 'present' : 'undefined'}`);
@@ -54,13 +58,10 @@ const extractScope = async (creatureToken?: string): Promise<DataScope> => {
   if (!identity.organization) {
     throw new Error("Authentication required: No organization context");
   }
-  if (!identity.project) {
-    throw new Error("Authentication required: No project context");
-  }
 
   return {
     orgId: identity.organization.id,
-    projectId: identity.project.id,
+    projectId: identity.project?.id,
   };
 };
 
