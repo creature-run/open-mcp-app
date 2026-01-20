@@ -8,7 +8,7 @@ This repository contains open-source artifacts for building MCP Apps with Creatu
 
 ### `sdk/`
 
-The [`@creature-ai/sdk`](https://www.npmjs.com/package/@creature-ai/sdk) package for building MCP Apps that work in both Creature and ChatGPT. Includes server utilities, React hooks, and Vite plugins for seamless development.
+The [`@creature-ai/sdk`](https://www.npmjs.com/package/@creature-ai/sdk) lets you build an MCP App once and run it in Creature, any client that supports MCP Apps, and ChatGPT. Includes server utilities, React hooks, and Vite plugins for seamless development.
 
 ### `template-notes/`
 
