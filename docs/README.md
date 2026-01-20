@@ -1,4 +1,4 @@
-# Creature
+<img width="3000" height="1050" alt="creature-github" src="https://github.com/user-attachments/assets/b7e060c5-7df5-4d6a-a474-fb8e5edc2415" />
 
 Creature is a desktop AI coding assistant that brings **MCP Apps** to life. While other AI tools show you text responses, Creature renders rich, interactive UIs alongside the conversation.
 
