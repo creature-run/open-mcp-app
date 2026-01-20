@@ -2,7 +2,7 @@
 
 [Creature](https://creature.run) is a beautiful desktop client for using and building MCP Apps. It renders rich, interactive UI widgets alongside AI conversations, transforming how you work with agents.
 
-This repository contains open-source artifacts for building and extending MCP Apps.
+This repository contains open-source artifacts for building MCP Apps, for anyone who wants to customize and enrich AI experiences, create custom tools, or build developer workflows, all with UI.
 
 ## What's Inside
 
