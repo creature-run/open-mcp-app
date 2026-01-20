@@ -7,11 +7,5 @@
     "api/mcp.ts": {
       "maxDuration": 60
     }
-  },
-  "rewrites": [
-    {
-      "source": "/.well-known/oauth-authorization-server",
-      "destination": "/api/.well-known/oauth-authorization-server"
-    }
-  ]
+  }
 }

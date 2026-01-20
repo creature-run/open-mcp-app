@@ -59,6 +59,9 @@ export class App {
   /** Whether the connected host supports multiInstance. ChatGPT doesn't, Creature does. */
   private hostSupportsMultiInstance = false;
 
+  /** OAuth discovery endpoint configuration. */
+  private oauthDiscoveryConfig: { path: string; body: Record<string, unknown> } | null = null;
+
   // ==========================================================================
   // Constructor
   // ==========================================================================
@@ -108,6 +111,30 @@ export class App {
       config: config as ToolConfig,
       handler: handler as ToolHandler<unknown>,
     });
+    return this;
+  }
+
+  /**
+   * Serve an OAuth discovery endpoint.
+   * Used by OAuth clients (like ChatGPT) to discover authorization server metadata.
+   *
+   * @param config.path - The endpoint path (e.g., "/.well-known/oauth-authorization-server")
+   * @param config.[rest] - All other properties become the JSON response body
+   *
+   * @example
+   * app.serveOAuthDiscovery({
+   *   path: "/.well-known/oauth-authorization-server",
+   *   issuer: "https://creature.run",
+   *   authorization_endpoint: "https://creature.run/oauth/authorize",
+   *   token_endpoint: "https://api.creature.run/apps/v1/oauth/token",
+   *   response_types_supported: ["code"],
+   *   grant_types_supported: ["authorization_code", "refresh_token"],
+   *   code_challenge_methods_supported: ["S256"],
+   * });
+   */
+  serveOAuthDiscovery(config: { path: string; [key: string]: unknown }): this {
+    const { path, ...body } = config;
+    this.oauthDiscoveryConfig = { path, body };
     return this;
   }
 
@@ -556,6 +583,24 @@ export class App {
         return;
       }
 
+      // Handle OAuth discovery endpoint (if configured and path matches)
+      if (app.oauthDiscoveryConfig) {
+        const requestPath = isEdge
+          ? new URL(reqOrRequest.url).pathname
+          : reqOrRequest.url?.split("?")[0];
+        
+        if (requestPath === app.oauthDiscoveryConfig.path) {
+          if (isEdge) {
+            return new Response(JSON.stringify(app.oauthDiscoveryConfig.body), {
+              status: 200,
+              headers: corsHeaders,
+            });
+          }
+          res.status(200).json(app.oauthDiscoveryConfig.body);
+          return;
+        }
+      }
+
       // Parse body
       let body: any = {};
       try {
@@ -930,6 +975,13 @@ export class App {
         websockets: this.instanceWebSockets.size,
       });
     });
+
+    // OAuth discovery endpoint
+    if (this.oauthDiscoveryConfig) {
+      app.get(this.oauthDiscoveryConfig.path, (_req: Request, res: Response) => {
+        res.json(this.oauthDiscoveryConfig!.body);
+      });
+    }
 
     // MCP endpoints
     app.post("/mcp", (req, res) => this.handleMcpPost(req, res));

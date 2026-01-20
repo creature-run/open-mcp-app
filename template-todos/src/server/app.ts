@@ -76,6 +76,21 @@ export const createTodosApp = (options: AppOptions = {}): App => {
 
   registerTodoTool(app);
 
+  // ==========================================================================
+  // OAuth Discovery (for ChatGPT and other OAuth clients)
+  // ==========================================================================
+
+  app.serveOAuthDiscovery({
+    path: "/api/mcp/.well-known/oauth-authorization-server",
+    issuer: "https://creature.run",
+    authorization_endpoint: "https://creature.run/oauth/authorize",
+    token_endpoint: "https://api.creature.run/apps/v1/oauth/token",
+    response_types_supported: ["code"],
+    grant_types_supported: ["authorization_code", "refresh_token"],
+    code_challenge_methods_supported: ["S256"],
+    token_endpoint_auth_methods_supported: ["client_secret_basic", "client_secret_post"],
+  });
+
   return app;
 };
 
