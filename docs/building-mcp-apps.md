@@ -31,15 +31,22 @@ Your app is created with:
 
 ```
 my-app/
-├── src/
-│   ├── server.ts     # MCP server
-│   ├── icon.ts       # Widget icon (SVG)
-│   └── ui/
-│       ├── page.tsx  # React UI
-│       └── styles.css
-├── package.json
-├── vite.config.ts
-└── tsconfig.json
+  src/
+    server/
+      app.ts        # App definition with resources
+      dev.ts        # Development entry point
+      icon.ts       # Widget icon (SVG)
+      types.ts      # Shared types
+      tools/
+        my-tool.ts  # Tool implementations
+    ui/
+      page.tsx      # React UI
+      styles.css
+  dist/             # Build output
+  package.json
+  vite.config.ts
+  tsconfig.json
+  tsconfig.server.json
 ```
 
 ---
@@ -186,17 +193,22 @@ useHost({
 ### Create the App
 
 ```typescript
-// src/server.ts
+// src/server/app.ts
 import { createApp } from "@creature-ai/sdk/server";
-import { z } from "zod";
 import { ICON_SVG, ICON_ALT } from "./icon.js";
 
 const app = createApp({
   name: "my-app",
   version: "1.0.0",
-  instructions: "This app manages a todo list. Use todo_add to add items.",
+  instructions: `This app manages a todo list. Key behaviors:
+- Use action:"list" to view all todos and open the UI.
+- Use action:"add" to create new items.
+- Use action:"toggle" to mark items complete/incomplete.`,
+  auth: { creatureManaged: true },  // Enable Creature identity
 });
 ```
+
+The `instructions` field is important. It tells the AI how to use your app effectively.
 
 ### Register a UI Resource
 
@@ -212,40 +224,76 @@ app.resource({
 
 ### Register a Tool
 
+The recommended pattern is a consolidated tool with an `action` parameter:
+
 ```typescript
-app.tool(
-  "todo_add",
-  {
-    description: "Add a new todo item",
-    input: z.object({
-      text: z.string().describe("The todo text"),
-    }),
-    ui: "ui://my-app/todos",
-    displayModes: ["inline", "pip"],
-    defaultDisplayMode: "pip",  // Creature preference (ChatGPT ignores)
-    loadingMessage: "Adding todo...",  // ChatGPT shows this while loading
-    completedMessage: "Todo added",    // ChatGPT shows this when done
-  },
-  async ({ text }, context) => {
-    // Get existing state for this instance
-    const todos = context.getState<Todo[]>() || [];
-    const todo = { id: Date.now().toString(), text, completed: false };
-    todos.push(todo);
-    context.setState(todos);
-    
-    return {
-      data: { todos },  // instanceId auto-included
-      text: `Added: ${text}`,
-      title: `Todos (${todos.length})`,
-    };
-  }
-);
+// src/server/tools/todo.ts
+import { z } from "zod";
+import type { App } from "@creature-ai/sdk/server";
+
+const TodoSchema = z.object({
+  action: z.enum(["list", "add", "toggle", "remove"])
+    .describe("Action: list, add, toggle, or remove"),
+  text: z.string().optional().describe("Todo text (for add)"),
+  id: z.string().optional().describe("Todo ID (for toggle/remove)"),
+});
+
+export const registerTodoTool = (app: App) => {
+  app.tool(
+    "todo",
+    {
+      description: `Manage todos. Actions:
+- list: Show all todos and open the UI.
+- add: Create a new todo with the given text.
+- toggle: Toggle completed status by ID.
+- remove: Delete a todo by ID.`,
+      input: TodoSchema,
+      ui: "ui://my-app/todos",
+      displayModes: ["pip", "inline"],
+      defaultDisplayMode: "pip",
+    },
+    async (input, context) => {
+      if (input.action === "add") {
+        if (!input.text) {
+          return { text: "text is required", isError: true, noWidget: true };
+        }
+        // Add todo logic...
+        return {
+          data: { todos: allTodos },
+          text: `Added: ${input.text}`,
+          title: `Todos (${openCount})`,
+        };
+      }
+      // Handle other actions...
+    }
+  );
+};
 ```
+
+**Key options:**
+- `noWidget: true` — Return error without opening/updating UI
+- `title` — Dynamic title shown in the PIP tab
+- `isError: true` — Mark result as an error
 
 ### Start the Server
 
+Create a development entry point:
+
 ```typescript
+// src/server/dev.ts
+import { app } from "./app.js";
+
 app.start();
+```
+
+Run with `npm run dev` which typically uses:
+
+```json
+{
+  "scripts": {
+    "dev": "concurrently \"vite build --watch\" \"nodemon --exec 'tsx src/server/dev.ts'\""
+  }
+}
 ```
 
 → See [SDK Reference](./sdk-reference.md) for all options and advanced features.
@@ -258,38 +306,61 @@ app.start();
 
 ```tsx
 // src/ui/page.tsx
+import { useEffect, useState } from "react";
 import { useHost, useToolResult } from "@creature-ai/sdk/react";
 import "./styles.css";
 
+interface Todo {
+  id: string;
+  text: string;
+  completed: boolean;
+}
+
 interface TodoData {
-  todos: Array<{ id: string; text: string; completed: boolean }>;
+  todos: Todo[];
 }
 
 export default function Page() {
-  const { data, title, instanceId, onToolResult } = useToolResult<TodoData>();
+  const [todos, setTodos] = useState<Todo[]>([]);
+  const { data, onToolResult } = useToolResult<TodoData>();
   
-  const { callTool, isReady, environment, log } = useHost({
+  const { callTool, isReady, log, widgetState, setWidgetState } = useHost({
     name: "my-app",
     version: "1.0.0",
     onToolResult,
   });
-  
-  if (!isReady) {
-    return <div className="loading">Connecting...</div>;
-  }
 
-  log("Widget loaded", { instanceId, environment });
+  // Update local state when tool results arrive
+  useEffect(() => {
+    if (data?.todos) {
+      setTodos(data.todos);
+    }
+  }, [data]);
+
+  // Fetch initial data when ready
+  useEffect(() => {
+    if (isReady) {
+      log.info("Widget connected");
+      callTool("todo", { action: "list" });
+    }
+  }, [isReady, callTool, log]);
+
+  const handleAdd = async (text: string) => {
+    await callTool("todo", { action: "add", text });
+  };
+
+  const handleToggle = async (id: string) => {
+    await callTool("todo", { action: "toggle", id });
+  };
 
   return (
-    <div className="app">
-      <header>
-        <h1>{title || "Todos"}</h1>
-      </header>
-      <ul>
-        {data?.todos?.map((todo) => (
-          <li key={todo.id}>{todo.text}</li>
-        ))}
-      </ul>
+    <div className="container">
+      <h1>Todo List</h1>
+      {todos.map((todo) => (
+        <div key={todo.id} onClick={() => handleToggle(todo.id)}>
+          {todo.completed ? "✓" : "○"} {todo.text}
+        </div>
+      ))}
     </div>
   );
 }
@@ -297,22 +368,41 @@ export default function Page() {
 
 ### Using Widget State
 
-Use `setWidgetState` for state that persists across reloads:
+Use `setWidgetState` for state that persists across PIP refreshes and popouts:
 
 ```tsx
 const { widgetState, setWidgetState } = useHost({ ... });
 
-// Update state
-const selectItem = (id: string) => {
-  setWidgetState({
-    modelContent: { selectedId: id },      // AI sees this
-    privateContent: { viewMode: "list" },  // AI doesn't see this
-  });
-};
+// Persist state when data changes
+useEffect(() => {
+  if (data?.todos) {
+    const incompleteCount = data.todos.filter(t => !t.completed).length;
+    
+    setWidgetState({
+      // modelContent: Concise summary for the AI (keep it small!)
+      modelContent: {
+        countTotal: data.todos.length,
+        countIncomplete: incompleteCount,
+      },
+      // privateContent: Full data for UI restoration (AI doesn't see this)
+      privateContent: {
+        todos: data.todos,
+        lastViewedAt: new Date().toISOString(),
+      },
+    });
+  }
+}, [data, setWidgetState]);
 
-// Read state
-const selectedId = widgetState?.modelContent?.selectedId;
+// Restore from widget state on mount
+useEffect(() => {
+  const savedTodos = widgetState?.privateContent?.todos;
+  if (savedTodos && todos.length === 0) {
+    setTodos(savedTodos);
+  }
+}, [widgetState]);
 ```
+
+**Best practice:** Put summaries/counts in `modelContent`, full data in `privateContent`. This keeps the AI's context window lean.
 
 ### Responsive Design for Both Modes
 
@@ -687,12 +777,14 @@ Use the SDK's logger for debugging:
 ```tsx
 const { log } = useHost({ ... });
 
-log("User clicked button");              // info level
-log.debug("Verbose details", { data });  // debug level
-log.error("Something failed", { err });  // error level
+log("User clicked button");                    // info level (default)
+log.info("Todo added", { id: todo.id });       // info level
+log.debug("Verbose details", { data });        // debug level
+log.warn("Deprecated feature used");           // warning level
+log.error("Something failed", { error: err }); // error level
 ```
 
-Logs appear in Creature's DevConsole. On ChatGPT, they fall back to `console`.
+Logs appear in Creature's DevConsole. On ChatGPT and standalone, they fall back to `console`.
 
 ---
 
@@ -702,17 +794,33 @@ Deploy to Vercel or AWS Lambda:
 
 ```typescript
 // api/mcp.ts (Vercel)
-import { app } from "../src/app";
-export default app.toVercelFunctionHandler();
-
-// For bundled UI in serverless
+import { createTodosApp } from "../src/server/app";
 import { main } from "../dist/ui/bundle.js";
 
-const app = createApp({ ... });
-app.resource({ uri: "ui://my-app/main", html: main });
+// Pass bundled HTML for serverless (no file system access)
+const app = createTodosApp({ html: main });
+
+export default app.toVercelFunctionHandler();
 ```
 
-Enable `generateBundle: true` in Vite config to create embedded HTML for serverless:
+Your app factory should accept bundled HTML:
+
+```typescript
+// src/server/app.ts
+export const createTodosApp = (options: { html?: string } = {}) => {
+  const app = createApp({ name: "my-app", version: "1.0.0" });
+  
+  app.resource({
+    uri: "ui://my-app/main",
+    // Use bundled HTML if provided, otherwise file path for local dev
+    html: options.html || "../../dist/ui/main.html",
+  });
+  
+  return app;
+};
+```
+
+Enable `generateBundle: true` in Vite config to create the embedded HTML:
 
 ```typescript
 // vite.config.ts
