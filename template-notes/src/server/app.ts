@@ -79,13 +79,10 @@ export const createNotesApp = (options: AppOptions = {}): App => {
   // OAuth Discovery (for ChatGPT and other OAuth clients)
   // ==========================================================================
 
-  // Path differs between environments:
-  // - Production (Vercel): /api/mcp/... — Vercel requires serverless functions in /api
-  // - Development (local): /mcp/... — SDK serves MCP at /mcp directly
-  const isProduction = process.env.NODE_ENV === "production";
-  const oauthPath = isProduction
-    ? "/api/mcp/.well-known/oauth-authorization-server"
-    : "/mcp/.well-known/oauth-authorization-server";
+  // ChatGPT expects OAuth discovery at server root, not under /mcp path
+  // - Local dev: /.well-known/oauth-authorization-server
+  // - Vercel: Needs rewrite from /.well-known/* or dedicated function
+  const oauthPath = "/.well-known/oauth-authorization-server";
 
   app.serveOAuthDiscovery({
     path: oauthPath,

@@ -48,8 +48,10 @@ const extractScope = async (creatureToken?: string): Promise<DataScope> => {
   }
 
   const identity = await getIdentity(creatureToken);
+  console.log(`[Notes] getIdentity response:`, JSON.stringify(identity, null, 2));
 
   if (!identity.organization) {
+    console.log(`[Notes] ERROR: No organization in identity response`);
     throw new Error("Authentication required: No organization context");
   }
 
