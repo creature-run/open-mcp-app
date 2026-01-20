@@ -41,17 +41,13 @@ const getAllNotes = async (store: DataStore<Note>) => {
  * Throws if token is missing or invalid.
  */
 const extractScope = async (creatureToken?: string): Promise<DataScope> => {
-  console.log(`[Notes] extractScope called with creatureToken: ${creatureToken ? 'present' : 'undefined'}`);
-  
   if (!creatureToken) {
     throw new Error("Authentication required: No Creature token provided");
   }
 
   const identity = await getIdentity(creatureToken);
-  console.log(`[Notes] getIdentity response:`, JSON.stringify(identity, null, 2));
 
   if (!identity.organization) {
-    console.log(`[Notes] ERROR: No organization in identity response`);
     throw new Error("Authentication required: No organization context");
   }
 
