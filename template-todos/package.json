@@ -12,10 +12,7 @@
   },
   "creature": {
     "name": "todos",
-    "publish": true,
-    "hosted": {
-      "url": "https://mcp-todos.creature.run/api/mcp"
-    }
+    "publish": true
   },
   "dependencies": {
     "@creature-ai/sdk": "^0.1.21",
