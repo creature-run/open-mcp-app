@@ -10,5 +10,5 @@
  * For production (Vercel), requests go through:
  *   api/mcp.ts (serverless function)
  */
-import { app } from "./app.js";
+import { app } from "../app.js";
 app.start();

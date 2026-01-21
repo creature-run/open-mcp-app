@@ -1,7 +1,11 @@
 /**
  * MCP Notes UI
  *
- * A WYSIWYG markdown note editor demonstrating multi-instance MCP apps.
+ * A notes app demonstrating multi-instance MCP Apps.
+ *
+ * Views:
+ * - List view: Searchable list of all notes
+ * - Editor view: WYSIWYG markdown editor for a single note
  *
  * Features:
  * - Unified editor: edit markdown and see formatted preview in one view
@@ -36,228 +40,173 @@ interface Note {
   updatedAt: string;
 }
 
+interface NoteSummary {
+  id: string;
+  title: string;
+  updatedAt: string;
+}
+
+type ViewType = "list" | "editor";
+
 interface NoteData {
   note?: Note;
+  notes?: NoteSummary[];
+  view?: ViewType;
   success?: boolean;
   error?: string;
+  instanceId?: string;
 }
 
 interface NoteWidgetState {
-  /** Concise summary for the agent - enough context to interact with this note */
+  /** Concise summary for the agent - enough context to interact */
   modelContent: {
-    noteId: string;
-    noteTitle: string;
-    wordCount: number;
+    view: ViewType;
+    noteId?: string;
+    noteTitle?: string;
+    wordCount?: number;
+    noteCount?: number;
   };
   /** UI-only state for persistence - not visible to agent */
   privateContent: {
     lastNote: Note | null;
+    lastNotes: NoteSummary[] | null;
+    lastView: ViewType;
   };
 }
 
 // =============================================================================
-// Main Component
+// List View Component
 // =============================================================================
 
-export default function Page() {
-  const [note, setNote] = useState<Note | null>(null);
-  const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
-  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+interface ListViewProps {
+  notes: NoteSummary[];
+  onOpenNote: (noteId: string) => void;
+  onCreateNote: () => void;
+}
+
+/**
+ * List view showing all notes with search/filter.
+ */
+function ListView({ notes, onOpenNote, onCreateNote }: ListViewProps) {
+  const [search, setSearch] = useState("");
+
+  const filteredNotes = useMemo(() => {
+    if (!search.trim()) return notes;
+    const query = search.toLowerCase();
+    return notes.filter((n) => n.title.toLowerCase().includes(query));
+  }, [notes, search]);
 
   /**
-   * The instanceId from the host, used to route tool results to this pip.
-   * Using a ref instead of state to avoid closure/timing issues in callbacks.
-   * Refs are always current when accessed, unlike state captured in closures.
+   * Format relative time.
    */
-  const instanceIdRef = useRef<string | null>(null);
+  const formatTime = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
 
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const hasLoggedReady = useRef(false);
+    if (minutes < 1) return "Just now";
+    if (minutes < 60) return `${minutes}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    if (days < 7) return `${days}d ago`;
+    return date.toLocaleDateString();
+  };
 
-  /**
-   * Tracks the current note ID to detect when a new note is loaded.
-   * Using a ref instead of depending on `note` state prevents effect re-runs
-   * when we update `note` within the effect.
-   */
-  const currentNoteIdRef = useRef<string | null>(null);
+  return (
+    <div className="list-container">
+      <header className="list-header">
+        <h1 className="list-title">Notes</h1>
+        <button className="create-button" onClick={onCreateNote}>
+          + New Note
+        </button>
+      </header>
 
-  /**
-   * Tracks the content the UI last saved.
-   * Used to distinguish between our own save result (content matches)
-   * and agent-initiated saves (content differs).
-   */
-  const lastSavedContentRef = useRef<string | null>(null);
+      <div className="search-container">
+        <input
+          type="text"
+          className="search-input"
+          placeholder="Search notes..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
 
-  /** Ref to the Milkdown editor for imperative content updates */
-  const editorRef = useRef<MilkdownEditorRef>(null);
-
-  const { data, onToolResult } = useToolResult<NoteData>();
-
-  /**
-   * Connect to host and get widget state for persistence.
-   * widgetState is restored by the host on PIP refresh/popout.
-   * setWidgetState persists data and notifies the host.
-   */
-  const { callTool, isReady, log, widgetState, setWidgetState } = useHost({
-    name: "mcp-template-notes",
-    version: "0.1.0",
-    onToolResult,
-  });
-
-  // Cast widget state to our expected type
-  const typedWidgetState = widgetState as NoteWidgetState | null;
-
-  /**
-   * Save note via tool call.
-   * This is the MCP Apps pattern - UI calls tools to update server state.
-   * The result comes back via onToolResult callback.
-   */
-  const saveNote = useCallback(
-    async (noteId: string, newTitle: string, newContent: string) => {
-      setIsSaving(true);
-      lastSavedContentRef.current = newContent;
-      try {
-        await callTool("note", {
-          action: "save",
-          noteId,
-          title: newTitle,
-          content: newContent,
-          instanceId: instanceIdRef.current ?? undefined,
-        });
-        // Result will come back via onToolResult, updating `data`
-        setLastSaved(new Date());
-        log.debug("Note saved", { noteId, title: newTitle });
-      } catch (err) {
-        log.error("Failed to save note", { error: String(err) });
-      } finally {
-        setIsSaving(false);
-      }
-    },
-    [callTool, log]
+      {filteredNotes.length === 0 ? (
+        <div className="empty-state">
+          {notes.length === 0 ? (
+            <>
+              <p>No notes yet</p>
+              <button className="create-button-large" onClick={onCreateNote}>
+                Create your first note
+              </button>
+            </>
+          ) : (
+            <p>No notes match "{search}"</p>
+          )}
+        </div>
+      ) : (
+        <ul className="notes-list">
+          {filteredNotes.map((note) => (
+            <li
+              key={note.id}
+              className="note-item"
+              onClick={() => onOpenNote(note.id)}
+            >
+              <span className="note-item-title">{note.title || "Untitled"}</span>
+              <span className="note-item-time">{formatTime(note.updatedAt)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
+}
+
+// =============================================================================
+// Editor View Component
+// =============================================================================
+
+interface EditorViewProps {
+  note: Note;
+  onSave: (noteId: string, title: string, content: string) => void;
+  onBack: () => void;
+  isSaving: boolean;
+  lastSaved: Date | null;
+  editorRef: React.RefObject<MilkdownEditorRef | null>;
+}
+
+/**
+ * Editor view for editing a single note.
+ */
+function EditorView({
+  note,
+  onSave,
+  onBack,
+  isSaving,
+  lastSaved,
+  editorRef,
+}: EditorViewProps) {
+  const [title, setTitle] = useState(note.title);
+  const contentRef = useRef(note.content);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /**
    * Debounced save function.
-   * Saves after user stops typing for 800ms.
    */
   const debouncedSave = useCallback(
-    (noteId: string, newTitle: string, newContent: string) => {
+    (newTitle: string, newContent: string) => {
       if (saveTimerRef.current) {
         clearTimeout(saveTimerRef.current);
       }
-
       saveTimerRef.current = setTimeout(() => {
-        saveNote(noteId, newTitle, newContent);
+        onSave(note.id, newTitle, newContent);
         saveTimerRef.current = null;
       }, 800);
     },
-    [saveNote]
+    [note.id, onSave]
   );
-
-  /**
-   * Log when connection is ready.
-   */
-  useEffect(() => {
-    if (isReady && !hasLoggedReady.current) {
-      hasLoggedReady.current = true;
-      log.info("Note editor connected");
-    }
-  }, [isReady, log]);
-
-  /**
-   * Handle data from tool results (initial load and saves).
-   * Updates local state when tool returns note data.
-   *
-   * Uses `currentNoteIdRef` instead of `note` state to detect new notes,
-   * preventing effect re-runs when we update `note` within the effect.
-   *
-   * For the same note, we compare result content against what the UI last saved:
-   * - If content matches our last save: ignore (prevents feedback loop / cursor jumps)
-   * - If content differs: apply update via editor's imperative setContent method
-   */
-  useEffect(() => {
-    if (data?.note) {
-      const noteData = data.note;
-
-      // Extract instanceId from structuredContent (sibling to note)
-      // Using a ref so it's immediately available in callbacks without re-render
-      const dataWithInstance = data as NoteData & { instanceId?: string };
-      if (dataWithInstance.instanceId) {
-        instanceIdRef.current = dataWithInstance.instanceId;
-      }
-
-      // Check if this is a different note using ref (not state)
-      const isNewNote = currentNoteIdRef.current !== noteData.id;
-
-      if (isNewNote) {
-        currentNoteIdRef.current = noteData.id;
-        setNote(noteData);
-        setTitle(noteData.title);
-        setContent(noteData.content);
-        // Initialize to current content so subsequent same-content results are ignored
-        lastSavedContentRef.current = noteData.content;
-        log.debug("Note loaded", { id: noteData.id, title: noteData.title });
-      } else {
-        // Same note - check if content changed externally (agent update)
-        const isExternalUpdate = noteData.content !== lastSavedContentRef.current;
-
-        if (isExternalUpdate) {
-          // Agent or external source updated the note
-          // Update React state for metadata
-          setNote(noteData);
-          setTitle(noteData.title);
-
-          // Imperatively update the editor content (doesn't trigger onChange)
-          editorRef.current?.setContent(noteData.content);
-          contentRef.current = noteData.content;
-          // Track this content so we ignore our own save echo
-          lastSavedContentRef.current = noteData.content;
-
-          log.debug("Note updated by agent", { id: noteData.id, title: noteData.title });
-        } else {
-          // Our own save result - just update metadata, don't touch content
-          setNote(noteData);
-        }
-      }
-    }
-  }, [data, log]);
-
-  /**
-   * Restore from widget state if no data (e.g., on pip refresh).
-   */
-  useEffect(() => {
-    const savedNote = typedWidgetState?.privateContent?.lastNote;
-
-    if (savedNote && !note) {
-      setNote(savedNote);
-      setTitle(savedNote.title);
-      setContent(savedNote.content);
-      log.debug("Note restored from widget state", { id: savedNote.id });
-    }
-  }, [typedWidgetState, note, log]);
-
-  /**
-   * Persist note to widget state when it changes.
-   * modelContent provides concise context for the agent to interact with this note.
-   * privateContent stores the full note for UI restoration on refresh/popout.
-   */
-  useEffect(() => {
-    if (note) {
-      const wordCount = note.content.trim().split(/\s+/).filter(Boolean).length;
-      setWidgetState({
-        modelContent: {
-          noteId: note.id,
-          noteTitle: note.title,
-          wordCount,
-        },
-        privateContent: {
-          lastNote: note,
-        },
-      });
-    }
-  }, [note, setWidgetState]);
 
   /**
    * Handle title changes.
@@ -266,33 +215,20 @@ export default function Page() {
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const newTitle = e.target.value;
       setTitle(newTitle);
-      if (note) {
-        debouncedSave(note.id, newTitle, contentRef.current);
-      }
+      debouncedSave(newTitle, contentRef.current);
     },
-    [note, debouncedSave]
+    [debouncedSave]
   );
 
   /**
-   * Track current content for saves (editor is uncontrolled).
-   * Sync ref when content state changes (new note loaded).
-   */
-  const contentRef = useRef(content);
-  useEffect(() => {
-    contentRef.current = content;
-  }, [content]);
-
-  /**
-   * Handle content changes from Milkdown editor.
+   * Handle content changes.
    */
   const handleContentChange = useCallback(
     (newContent: string) => {
       contentRef.current = newContent;
-      if (note) {
-        debouncedSave(note.id, title, newContent);
-      }
+      debouncedSave(title, newContent);
     },
-    [note, title, debouncedSave]
+    [title, debouncedSave]
   );
 
   /**
@@ -305,8 +241,10 @@ export default function Page() {
 
   return (
     <div className="note-container">
-      {/* Header */}
       <header className="note-header">
+        <button className="back-button" onClick={onBack}>
+          ← Back
+        </button>
         <input
           type="text"
           className="note-title"
@@ -323,18 +261,264 @@ export default function Page() {
         </div>
       </header>
 
-      {/* Unified WYSIWYG Editor - keyed by note ID to reset on note change */}
       <div className="note-editor-container">
-        {note && (
-          <MilkdownEditor
-            ref={editorRef}
-            key={note.id}
-            defaultValue={content}
-            onChange={handleContentChange}
-            placeholder="Write your note in markdown..."
-          />
-        )}
+        <MilkdownEditor
+          ref={editorRef}
+          key={note.id}
+          defaultValue={note.content}
+          onChange={handleContentChange}
+          placeholder="Write your note in markdown..."
+        />
       </div>
+    </div>
+  );
+}
+
+// =============================================================================
+// Main Component
+// =============================================================================
+
+export default function Page() {
+  const [view, setView] = useState<ViewType>("editor");
+  const [note, setNote] = useState<Note | null>(null);
+  const [notes, setNotes] = useState<NoteSummary[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+
+  /**
+   * The instanceId from the host, used to route tool results to this pip.
+   */
+  const instanceIdRef = useRef<string | null>(null);
+  const hasLoggedReady = useRef(false);
+
+  /**
+   * Tracks content for detecting external updates.
+   */
+  const lastSavedContentRef = useRef<string | null>(null);
+
+  /** Ref to the Milkdown editor for imperative content updates */
+  const editorRef = useRef<MilkdownEditorRef>(null);
+
+  const { data, onToolResult } = useToolResult<NoteData>();
+
+  /**
+   * Connect to host and get widget state for persistence.
+   */
+  const { callTool, isReady, log, widgetState, setWidgetState } = useHost({
+    name: "mcp-template-notes",
+    version: "0.1.0",
+    onToolResult,
+  });
+
+  const typedWidgetState = widgetState as NoteWidgetState | null;
+
+  /**
+   * Save note via tool call using the 'notes_api' tool (no UI).
+   */
+  const saveNote = useCallback(
+    async (noteId: string, newTitle: string, newContent: string) => {
+      setIsSaving(true);
+      lastSavedContentRef.current = newContent;
+      try {
+        await callTool("notes_api", {
+          action: "save",
+          noteId,
+          title: newTitle,
+          content: newContent,
+        });
+        setLastSaved(new Date());
+        log.debug("Note saved", { noteId, title: newTitle });
+      } catch (err) {
+        log.error("Failed to save note", { error: String(err) });
+      } finally {
+        setIsSaving(false);
+      }
+    },
+    [callTool, log]
+  );
+
+  /**
+   * Open a note by ID using notes_ui tool.
+   */
+  const openNote = useCallback(
+    async (noteId: string) => {
+      try {
+        await callTool("notes_ui", {
+          action: "open",
+          noteId,
+          instanceId: instanceIdRef.current ?? undefined,
+        });
+        log.debug("Opening note", { noteId });
+      } catch (err) {
+        log.error("Failed to open note", { error: String(err) });
+      }
+    },
+    [callTool, log]
+  );
+
+  /**
+   * Create a new note using notes_ui tool.
+   */
+  const createNote = useCallback(async () => {
+    try {
+      await callTool("notes_ui", {
+        action: "create",
+        instanceId: instanceIdRef.current ?? undefined,
+      });
+      log.debug("Creating new note");
+    } catch (err) {
+      log.error("Failed to create note", { error: String(err) });
+    }
+  }, [callTool, log]);
+
+  /**
+   * Go back to list view.
+   */
+  const goToList = useCallback(async () => {
+    try {
+      await callTool("notes_ui", {
+        action: "list",
+        instanceId: instanceIdRef.current ?? undefined,
+      });
+      log.debug("Navigating to list");
+    } catch (err) {
+      log.error("Failed to load list", { error: String(err) });
+    }
+  }, [callTool, log]);
+
+  /**
+   * Log when connection is ready.
+   */
+  useEffect(() => {
+    if (isReady && !hasLoggedReady.current) {
+      hasLoggedReady.current = true;
+      log.info("Notes app connected");
+    }
+  }, [isReady, log]);
+
+  /**
+   * Handle data from tool results.
+   */
+  useEffect(() => {
+    if (!data) return;
+
+    // Extract instanceId from data
+    if (data.instanceId) {
+      instanceIdRef.current = data.instanceId;
+    }
+
+    // Determine view from data
+    if (data.view === "list" && data.notes) {
+      setView("list");
+      setNotes(data.notes);
+      setNote(null);
+      log.debug("List view loaded", { count: data.notes.length });
+    } else if (data.note) {
+      setView("editor");
+      const noteData = data.note;
+      const isNewNote = note?.id !== noteData.id;
+
+      if (isNewNote) {
+        setNote(noteData);
+        lastSavedContentRef.current = noteData.content;
+        log.debug("Note loaded", { id: noteData.id, title: noteData.title });
+      } else {
+        // Same note - check for external update
+        const isExternalUpdate = noteData.content !== lastSavedContentRef.current;
+        if (isExternalUpdate) {
+          setNote(noteData);
+          editorRef.current?.setContent(noteData.content);
+          lastSavedContentRef.current = noteData.content;
+          log.debug("Note updated externally", { id: noteData.id });
+        } else {
+          // Our own save result - just update metadata
+          setNote(noteData);
+        }
+      }
+    }
+  }, [data, log, note?.id]);
+
+  /**
+   * Restore from widget state if no data.
+   */
+  useEffect(() => {
+    if (!data && typedWidgetState?.privateContent) {
+      const { lastView, lastNote, lastNotes } = typedWidgetState.privateContent;
+
+      if (lastView === "list" && lastNotes) {
+        setView("list");
+        setNotes(lastNotes);
+        log.debug("List restored from widget state");
+      } else if (lastView === "editor" && lastNote) {
+        setView("editor");
+        setNote(lastNote);
+        log.debug("Note restored from widget state", { id: lastNote.id });
+      }
+    }
+  }, [typedWidgetState, data, log]);
+
+  /**
+   * Persist state to widget state.
+   */
+  useEffect(() => {
+    if (view === "list") {
+      setWidgetState({
+        modelContent: {
+          view: "list",
+          noteCount: notes.length,
+        },
+        privateContent: {
+          lastNote: null,
+          lastNotes: notes,
+          lastView: "list",
+        },
+      });
+    } else if (note) {
+      const wordCount = note.content.trim().split(/\s+/).filter(Boolean).length;
+      setWidgetState({
+        modelContent: {
+          view: "editor",
+          noteId: note.id,
+          noteTitle: note.title,
+          wordCount,
+        },
+        privateContent: {
+          lastNote: note,
+          lastNotes: notes,
+          lastView: "editor",
+        },
+      });
+    }
+  }, [view, note, notes, setWidgetState]);
+
+  // Render appropriate view
+  if (view === "list") {
+    return (
+      <ListView
+        notes={notes}
+        onOpenNote={openNote}
+        onCreateNote={createNote}
+      />
+    );
+  }
+
+      if (note) {
+    return (
+      <EditorView
+        note={note}
+        onSave={saveNote}
+        onBack={goToList}
+        isSaving={isSaving}
+        lastSaved={lastSaved}
+        editorRef={editorRef}
+      />
+    );
+  }
+
+  // Loading state
+  return (
+    <div className="loading-container">
+      <p>Loading...</p>
     </div>
   );
 }

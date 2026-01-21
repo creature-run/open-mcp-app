@@ -10,9 +10,10 @@
  */
 
 import { createApp, type App } from "@creature-ai/sdk/server";
-import { registerTodoTool } from "./tools/todo.js";
-import { MCP_NAME, TODOS_UI_URI, type AppOptions } from "./types.js";
-import { ICON_SVG, ICON_ALT } from "./icon.js";
+import { registerTodosUiTool } from "./tools/todos_ui.js";
+import { registerTodosApiTool } from "./tools/todos_api.js";
+import { MCP_NAME, TODOS_UI_URI, type AppOptions } from "./lib/types.js";
+import { ICON_SVG, ICON_ALT } from "./lib/icon.js";
 
 // =============================================================================
 // Configuration
@@ -47,12 +48,17 @@ export const createTodosApp = (options: AppOptions = {}): App => {
     version: "0.1.0",
     port: PORT,
     auth: { creatureManaged: true },
-    instructions: `This MCP manages a todo list. Key behaviors:
-- Use action:"list" to view all todos and open the todo list UI.
-- Use action:"add" to create new todo items.
-- Use action:"toggle" to mark todos as complete/incomplete by ID.
-- Use action:"remove" to delete todos by ID.
-- When the user wants to see their todos, use action:"list" to open the interactive pip.`,
+    instructions: `This MCP manages a todo list with two tools:
+
+todos_ui (shows UI):
+- action:"list" - Display all todos in the interactive list
+
+todos_api (no UI, data operations):
+- action:"add" + text - Create a new todo item
+- action:"toggle" + id - Mark todo as complete/incomplete
+- action:"remove" + id - Delete a todo item
+
+When the user wants to see their todos, use todos_ui action:"list" to open the interactive pip.`,
   });
 
   // ==========================================================================
@@ -74,7 +80,8 @@ export const createTodosApp = (options: AppOptions = {}): App => {
   // Tools
   // ==========================================================================
 
-  registerTodoTool(app);
+  registerTodosUiTool(app);
+  registerTodosApiTool(app);
 
   // ==========================================================================
   // OAuth Discovery (for ChatGPT and other OAuth clients)

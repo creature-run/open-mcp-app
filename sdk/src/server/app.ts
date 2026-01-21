@@ -562,15 +562,6 @@ export class App {
   private formatServerlessResult(result: ToolResult, instanceId: string, websocketUrl?: string) {
     const text = result.text || JSON.stringify(result.data || {});
     
-    // If noWidget is set, don't include instanceId/widgetSessionId (no UI created)
-    if (result.noWidget) {
-      return {
-        content: [{ type: "text", text }],
-        structuredContent: result.data ? { ...result.data } : undefined,
-        ...(result.isError && { isError: true }),
-      };
-    }
-    
     return {
       content: [{ type: "text", text }],
       structuredContent: {
@@ -1378,20 +1369,17 @@ export class App {
    */
   private formatToolResult(result: ToolResult, instanceId?: string, websocketUrl?: string) {
     const text = result.text || JSON.stringify(result.data || {});
-    
-    // If noWidget is set, don't include instanceId/widgetSessionId (no UI created)
-    const skipWidget = result.noWidget;
 
     const structuredContent: Record<string, unknown> = {
       ...result.data,
       ...(result.title && { title: result.title }),
       ...(result.inlineHeight && { inlineHeight: result.inlineHeight }),
-      ...(!skipWidget && instanceId && { instanceId }),
-      ...(!skipWidget && websocketUrl && { websocketUrl }),
+      ...(instanceId && { instanceId }),
+      ...(websocketUrl && { websocketUrl }),
     };
 
     const meta: Record<string, unknown> = {};
-    if (!skipWidget && instanceId) {
+    if (instanceId) {
       meta["openai/widgetSessionId"] = instanceId;
     }
 

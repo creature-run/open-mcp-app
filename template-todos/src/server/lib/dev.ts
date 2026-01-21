@@ -7,5 +7,5 @@
  * 2. Direct Express server with hot reload via nodemon
  * 3. Creature connects directly to localhost:PORT/mcp
  */
-import { app } from "./app.js";
+import { app } from "../app.js";
 app.start();

@@ -510,3 +510,169 @@ body,
 .milkdown-wrapper::-webkit-scrollbar-thumb:hover {
   background: var(--color-border-secondary);
 }
+
+/* =============================================================================
+   Back Button (Editor View)
+============================================================================= */
+
+.back-button {
+  background: transparent;
+  border: none;
+  color: var(--color-text-info);
+  font-size: var(--font-text-sm-size);
+  cursor: pointer;
+  padding: 4px 8px;
+  margin-right: 8px;
+  border-radius: var(--border-radius-sm);
+  flex-shrink: 0;
+}
+
+.back-button:hover {
+  background: var(--color-background-secondary);
+}
+
+/* =============================================================================
+   List View
+============================================================================= */
+
+.list-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: var(--border-width-regular) solid var(--color-border-secondary);
+  flex-shrink: 0;
+}
+
+.list-title {
+  font-size: var(--font-heading-sm-size);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.create-button {
+  background: var(--color-text-info);
+  color: var(--color-text-inverse);
+  border: none;
+  padding: 6px 12px;
+  border-radius: var(--border-radius-md);
+  font-size: var(--font-text-sm-size);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+}
+
+.create-button:hover {
+  opacity: 0.9;
+}
+
+.search-container {
+  padding: 12px 16px;
+  border-bottom: var(--border-width-regular) solid var(--color-border-secondary);
+  flex-shrink: 0;
+}
+
+.search-input {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--color-background-secondary);
+  border: var(--border-width-regular) solid var(--color-border-secondary);
+  border-radius: var(--border-radius-md);
+  font-size: var(--font-text-sm-size);
+  color: var(--color-text-primary);
+  outline: none;
+}
+
+.search-input:focus {
+  border-color: var(--color-text-info);
+}
+
+.search-input::placeholder {
+  color: var(--color-text-tertiary);
+}
+
+.notes-list {
+  flex: 1;
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.note-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: var(--border-width-regular) solid var(--color-border-tertiary);
+  cursor: pointer;
+}
+
+.note-item:hover {
+  background: var(--color-background-secondary);
+}
+
+.note-item-title {
+  font-size: var(--font-text-md-size);
+  color: var(--color-text-primary);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.note-item-time {
+  font-size: var(--font-text-xs-size);
+  color: var(--color-text-tertiary);
+  flex-shrink: 0;
+  margin-left: 12px;
+}
+
+.empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+  padding: 32px;
+  text-align: center;
+}
+
+.empty-state p {
+  margin-bottom: 16px;
+}
+
+.create-button-large {
+  background: var(--color-text-info);
+  color: var(--color-text-inverse);
+  border: none;
+  padding: 12px 24px;
+  border-radius: var(--border-radius-md);
+  font-size: var(--font-text-md-size);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+}
+
+.create-button-large:hover {
+  opacity: 0.9;
+}
+
+/* =============================================================================
+   Loading State
+============================================================================= */
+
+.loading-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--color-text-secondary);
+}

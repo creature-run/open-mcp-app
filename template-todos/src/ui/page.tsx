@@ -272,22 +272,23 @@ export default function Page() {
 
   /**
    * Fetch initial todos when host connection is ready.
+   * Uses todos_ui tool to list all todos.
    */
   useEffect(() => {
     if (isReady) {
       log.debug("Fetching initial todos");
-      callTool("todo", { action: "list" });
+      callTool("todos_ui", { action: "list" });
     }
   }, [isReady, callTool, log]);
 
   /**
-   * Add a new todo item.
+   * Add a new todo item using todos_api tool.
    */
   const handleAdd = useCallback(
     async ({ text }: { text: string }) => {
       log.info("Adding todo", { text });
       try {
-        await callTool("todo", { action: "add", text });
+        await callTool("todos_api", { action: "add", text });
       } catch (err) {
         log.error("Failed to add todo", { error: String(err) });
       }
@@ -296,12 +297,12 @@ export default function Page() {
   );
 
   /**
-   * Toggle a todo's completed status.
+   * Toggle a todo's completed status using todos_api tool.
    */
   const handleToggle = useCallback(
     async ({ id }: { id: string }) => {
       try {
-        await callTool("todo", { action: "toggle", id });
+        await callTool("todos_api", { action: "toggle", id });
       } catch (err) {
         log.error("Failed to toggle todo", { id, error: String(err) });
       }
@@ -310,13 +311,13 @@ export default function Page() {
   );
 
   /**
-   * Delete a todo item.
+   * Delete a todo item using todos_api tool.
    */
   const handleDelete = useCallback(
     async ({ id }: { id: string }) => {
       log.info("Deleting todo", { id });
       try {
-        await callTool("todo", { action: "remove", id });
+        await callTool("todos_api", { action: "remove", id });
       } catch (err) {
         log.error("Failed to delete todo", { id, error: String(err) });
       }

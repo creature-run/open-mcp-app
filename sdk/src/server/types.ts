@@ -221,12 +221,6 @@ export interface ToolResult {
   inlineHeight?: number;
   /** Whether this is an error result */
   isError?: boolean;
-  /**
-   * Skip widget creation for this tool call.
-   * When true, no PIP/panel is created even if the tool has a `ui` configured.
-   * Use for read-only operations (read, list, delete) that shouldn't open UI.
-   */
-  noWidget?: boolean;
 }
 
 /**
