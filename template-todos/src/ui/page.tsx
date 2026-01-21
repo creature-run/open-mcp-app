@@ -11,7 +11,12 @@
  * SDK hooks used:
  * - useToolResult: Receive todo data from tool calls
  * - useHost: Connect to host, call tools, and persist widget state
+ * - initStyles: Inject environment-specific CSS variable defaults
  */
+
+// MUST be first - injects environment-specific CSS variable defaults before CSS loads
+import { detectEnvironment, initStyles } from "@creature-ai/sdk/core";
+initStyles({ environment: detectEnvironment() });
 
 import { useEffect, useCallback, useState, useRef, type FormEvent } from "react";
 import { useHost, useToolResult } from "@creature-ai/sdk/react";

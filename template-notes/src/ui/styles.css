@@ -1,13 +1,16 @@
 /**
  * MCP Notes Styles
  *
- * Uses ONLY MCP Apps spec CSS variables provided by the host.
- * No fallback values - the host provides all variables.
+ * Uses MCP Apps CSS variables for theming consistency with the host.
+ * Variables are injected by initStyles() from @creature-ai/sdk/core
+ * and overridden by host at runtime via hostContext.styles.variables.
  *
- * Includes Milkdown editor theming for WYSIWYG markdown editing.
- *
- * @see https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/draft/apps.mdx#theming
+ * @see https://github.com/modelcontextprotocol/ext-apps specification
  */
+
+/* =============================================================================
+   CSS Reset & Base Styles
+============================================================================= */
 
 * {
   margin: 0;
@@ -15,6 +18,9 @@
   box-sizing: border-box;
 }
 
+/**
+ * Form controls inherit font from parent.
+ */
 input,
 button,
 textarea,
@@ -31,17 +37,9 @@ input {
   outline: none;
 }
 
-/**
- * Form controls styling using MCP Apps spec input variables.
- * Ensures proper visibility in both light and dark modes.
- */
-select {
-  background: var(--color-input-background);
-  color: var(--color-input-text);
-  border: var(--border-width-regular) solid var(--color-input-border);
-  border-radius: var(--border-radius-sm);
-  padding: 4px 8px;
-}
+/* =============================================================================
+   Root & Document Styles
+============================================================================= */
 
 html,
 body,
@@ -57,7 +55,7 @@ body,
 }
 
 /* =============================================================================
-   Container
+   Note Container
 ============================================================================= */
 
 .note-container {
