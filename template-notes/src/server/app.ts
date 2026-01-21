@@ -47,17 +47,11 @@ export const createNotesApp = (options: AppOptions = {}): App => {
     version: "0.1.0",
     port: PORT,
     auth: { creatureManaged: true },
-    instructions: `This MCP manages markdown notes with the 'notes' tool.
-
-Actions:
-- action:"list" - Display all notes in a searchable list
-- action:"open" + noteId - Open existing note in editor  
-- action:"create" - Create new note (optional title/content)
-- action:"read" + noteId - Get note content for processing
-- action:"save" + noteId + title + content - Update existing note
-- action:"delete" + noteId - Remove a note
-
-Key behavior: When editing, use action:"read" first to get current content, then action:"save". This prevents overwriting user edits.`,
+    instructions: `CRITICAL - Tab Behavior:
+- action:"create" → NEVER pass instanceId.
+- action:"save" → ALWAYS pass instanceId of the tab showing that note.
+- action:"open" → ONLY pass instanceId if user explicitly wants to replace current tab's content.
+- MUST use "read" before "save" to avoid overwriting user edits.`,
   });
 
   // ==========================================================================

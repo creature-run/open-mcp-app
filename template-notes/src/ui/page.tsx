@@ -333,6 +333,7 @@ export default function Page() {
           noteId,
           title: newTitle,
           content: newContent,
+          instanceId: instanceIdRef.current ?? undefined,
         });
         setLastSaved(new Date());
         log.debug("Note saved", { noteId, title: newTitle });
@@ -354,6 +355,7 @@ export default function Page() {
         await callTool("notes", {
           action: "open",
           noteId,
+          instanceId: instanceIdRef.current ?? undefined,
         });
         log.debug("Opening note", { noteId });
       } catch (err) {
@@ -370,6 +372,7 @@ export default function Page() {
     try {
       await callTool("notes", {
         action: "create",
+        instanceId: instanceIdRef.current ?? undefined,
       });
       log.debug("Creating new note");
     } catch (err) {
@@ -384,6 +387,7 @@ export default function Page() {
     try {
       await callTool("notes", {
         action: "list",
+        instanceId: instanceIdRef.current ?? undefined,
       });
       log.debug("Navigating to list");
     } catch (err) {

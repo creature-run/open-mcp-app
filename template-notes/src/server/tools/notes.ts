@@ -46,6 +46,10 @@ const NotesSchema = z.object({
     .string()
     .optional()
     .describe("Note content (markdown) - optional for create, required for save"),
+  instanceId: z
+    .string()
+    .optional()
+    .describe("Tab instance ID. NEVER pass for 'create' action. ALWAYS pass for 'save' action. For 'open', only pass to replace current tab."),
 });
 
 type NotesInput = z.infer<typeof NotesSchema>;
@@ -285,6 +289,7 @@ export const registerNotesTool = (app: App) => {
 - list: Show all notes
 - open: Open note in editor (requires noteId)
 - create: Create new note (optional title/content)
+    - NEVER pass instanceId for 'create' action
 - read: Get note content for processing (requires noteId)
 - save: Update note (requires noteId, title, content)
 - delete: Remove note (requires noteId)`,
