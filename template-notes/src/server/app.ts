@@ -10,8 +10,7 @@
  */
 
 import { createApp, type App } from "@creature-ai/sdk/server";
-import { registerNotesUiTool } from "./tools/notes_ui.js";
-import { registerNotesApiTool } from "./tools/notes_api.js";
+import { registerNotesTool } from "./tools/notes.js";
 import { MCP_NAME, NOTE_UI_URI, type AppOptions } from "./lib/types.js";
 import { ICON_SVG, ICON_ALT } from "./lib/icon.js";
 
@@ -48,19 +47,17 @@ export const createNotesApp = (options: AppOptions = {}): App => {
     version: "0.1.0",
     port: PORT,
     auth: { creatureManaged: true },
-    instructions: `This MCP manages markdown notes with two tools:
+    instructions: `This MCP manages markdown notes with the 'notes' tool.
 
-notes_ui (shows UI):
+Actions:
 - action:"list" - Display all notes in a searchable list
 - action:"open" + noteId - Open existing note in editor  
 - action:"create" - Create new note (optional title/content)
-
-notes_api (no UI, data operations):
 - action:"read" + noteId - Get note content for processing
 - action:"save" + noteId + title + content - Update existing note
 - action:"delete" + noteId - Remove a note
 
-Key behavior: When editing, use notes_api action:"read" first to get current content, then action:"save". This prevents overwriting user edits.`,
+Key behavior: When editing, use action:"read" first to get current content, then action:"save". This prevents overwriting user edits.`,
   });
 
   // ==========================================================================
@@ -83,8 +80,7 @@ Key behavior: When editing, use notes_api action:"read" first to get current con
   // Tools
   // ==========================================================================
 
-  registerNotesUiTool(app);
-  registerNotesApiTool(app);
+  registerNotesTool(app);
 
   // ==========================================================================
   // OAuth Discovery (for ChatGPT and other OAuth clients)

@@ -193,6 +193,14 @@ function EditorView({
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /**
+   * Sync title state when note changes (e.g., switching notes).
+   */
+  useEffect(() => {
+    setTitle(note.title);
+    contentRef.current = note.content;
+  }, [note.id, note.title, note.content]);
+
+  /**
    * Debounced save function.
    */
   const debouncedSave = useCallback(
@@ -313,14 +321,14 @@ export default function Page() {
   const typedWidgetState = widgetState as NoteWidgetState | null;
 
   /**
-   * Save note via tool call using the 'notes_api' tool (no UI).
+   * Save note via tool call.
    */
   const saveNote = useCallback(
     async (noteId: string, newTitle: string, newContent: string) => {
       setIsSaving(true);
       lastSavedContentRef.current = newContent;
       try {
-        await callTool("notes_api", {
+        await callTool("notes", {
           action: "save",
           noteId,
           title: newTitle,
@@ -338,15 +346,14 @@ export default function Page() {
   );
 
   /**
-   * Open a note by ID using notes_ui tool.
+   * Open a note by ID.
    */
   const openNote = useCallback(
     async (noteId: string) => {
       try {
-        await callTool("notes_ui", {
+        await callTool("notes", {
           action: "open",
           noteId,
-          instanceId: instanceIdRef.current ?? undefined,
         });
         log.debug("Opening note", { noteId });
       } catch (err) {
@@ -357,13 +364,12 @@ export default function Page() {
   );
 
   /**
-   * Create a new note using notes_ui tool.
+   * Create a new note.
    */
   const createNote = useCallback(async () => {
     try {
-      await callTool("notes_ui", {
+      await callTool("notes", {
         action: "create",
-        instanceId: instanceIdRef.current ?? undefined,
       });
       log.debug("Creating new note");
     } catch (err) {
@@ -376,9 +382,8 @@ export default function Page() {
    */
   const goToList = useCallback(async () => {
     try {
-      await callTool("notes_ui", {
+      await callTool("notes", {
         action: "list",
-        instanceId: instanceIdRef.current ?? undefined,
       });
       log.debug("Navigating to list");
     } catch (err) {

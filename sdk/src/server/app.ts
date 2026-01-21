@@ -734,6 +734,11 @@ export class App {
           name: config.name,
           description: config.description,
           mimeType: MIME_TYPES.MCP_APPS,
+          _meta: {
+            ui: {
+              multiInstance: config.multiInstance,
+            },
+          },
         });
       }
       return { jsonrpc: "2.0", result: { resources }, id };
@@ -1150,6 +1155,11 @@ export class App {
         {
           mimeType: MIME_TYPES.MCP_APPS,
           description: config.description,
+          _meta: {
+            ui: {
+              multiInstance: config.multiInstance,
+            },
+          },
         },
         async () => {
           let html = typeof config.html === "function" ? await config.html() : config.html;
