@@ -54,6 +54,8 @@ export class ChatGptAppHostClient extends Subscribable implements HostClient {
   private connected = false;
   private hasProcessedInitialData = false;
   private globalsHandler: ((event: Event) => void) | null = null;
+  private lastToolOutputJson: string | null = null;
+  private lastWidgetStateJson: string | null = null;
 
   // ============================================================================
   // Constructor
@@ -92,7 +94,7 @@ export class ChatGptAppHostClient extends Subscribable implements HostClient {
   /**
    * Disconnect from the host.
    *
-   * Removes the globals event listener.
+   * Removes the globals event listener and cleanup.
    */
   disconnect(): void {
     if (!this.connected) return;
@@ -222,7 +224,8 @@ export class ChatGptAppHostClient extends Subscribable implements HostClient {
    * Set up listener for `openai:set_globals` events.
    *
    * ChatGPT dispatches this event when tool output or widget state
-   * changes after initial load.
+   * changes after initial load. Uses JSON comparison to prevent
+   * infinite loops from unchanged data.
    */
   private setupGlobalsListener(): void {
     this.globalsHandler = (event: Event) => {
@@ -235,13 +238,21 @@ export class ChatGptAppHostClient extends Subscribable implements HostClient {
       const globals = customEvent.detail?.globals;
 
       if (globals?.toolOutput) {
-        this.emit("tool-input", globals.toolOutput);
-        this.emit("tool-result", { structuredContent: globals.toolOutput });
+        const toolOutputJson = JSON.stringify(globals.toolOutput);
+        if (toolOutputJson !== this.lastToolOutputJson) {
+          this.lastToolOutputJson = toolOutputJson;
+          this.emit("tool-input", globals.toolOutput);
+          this.emit("tool-result", { structuredContent: globals.toolOutput });
+        }
       }
 
       if (globals?.widgetState !== undefined) {
-        this.setState({ widgetState: globals.widgetState });
-        this.emit("widget-state-change", globals.widgetState);
+        const widgetStateJson = JSON.stringify(globals.widgetState);
+        if (widgetStateJson !== this.lastWidgetStateJson) {
+          this.lastWidgetStateJson = widgetStateJson;
+          this.setState({ widgetState: globals.widgetState });
+          this.emit("widget-state-change", globals.widgetState);
+        }
       }
     };
 

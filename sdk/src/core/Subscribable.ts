@@ -25,10 +25,8 @@ export abstract class Subscribable {
       this.eventHandlers.set(event, handlers);
     }
     handlers.add(handler as EventHandler);
-    console.log(`[Subscribable] on "${String(event)}" registered, total handlers: ${handlers.size}`);
     return () => {
       handlers!.delete(handler as EventHandler);
-      console.log(`[Subscribable] on "${String(event)}" unregistered, remaining: ${handlers!.size}`);
     };
   }
 
@@ -41,7 +39,6 @@ export abstract class Subscribable {
     ...args: Parameters<HostClientEvents[K]>
   ): void {
     const handlers = this.eventHandlers.get(event);
-    console.log(`[Subscribable] emit "${String(event)}", handlers: ${handlers?.size ?? 0}`);
     if (handlers) {
       handlers.forEach((handler) => {
         (handler as (...args: Parameters<HostClientEvents[K]>) => void)(...args);

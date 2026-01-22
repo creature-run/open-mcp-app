@@ -1,10 +1,10 @@
 /**
- * todos_api Tool
+ * Todos Tool
  *
- * Data operations tool for programmatic todo access.
- * No UI is shown - this is for AI/backend operations.
+ * Single tool for all todo operations. All actions route to the same UI.
  *
  * Actions:
+ * - list: Show all todos in interactive list
  * - add: Create a new todo item
  * - toggle: Toggle a todo's completed status
  * - remove: Delete a todo item
@@ -15,7 +15,12 @@
 import { z } from "zod";
 import type { App } from "@creature-ai/sdk/server";
 import type { DataStore } from "../lib/data.js";
-import type { Todo, ToolContext, ToolResult } from "../lib/types.js";
+import {
+  TODOS_UI_URI,
+  type Todo,
+  type ToolContext,
+  type ToolResult,
+} from "../lib/types.js";
 import {
   generateTodoId,
   getAllTodos,
@@ -27,10 +32,10 @@ import {
 // Input Schema
 // =============================================================================
 
-const TodosApiSchema = z.object({
+const TodosSchema = z.object({
   action: z
-    .enum(["add", "toggle", "remove"])
-    .describe("Action: 'add' creates new, 'toggle' completes/uncompletes, 'remove' deletes"),
+    .enum(["list", "add", "toggle", "remove"])
+    .describe("Action to perform on todos"),
   text: z
     .string()
     .optional()
@@ -41,17 +46,39 @@ const TodosApiSchema = z.object({
     .describe("Todo ID - required for 'toggle' and 'remove' actions"),
 });
 
-type TodosApiInput = z.infer<typeof TodosApiSchema>;
+type TodosInput = z.infer<typeof TodosSchema>;
 
 // =============================================================================
 // Action Handlers
 // =============================================================================
 
 /**
+ * Handle 'list' action - show all todos.
+ */
+const handleList = async (store: DataStore<Todo>): Promise<ToolResult> => {
+  const todos = await getAllTodos(store);
+  const { total, open } = getTodoCounts(todos);
+
+  if (total === 0) {
+    return {
+      data: { todos: [] },
+      title: "Todos (0)",
+      text: "No todos yet. Use action 'add' with text to create one.",
+    };
+  }
+
+  return {
+    data: { todos },
+    title: `Todos (${open})`,
+    text: `${total} todo(s), ${open} remaining`,
+  };
+};
+
+/**
  * Handle 'add' action - create a new todo item.
  */
 const handleAdd = async (
-  { text }: TodosApiInput,
+  { text }: TodosInput,
   store: DataStore<Todo>
 ): Promise<ToolResult> => {
   if (!text) {
@@ -87,7 +114,7 @@ const handleAdd = async (
  * Handle 'toggle' action - toggle a todo's completed status.
  */
 const handleToggle = async (
-  { id }: TodosApiInput,
+  { id }: TodosInput,
   store: DataStore<Todo>
 ): Promise<ToolResult> => {
   if (!id) {
@@ -126,7 +153,7 @@ const handleToggle = async (
  * Handle 'remove' action - delete a todo item.
  */
 const handleRemove = async (
-  { id }: TodosApiInput,
+  { id }: TodosInput,
   store: DataStore<Todo>
 ): Promise<ToolResult> => {
   if (!id) {
@@ -164,26 +191,31 @@ const handleRemove = async (
 // =============================================================================
 
 /**
- * Register the todos_api tool.
+ * Register the todos tool.
  *
- * This tool performs data operations without showing UI.
- * Use for: adding todos, toggling completion, removing todos.
+ * Single tool for all todo operations. Results are routed to the pip
+ * for UI updates.
  */
-export const registerTodosApiTool = (app: App) => {
+export const registerTodosTool = (app: App) => {
   app.tool(
-    "todos_api",
+    "todos",
     {
-      description: `Data operations on todos (no UI shown). Actions:
-- add: Create a new todo item (requires text)
+      description: `Manage todos. Actions:
+- list: Show all todos in interactive list
+- add: Create a new todo (requires text)
 - toggle: Toggle completed status (requires id)
-- remove: Delete a todo item (requires id)`,
-      input: TodosApiSchema,
-      // No UI configured - this tool doesn't show a widget
+- remove: Delete a todo (requires id)`,
+      input: TodosSchema,
+      ui: TODOS_UI_URI,
       visibility: ["model", "app"],
+      displayModes: ["pip", "inline"],
+      defaultDisplayMode: "pip",
     },
-    async (input: TodosApiInput, context: ToolContext) => {
+    async (input: TodosInput, context: ToolContext) => {
       return withAuth(context, async (store) => {
         switch (input.action) {
+          case "list":
+            return handleList(store);
           case "add":
             return handleAdd(input, store);
           case "toggle":

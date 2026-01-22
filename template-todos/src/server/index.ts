@@ -10,8 +10,7 @@
  */
 
 import { createApp } from "@creature-ai/sdk/server";
-import { registerTodosUiTool } from "./tools/todos_ui.js";
-import { registerTodosApiTool } from "./tools/todos_api.js";
+import { registerTodosTool } from "./tools/todos.js";
 import { MCP_NAME, TODOS_UI_URI } from "./lib/types.js";
 import { ICON_SVG, ICON_ALT } from "./lib/icon.js";
 
@@ -30,17 +29,14 @@ const app = createApp({
   version: "0.1.0",
   port: PORT,
   auth: { creatureManaged: true },
-  instructions: `This MCP manages a todo list with two tools:
+  instructions: `This MCP manages a todo list with a single "todos" tool:
 
-todos_ui (shows UI):
 - action:"list" - Display all todos in the interactive list
-
-todos_api (no UI, data operations):
 - action:"add" + text - Create a new todo item
 - action:"toggle" + id - Mark todo as complete/incomplete
 - action:"remove" + id - Delete a todo item
 
-When the user wants to see their todos, use todos_ui action:"list" to open the interactive pip.`,
+Use action:"list" to open the interactive pip when the user wants to see their todos.`,
 });
 
 // =============================================================================
@@ -60,8 +56,7 @@ app.resource({
 // Tools
 // =============================================================================
 
-registerTodosUiTool(app);
-registerTodosApiTool(app);
+registerTodosTool(app);
 
 // =============================================================================
 // OAuth Discovery (for ChatGPT and other OAuth clients)

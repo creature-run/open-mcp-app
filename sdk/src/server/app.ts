@@ -1326,13 +1326,16 @@ export class App {
     const toolMeta: Record<string, unknown> = {};
     
     if (config.ui) {
+      const visibility = config.visibility || ["model", "app"];
       toolMeta.ui = {
         resourceUri: config.ui,
-        visibility: config.visibility || ["model", "app"],
+        visibility,
         ...(config.displayModes && { displayModes: config.displayModes }),
         ...(config.defaultDisplayMode && { defaultDisplayMode: config.defaultDisplayMode }),
       };
       toolMeta["openai/outputTemplate"] = config.ui;
+      // ChatGPT requires this to allow widget/UI to call the tool
+      toolMeta["openai/widgetAccessible"] = visibility.includes("app");
     }
     
     if (config.loadingMessage) {
