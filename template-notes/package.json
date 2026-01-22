@@ -4,10 +4,11 @@
   "description": "An MCP App for adding notes to your Creature projects, with a full-featured Markdown editor.",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -k \"vite build --watch\" \"nodemon -q --ext ts --watch src/server --exec 'npx tsx src/server/lib/dev.ts'\"",
+    "dev": "concurrently -k \"vite build --watch\" \"nodemon -q --ext ts --watch src/server --exec 'npx tsx src/server/index.ts'\"",
     "build": "npm run build:ui && npm run build:server",
     "build:ui": "vite build",
     "build:server": "tsc -p tsconfig.server.json",
+    "start": "node dist/server/index.js",
     "typecheck": "tsc --noEmit"
   },
   "creature": {
@@ -34,7 +35,6 @@
     "@types/node": "^22.15.21",
     "@types/react": "^19.1.6",
     "@types/react-dom": "^19.1.6",
-    "@vercel/node": "^3.0.0",
     "@vitejs/plugin-react": "^4.5.2",
     "concurrently": "^9.1.2",
     "nodemon": "^3.1.0",

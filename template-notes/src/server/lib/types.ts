@@ -39,20 +39,6 @@ export interface NoteInstanceState {
 }
 
 // =============================================================================
-// App Options
-// =============================================================================
-
-/**
- * HTML content options for the UI resource.
- * 
- * - Local dev: Pass nothing (uses file path)
- * - Serverless: Pass bundled HTML string from dist/ui/bundle.js
- */
-export interface AppOptions {
-  html?: string;
-}
-
-// =============================================================================
 // Tool Types
 // =============================================================================
 
