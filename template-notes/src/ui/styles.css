@@ -130,6 +130,10 @@ body,
   flex: 1;
   overflow-y: auto;
   padding: 16px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  cursor: text;
 }
 
 /* =============================================================================
@@ -144,11 +148,31 @@ body,
   outline: none;
   font-size: var(--font-text-md-size);
   line-height: var(--font-text-md-line-height);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
+/**
+ * ProseMirror editor element - the actual contenteditable area.
+ * Uses flex: 1 to fill available space, allowing clicks anywhere
+ * in the content area to focus the editor, even when empty.
+ */
 .milkdown .editor {
   outline: none;
-  min-height: 100%;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/**
+ * ProseMirror paragraph - when editor is empty, this single paragraph
+ * fills the available space so the entire area is clickable.
+ */
+.milkdown .editor > .paragraph:only-child,
+.milkdown .editor > p:only-child {
+  flex: 1;
 }
 
 /* Placeholder text when editor is empty */
@@ -519,7 +543,7 @@ body,
   background: transparent;
   border: none;
   color: var(--color-text-info);
-  font-size: var(--font-text-sm-size);
+  font-size: calc(var(--font-text-sm-size) * 1.5);
   cursor: pointer;
   padding: 4px 8px;
   margin-right: 8px;

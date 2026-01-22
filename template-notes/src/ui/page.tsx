@@ -251,7 +251,7 @@ function EditorView({
     <div className="note-container">
       <header className="note-header">
         <button className="back-button" onClick={onBack}>
-          ← Back
+          ←
         </button>
         <input
           type="text"
