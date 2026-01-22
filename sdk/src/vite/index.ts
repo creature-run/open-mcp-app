@@ -29,6 +29,13 @@ export interface HmrConfig {
   port: number;
 }
 
+/**
+ * Offset added to MCP_PORT to derive the HMR port.
+ * When MCP_PORT is set (by Creature), both Vite and the SDK server
+ * can independently calculate the same HMR port without coordination.
+ */
+export const HMR_PORT_OFFSET = 1000;
+
 function findAvailablePort(startPort: number): Promise<number> {
   return new Promise((resolve) => {
     const server = createNetServer();
@@ -287,9 +294,14 @@ createRoot(document.getElementById("root")!).render(createElement(Page));
       isWatchMode = this.meta.watchMode === true;
       
       if (isWatchMode && !hmrServer) {
-        hmrPort = await findAvailablePort(preferredHmrPort);
+        // Derive HMR port from MCP_PORT when available (set by Creature).
+        // This allows the SDK server to know the HMR port immediately without
+        // waiting for hmr.json to be written, eliminating the race condition.
+        const mcpPort = process.env.MCP_PORT ? parseInt(process.env.MCP_PORT, 10) : null;
+        hmrPort = mcpPort ? mcpPort + HMR_PORT_OFFSET : await findAvailablePort(preferredHmrPort);
         startHmrServer(hmrPort);
         
+        // Still write hmr.json for non-Creature environments (manual npm run dev)
         mkdirSync(tempDir, { recursive: true });
         const hmrConfig: HmrConfig = { port: hmrPort };
         writeFileSync(

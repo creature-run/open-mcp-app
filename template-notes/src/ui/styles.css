@@ -268,7 +268,7 @@ body,
 ============================================================================= */
 
 .milkdown a {
-  color: var(--color-text-info);
+  color: var(--color-text-primary);
   text-decoration: underline;
   cursor: pointer;
 }
@@ -380,8 +380,8 @@ body,
 }
 
 .milkdown li[data-item-type="task"][data-checked="true"]::before {
-  background: var(--color-text-info);
-  border-color: var(--color-text-info);
+  background: var(--color-text-primary);
+  border-color: var(--color-text-primary);
 }
 
 .milkdown li[data-item-type="task"][data-checked="true"]::after {
@@ -475,7 +475,7 @@ body,
 ============================================================================= */
 
 .milkdown ::selection {
-  background: var(--color-text-info);
+  background: var(--color-text-primary);
   color: var(--color-background-primary);
 }
 
@@ -490,7 +490,7 @@ body,
 
 /* Selection highlight */
 .milkdown .ProseMirror-selectednode {
-  outline: 2px solid var(--color-text-info);
+  outline: 2px solid var(--color-text-primary);
   outline-offset: 2px;
 }
 
@@ -542,8 +542,8 @@ body,
 .back-button {
   background: transparent;
   border: none;
-  color: var(--color-text-info);
-  font-size: calc(var(--font-text-sm-size) * 1.5);
+  color: var(--color-text-primary);
+  font-size: var(--font-text-md-size);
   cursor: pointer;
   padding: 4px 8px;
   margin-right: 8px;
@@ -583,7 +583,7 @@ body,
 }
 
 .create-button {
-  background: var(--color-text-info);
+  background: var(--color-text-primary);
   color: var(--color-text-inverse);
   border: none;
   padding: 6px 12px;
@@ -615,7 +615,7 @@ body,
 }
 
 .search-input:focus {
-  border-color: var(--color-text-info);
+  border-color: var(--color-border-primary);
 }
 
 .search-input::placeholder {
@@ -675,7 +675,7 @@ body,
 }
 
 .create-button-large {
-  background: var(--color-text-info);
+  background: var(--color-text-primary);
   color: var(--color-text-inverse);
   border: none;
   padding: 12px 24px;

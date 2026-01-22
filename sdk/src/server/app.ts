@@ -21,7 +21,7 @@ import type {
   TransportSessionInfo,
 } from "./types.js";
 import { MIME_TYPES } from "./types.js";
-import { svgToDataUri, isInitializeRequest, injectHmrClient, readHmrConfig, htmlLoader } from "./utils.js";
+import { svgToDataUri, isInitializeRequest, injectHmrClient, readHmrConfig, htmlLoader, HMR_PORT_OFFSET } from "./utils.js";
 import { WebSocketManager } from "./websocket.js";
 import type { WebSocketConnection } from "./types.js";
 
@@ -888,10 +888,27 @@ export class App {
     };
   }
 
+  /**
+   * Get the HMR port for injecting the live reload client.
+   * 
+   * When MCP_PORT is set (by Creature), derives the HMR port deterministically
+   * as MCP_PORT + HMR_PORT_OFFSET. This eliminates the race condition where
+   * the hmr.json file might not exist yet when the server starts.
+   * 
+   * Falls back to reading hmr.json for non-Creature environments (manual npm run dev).
+   */
   private getHmrPort(): number | null {
     if (!this.isDev) return null;
     if (this.hmrPort !== null) return this.hmrPort;
     
+    // Derive from MCP_PORT when available (set by Creature)
+    const mcpPort = process.env.MCP_PORT ? parseInt(process.env.MCP_PORT, 10) : null;
+    if (mcpPort && !isNaN(mcpPort)) {
+      this.hmrPort = mcpPort + HMR_PORT_OFFSET;
+      return this.hmrPort;
+    }
+    
+    // Fallback to config file for non-Creature environments
     const hmrConfig = readHmrConfig();
     if (hmrConfig) {
       this.hmrPort = hmrConfig.port;
@@ -1433,6 +1450,9 @@ export class App {
 /**
  * Detect if a file path is within the SDK package.
  */
+/**
+ * Checks if a filename belongs to the SDK itself.
+ */
 function isSDKPath(filename: string): boolean {
   return (
     filename.includes("/public/sdk/") ||
@@ -1455,10 +1475,9 @@ function getCallerDirectory(): string {
   for (const frame of stack) {
     const filename = frame.getFileName();
     if (filename && !isSDKPath(filename)) {
-      if (filename.startsWith("file://")) {
-        return path.dirname(fileURLToPath(filename));
-      }
-      return path.dirname(filename);
+      return filename.startsWith("file://") 
+        ? path.dirname(fileURLToPath(filename))
+        : path.dirname(filename);
     }
   }
   return process.cwd();
