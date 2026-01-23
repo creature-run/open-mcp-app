@@ -31,8 +31,7 @@ const app = createApp({
   auth: { creatureManaged: true },
   instructions: `CRITICAL - Tab Behavior:
 - action:"create" → NEVER pass instanceId.
-- action:"save" → ALWAYS pass instanceId of the tab showing that note.
-- action:"open" → ONLY pass instanceId if user explicitly wants to replace current tab's content.
+- action:"read", "save", "open", "delete" → ALWAYS input instanceId of the tab showing that note.
 - MUST use "read" before "save" to avoid overwriting user edits.`,
 });
 
