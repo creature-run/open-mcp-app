@@ -73,6 +73,7 @@ export function useHost(config: UseHostConfig): UseHostReturn {
       callTool: client.callTool.bind(client),
       sendNotification: client.sendNotification.bind(client),
       setWidgetState: client.setWidgetState.bind(client),
+      setTitle: client.setTitle.bind(client),
       requestDisplayMode: client.requestDisplayMode.bind(client),
     }),
     [client]
@@ -143,6 +144,7 @@ export function useHost(config: UseHostConfig): UseHostReturn {
     callTool: boundMethods.callTool,
     sendNotification: boundMethods.sendNotification,
     setWidgetState: boundMethods.setWidgetState,
+    setTitle: boundMethods.setTitle,
     requestDisplayMode: boundMethods.requestDisplayMode,
     log,
   };

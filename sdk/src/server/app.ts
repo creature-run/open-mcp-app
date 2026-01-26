@@ -737,6 +737,12 @@ export class App {
           _meta: {
             ui: {
               multiInstance: config.multiInstance,
+              ...(config.icon && {
+                icon: {
+                  data: svgToDataUri(config.icon.svg),
+                  alt: config.icon.alt,
+                },
+              }),
             },
           },
         });
@@ -1175,6 +1181,12 @@ export class App {
           _meta: {
             ui: {
               multiInstance: config.multiInstance,
+              ...(config.icon && {
+                icon: {
+                  data: svgToDataUri(config.icon.svg),
+                  alt: config.icon.alt,
+                },
+              }),
             },
           },
         },

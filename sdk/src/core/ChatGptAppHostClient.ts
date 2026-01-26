@@ -164,6 +164,17 @@ export class ChatGptAppHostClient extends Subscribable implements HostClient {
   }
 
   /**
+   * Set the pip/widget title displayed in the host UI.
+   *
+   * No-op on ChatGPT — title updates are not supported.
+   *
+   * @param _title - The new title to display (ignored)
+   */
+  setTitle(_title: string): void {
+    // No-op on ChatGPT
+  }
+
+  /**
    * Log a message to the console.
    *
    * ChatGPT doesn't have a DevConsole, so logs go to browser console only.

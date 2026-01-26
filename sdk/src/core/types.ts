@@ -158,6 +158,19 @@ export interface HostClient {
   setWidgetState(state: WidgetState | null): void;
 
   /**
+   * Set the pip/widget title displayed in the host UI.
+   *
+   * Sends a notification to the host to update the title. This is useful
+   * for updating the title based on user actions (e.g., switching tabs)
+   * without making a tool call.
+   *
+   * Note: Creature-specific extension, no-op on ChatGPT Apps.
+   *
+   * @param title - The new title to display
+   */
+  setTitle(title: string): void;
+
+  /**
    * Request a display mode change from the host.
    *
    * The host may refuse or coerce the request (e.g., "pip" → "fullscreen" on mobile).

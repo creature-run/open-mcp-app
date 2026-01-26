@@ -77,6 +77,17 @@ export interface UseHostReturn {
   environment: Environment;
   widgetState: WidgetState | null;
   setWidgetState: (state: WidgetState | null) => void;
+  /**
+   * Set the pip/widget title displayed in the host UI.
+   *
+   * Useful for updating the title based on user actions (e.g., switching tabs)
+   * without making a tool call.
+   *
+   * Note: Creature-specific extension, no-op on ChatGPT Apps.
+   *
+   * @param title - The new title to display
+   */
+  setTitle: (title: string) => void;
   requestDisplayMode: (params: { mode: DisplayMode }) => Promise<{ mode: DisplayMode }>;
 
   /**

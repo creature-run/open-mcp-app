@@ -169,6 +169,21 @@ export class McpAppHostClient extends Subscribable implements HostClient {
     });
   }
 
+  /**
+   * Set the pip/widget title displayed in the host UI.
+   *
+   * Sends a notification to the host to update the title. This is useful
+   * for updating the title based on user actions (e.g., switching tabs)
+   * without making a tool call.
+   *
+   * Note: This is a Creature-specific extension, not part of the MCP Apps spec.
+   *
+   * @param title - The new title to display
+   */
+  setTitle(title: string): void {
+    this.sendNotification("ui/notifications/title-changed", { title });
+  }
+
   async requestDisplayMode(params: { mode: DisplayMode }): Promise<{ mode: DisplayMode }> {
     if (!this.app) {
       return { mode: params.mode };
