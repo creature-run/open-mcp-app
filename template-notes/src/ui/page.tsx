@@ -1,7 +1,12 @@
 /**
  * MCP Notes UI
  *
- * A notes app demonstrating multi-instance MCP Apps.
+ * A notes app demonstrating cross-platform multi-instance MCP Apps.
+ *
+ * Cross-Platform Compatibility:
+ * - Works in Creature (MCP Apps host)
+ * - Works in ChatGPT Apps
+ * - Works in any generic MCP Apps host
  *
  * Views:
  * - List view: Searchable list of all notes
@@ -9,7 +14,7 @@
  *
  * Features:
  * - Unified editor: edit markdown and see formatted preview in one view
- * - Saves via tool calls (compatible with ChatGPT Apps)
+ * - Saves via tool calls (compatible with all hosts)
  * - Auto-save on edit with debouncing
  * - Full markdown support via Milkdown
  *
@@ -17,14 +22,19 @@
  * - useToolResult: Receive note data from tool calls
  * - useHost: Connect to host, call tools, and persist widget state
  * - initStyles: Inject environment-specific CSS variable defaults
+ *
+ * The SDK automatically detects the host environment and provides a unified
+ * API that works across all platforms. Environment-specific features like
+ * logging to DevConsole (Creature) gracefully degrade on other hosts.
  */
 
 // MUST be first - injects environment-specific CSS variable defaults before CSS loads
 import { detectEnvironment, initStyles } from "@creature-ai/sdk/core";
-initStyles({ environment: detectEnvironment() });
+const environment = detectEnvironment();
+initStyles({ environment });
 
 import { useEffect, useCallback, useState, useRef, useMemo } from "react";
-import { useHost, useToolResult } from "@creature-ai/sdk/react";
+import { useHost, useToolResult, type Environment } from "@creature-ai/sdk/react";
 import MilkdownEditor, { type MilkdownEditorRef } from "./MilkdownEditor";
 import "./styles.css";
 
@@ -283,9 +293,35 @@ function EditorView({
 }
 
 // =============================================================================
+// Utilities
+// =============================================================================
+
+/**
+ * Get a human-readable label for the environment.
+ */
+function getEnvironmentLabel(env: Environment): string {
+  switch (env) {
+    case "chatgpt":
+      return "ChatGPT";
+    case "mcp-apps":
+      return "MCP Apps";
+    case "standalone":
+      return "Standalone";
+  }
+}
+
+// =============================================================================
 // Main Component
 // =============================================================================
 
+/**
+ * Main notes page component.
+ *
+ * The component works identically across all supported hosts:
+ * - Creature (MCP Apps): Full feature support including DevConsole logging
+ * - ChatGPT Apps: Core features work, logging falls back to console
+ * - Standalone: For development/testing outside a host
+ */
 export default function Page() {
   const [view, setView] = useState<ViewType>("editor");
   const [note, setNote] = useState<Note | null>(null);
@@ -311,8 +347,13 @@ export default function Page() {
 
   /**
    * Connect to host and get widget state for persistence.
+   *
+   * The SDK automatically detects the host environment:
+   * - In Creature/MCP Apps: Uses PostMessage protocol
+   * - In ChatGPT: Uses window.openai bridge
+   * - Standalone: Provides fallback behavior
    */
-  const { callTool, isReady, log, widgetState, setWidgetState } = useHost({
+  const { callTool, isReady, log, widgetState, setWidgetState, environment: hostEnvironment } = useHost({
     name: "mcp-template-notes",
     version: "0.1.0",
     onToolResult,
@@ -397,13 +438,14 @@ export default function Page() {
 
   /**
    * Log when connection is ready.
+   * On Creature, this appears in DevConsole. On ChatGPT, it goes to browser console.
    */
   useEffect(() => {
     if (isReady && !hasLoggedReady.current) {
       hasLoggedReady.current = true;
-      log.info("Notes app connected");
+      log.info("Notes app connected", { environment: hostEnvironment });
     }
-  }, [isReady, log]);
+  }, [isReady, log, hostEnvironment]);
 
   /**
    * Handle data from tool results.
@@ -528,6 +570,12 @@ export default function Page() {
   return (
     <div className="loading-container">
       <p>Loading...</p>
+      {/* Environment indicator - useful for development/debugging */}
+      {hostEnvironment === "standalone" && (
+        <div className="environment-badge" title="Running outside a host environment">
+          {getEnvironmentLabel(hostEnvironment)}
+        </div>
+      )}
     </div>
   );
 }

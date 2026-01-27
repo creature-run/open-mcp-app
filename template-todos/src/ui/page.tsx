@@ -1,7 +1,12 @@
 /**
  * MCP Todos UI
  *
- * A clean, interactive todo list demonstrating MCP Apps SDK patterns.
+ * A clean, interactive todo list demonstrating cross-platform MCP Apps.
+ *
+ * Cross-Platform Compatibility:
+ * - Works in Creature (MCP Apps host)
+ * - Works in ChatGPT Apps
+ * - Works in any generic MCP Apps host
  *
  * Features:
  * - Add, toggle, and delete todos
@@ -12,14 +17,19 @@
  * - useToolResult: Receive todo data from tool calls
  * - useHost: Connect to host, call tools, and persist widget state
  * - initStyles: Inject environment-specific CSS variable defaults
+ *
+ * The SDK automatically detects the host environment and provides a unified
+ * API that works across all platforms. Environment-specific features like
+ * logging to DevConsole (Creature) gracefully degrade on other hosts.
  */
 
 // MUST be first - injects environment-specific CSS variable defaults before CSS loads
 import { detectEnvironment, initStyles } from "@creature-ai/sdk/core";
-initStyles({ environment: detectEnvironment() });
+const environment = detectEnvironment();
+initStyles({ environment });
 
 import { useEffect, useCallback, useState, useRef, type FormEvent } from "react";
-import { useHost, useToolResult } from "@creature-ai/sdk/react";
+import { useHost, useToolResult, type Environment } from "@creature-ai/sdk/react";
 import "./styles.css";
 
 // =============================================================================
@@ -196,11 +206,30 @@ function AddTodoForm({ onAdd }: { onAdd: ({ text }: { text: string }) => Promise
 // =============================================================================
 
 /**
+ * Get a human-readable label for the environment.
+ */
+function getEnvironmentLabel(env: Environment): string {
+  switch (env) {
+    case "chatgpt":
+      return "ChatGPT";
+    case "mcp-apps":
+      return "MCP Apps";
+    case "standalone":
+      return "Standalone";
+  }
+}
+
+/**
  * Main todo list page component.
  *
  * Uses the MCP Apps SDK hooks:
  * - useToolResult: Receive data from tool calls
  * - useHost: Connect to host, call tools, log messages, and persist widget state
+ *
+ * The component works identically across all supported hosts:
+ * - Creature (MCP Apps): Full feature support including DevConsole logging
+ * - ChatGPT Apps: Core features work, logging falls back to console
+ * - Standalone: For development/testing outside a host
  */
 export default function Page() {
   const [todos, setTodos] = useState<Todo[]>([]);
@@ -209,10 +238,16 @@ export default function Page() {
 
   /**
    * Connect to host and get widget state for persistence.
+   *
+   * The SDK automatically detects the host environment:
+   * - In Creature/MCP Apps: Uses PostMessage protocol
+   * - In ChatGPT: Uses window.openai bridge
+   * - Standalone: Provides fallback behavior
+   *
    * widgetState is restored by the host on PIP refresh/popout.
    * setWidgetState persists data and notifies the host.
    */
-  const { callTool, isReady, log, widgetState, setWidgetState } = useHost({
+  const { callTool, isReady, log, widgetState, setWidgetState, environment: hostEnvironment } = useHost({
     name: "mcp-template-todos",
     version: "0.1.0",
     onToolResult,
@@ -223,13 +258,14 @@ export default function Page() {
 
   /**
    * Log when connection is ready.
+   * On Creature, this appears in DevConsole. On ChatGPT, it goes to browser console.
    */
   useEffect(() => {
     if (isReady && !hasLoggedReady.current) {
       hasLoggedReady.current = true;
-      log.info("Todo list connected");
+      log.info("Todo list connected", { environment: hostEnvironment });
     }
-  }, [isReady, log]);
+  }, [isReady, log, hostEnvironment]);
 
   /**
    * Restore todos from widget state on initial load.
@@ -345,6 +381,13 @@ export default function Page() {
         onToggle={handleToggle}
         onDelete={handleDelete}
       />
+
+      {/* Environment indicator - useful for development/debugging */}
+      {hostEnvironment === "standalone" && (
+        <div className="environment-badge" title="Running outside a host environment">
+          {getEnvironmentLabel(hostEnvironment)}
+        </div>
+      )}
     </div>
   );
 }

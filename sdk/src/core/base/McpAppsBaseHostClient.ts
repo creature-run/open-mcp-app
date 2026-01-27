@@ -1,19 +1,44 @@
-/**
- * Legacy MCP App Host Client
- *
- * @deprecated This file is kept for backward compatibility.
- * New code should import CreatureAdapter from "./providers/creature/CreatureAdapter.js"
- */
+import {
+  App,
+  PostMessageTransport,
+  applyDocumentTheme,
+  applyHostStyleVariables,
+  applyHostFonts,
+} from "@modelcontextprotocol/ext-apps";
+import { McpAppsSubscribable } from "./Subscribable.js";
+import type {
+  DisplayMode,
+  BaseHostClient,
+  HostClientConfig,
+  HostClientState,
+  LogLevel,
+  ToolResult,
+  WidgetState,
+  HostContext,
+} from "./types.js";
 
-<<<<<<< Updated upstream
+/**
+ * MCP Apps base host client implementation.
+ *
+ * Wraps the official MCP Apps SDK `App` class to provide a spec-compliant interface.
+ * Handles the protocol handshake, tool calls, notifications, and automatic style/theme application.
+ *
+ * This is the base implementation - Creature-specific extensions are added via CreatureAdapter.
+ */
+export class McpAppsBaseHostClient extends McpAppsSubscribable implements BaseHostClient {
+  // ============================================================================
+  // Private Properties
+  // ============================================================================
+
   private state: HostClientState = {
     isReady: false,
     environment: "mcp-apps",
     widgetState: null,
   };
-  private config: HostClientConfig;
-  private app: App | null = null;
+  protected config: HostClientConfig;
+  protected app: App | null = null;
   private connected = false;
+  private hostContext: HostContext | null = null;
 
   // ============================================================================
   // Constructor
@@ -33,6 +58,13 @@
    */
   getState(): HostClientState {
     return this.state;
+  }
+
+  /**
+   * Get the host context received during initialization.
+   */
+  getHostContext(): HostContext | null {
+    return this.hostContext;
   }
 
   /**
@@ -80,10 +112,6 @@
    *
    * Uses the SDK's callServerTool method which properly routes through
    * the host to the MCP server.
-   *
-   * @param toolName - Name of the tool to call
-   * @param args - Arguments to pass to the tool
-   * @returns Tool result with content and structuredContent
    */
   async callTool<T = Record<string, unknown>>(
     toolName: string,
@@ -111,18 +139,14 @@
   /**
    * Send a notification to the host.
    *
-   * Sends a notification via the ext-apps SDK transport. Can be used for both
-   * spec-compliant and custom (Creature-specific) notifications.
-   *
-   * @param method - Notification method name
-   * @param params - Notification parameters
+   * Sends a notification via the ext-apps SDK transport.
    */
   sendNotification(method: string, params: unknown): void {
     if (!this.app) {
       console.warn(`[${this.config.name}] Cannot send notification before connection`);
       return;
     }
-    // Type assertion needed for Creature-specific extensions not in the MCP Apps spec
+    // Type assertion needed for notifications not in the official MCP Apps spec
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     this.app.notification({ method, params } as any);
   }
@@ -132,11 +156,6 @@
    *
    * Widget state is synchronized with the host for persistence across
    * sessions and visibility to the AI model.
-   *
-   * Note: This is a Creature-specific extension, not part of the MCP Apps spec.
-   * The host should handle `ui/notifications/widget-state-changed` notifications.
-   *
-   * @param state - New widget state (or null to clear)
    */
   setWidgetState(state: WidgetState | null): void {
     this.setState({ widgetState: state });
@@ -147,6 +166,9 @@
     });
   }
 
+  /**
+   * Request a display mode change from the host.
+   */
   async requestDisplayMode(params: { mode: DisplayMode }): Promise<{ mode: DisplayMode }> {
     if (!this.app) {
       return { mode: params.mode };
@@ -162,10 +184,6 @@
    * Uses the MCP protocol's `notifications/message` notification to send logs
    * to the host. Logs appear in the unified DevConsole alongside server logs,
    * with appropriate color coding based on level.
-   *
-   * @param level - Log severity level (debug, info, notice, warning, error)
-   * @param message - Log message
-   * @param data - Optional structured data to include with the log
    */
   log(level: LogLevel, message: string, data?: Record<string, unknown>): void {
     if (!this.app) {
@@ -181,6 +199,13 @@
     });
   }
 
+  /**
+   * Get the underlying App instance for advanced use cases.
+   */
+  getApp(): App | null {
+    return this.app;
+  }
+
   // ============================================================================
   // Private Methods
   // ============================================================================
@@ -188,7 +213,7 @@
   /**
    * Update internal state and notify listeners.
    */
-  private setState(partial: Partial<HostClientState>): void {
+  protected setState(partial: Partial<HostClientState>): void {
     const prev = this.state;
     this.state = { ...this.state, ...partial };
     this.notifyStateChange(this.state, prev);
@@ -209,8 +234,8 @@
     };
 
     this.app.ontoolresult = (params) => {
-      console.log(`[McpAppHostClient] ontoolresult called`, { 
-        isError: params.isError, 
+      console.log(`[McpAppsBaseHostClient] ontoolresult called`, {
+        isError: params.isError,
         source: params.source,
         hasContent: !!params.content,
         hasStructuredContent: !!params.structuredContent,
@@ -224,7 +249,7 @@
         source: params.source as "agent" | "ui",
       };
 
-      console.log(`[McpAppHostClient] Emitting tool-result event`, result);
+      console.log(`[McpAppsBaseHostClient] Emitting tool-result event`, result);
       this.emit("tool-result", result);
     };
 
@@ -235,7 +260,7 @@
 
     this.app.onteardown = async (_params, _extra) => {
       console.debug(`[${this.config.name}] Teardown requested`);
-      await this.emit("teardown");
+      await this.emitMcpEvent("teardown");
       return {};
     };
   }
@@ -259,6 +284,7 @@
       console.debug(`[${this.config.name}] Connected to host`, { theme: hostContext?.theme });
 
       if (hostContext) {
+        this.hostContext = hostContext as HostContext;
         this.applyHostContext(hostContext);
 
         // Restore widget state if provided by host
@@ -277,16 +303,15 @@
 
   /**
    * Apply theme, styles, and fonts from host context.
-   * Also applies Creature-specific extension styles if present.
+   * Subclasses can override to add additional context handling.
    */
-  private applyHostContext(context: {
+  protected applyHostContext(context: {
     theme?: unknown;
     styles?: { variables?: unknown; css?: { fonts?: string } };
-    creatureStyles?: Record<string, string | undefined>;
   }): void {
     if (context.theme) {
       applyDocumentTheme(context.theme as Parameters<typeof applyDocumentTheme>[0]);
-      this.emit("theme-change", context.theme as "light" | "dark");
+      this.emitMcpEvent("theme-change", context.theme as "light" | "dark");
     }
 
     if (context.styles?.variables) {
@@ -295,24 +320,6 @@
 
     if (context.styles?.css?.fonts) {
       applyHostFonts(context.styles.css.fonts);
-    }
-
-    // Apply Creature-specific extension styles (outside the validated schema path)
-    if (context.creatureStyles) {
-      this.applyCreatureStyles(context.creatureStyles);
-    }
-  }
-
-  /**
-   * Apply Creature-specific CSS variables to the document root.
-   * These are host extensions sent outside the spec-validated styles.variables path.
-   */
-  private applyCreatureStyles(styles: Record<string, string | undefined>): void {
-    const root = document.documentElement;
-    for (const [key, value] of Object.entries(styles)) {
-      if (value !== undefined) {
-        root.style.setProperty(key, value);
-      }
     }
   }
 
@@ -328,6 +335,3 @@
       .map((item) => ({ type: item.type, text: item.text }));
   }
 }
-=======
-export { CreatureAdapter as McpAppHostClient } from "./providers/creature/CreatureAdapter.js";
->>>>>>> Stashed changes

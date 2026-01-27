@@ -1,53 +1,31 @@
 /**
- * Core types for the MCP SDK.
+ * Base Host Client Types
  *
- * This file re-exports types from the new architecture for backward compatibility.
- * New code should import from the specific modules.
+ * These types define the spec-compliant interface for MCP Apps and ChatGPT Apps.
+ * Host-specific extensions are defined in their respective adapter modules.
  */
-
-// Re-export all base types
-export type {
-  Environment,
-  DisplayMode,
-  LogLevel,
-  StructuredWidgetState,
-  WidgetState,
-  ToolResult,
-  HostContext,
-  HostClientConfig,
-  HostClientState,
-  BaseHostClientEvents,
-  McpAppsHostClientEvents,
-  StateListener,
-  BaseHostClient,
-  WebSocketStatus,
-  WebSocketClientConfig,
-  WebSocketClient,
-} from "./base/types.js";
-
-// Re-export adapter types
-export type {
-  AdapterKind,
-  HostAdapter,
-  UnifiedHostClient,
-  UnifiedHostClientEvents,
-} from "./providers/types.js";
 
 // ============================================================================
-// Backward Compatibility Aliases
+// Environment & Logging
 // ============================================================================
 
-import type { UnifiedHostClient, UnifiedHostClientEvents } from "./providers/types.js";
+/**
+ * Environment types for host detection.
+ */
+export type Environment = "chatgpt" | "mcp-apps" | "standalone";
 
 /**
- * @deprecated Use UnifiedHostClient instead
+ * Display modes for UI resources.
+ * - "inline": Embedded within the conversation flow
+ * - "pip": Picture-in-picture floating panel
+ * - "fullscreen": Full-screen overlay
  */
-export type HostClient = UnifiedHostClient;
+export type DisplayMode = "inline" | "pip" | "fullscreen";
 
 /**
- * @deprecated Use UnifiedHostClientEvents instead
+ * Log severity levels matching MCP protocol LoggingLevel.
+ * These are displayed in the host's DevConsole with appropriate colors.
  */
-<<<<<<< Updated upstream
 export type LogLevel = "debug" | "info" | "notice" | "warning" | "error";
 
 // ============================================================================
@@ -93,7 +71,7 @@ export interface ToolResult<T = Record<string, unknown>> {
 
 /**
  * Host context sent from MCP Apps host.
- * Follows MCP Apps spec with Creature extensions via [key: string]: unknown.
+ * Follows MCP Apps spec with extensions via [key: string]: unknown.
  */
 export interface HostContext {
   theme?: "light" | "dark";
@@ -106,13 +84,17 @@ export interface HostContext {
   platform?: string;
   /**
    * Widget state restored from previous widget instance.
-   * Creature extension - passed via hostContext on ui/initialize.
+   * Supported on both MCP Apps and ChatGPT.
    */
   widgetState?: WidgetState;
+  /**
+   * Allow additional host-specific properties.
+   */
+  [key: string]: unknown;
 }
 
 // ============================================================================
-// Host Client
+// Base Host Client
 // ============================================================================
 
 /**
@@ -138,19 +120,27 @@ export interface HostClientState {
 }
 
 /**
- * Event handlers that can be registered on the host client.
+ * Base event handlers supported by all host clients.
+ * These are spec-compliant events that work across platforms.
  */
-export interface HostClientEvents {
+export interface BaseHostClientEvents {
   /** Called when tool input is received (before execution) */
   "tool-input": (args: Record<string, unknown>) => void;
   /** Called when tool result is received */
   "tool-result": (result: ToolResult) => void;
+  /** Called when widget state changes (restored or updated) */
+  "widget-state-change": (widgetState: WidgetState | null) => void;
+}
+
+/**
+ * Extended event handlers for MCP Apps hosts.
+ * These are MCP-specific events not available on ChatGPT.
+ */
+export interface McpAppsHostClientEvents extends BaseHostClientEvents {
   /** Called when theme changes (MCP Apps only) */
   "theme-change": (theme: "light" | "dark") => void;
   /** Called when host requests teardown (MCP Apps only) */
   teardown: () => Promise<void> | void;
-  /** Called when widget state changes (restored or updated) */
-  "widget-state-change": (widgetState: WidgetState | null) => void;
 }
 
 /**
@@ -159,10 +149,10 @@ export interface HostClientEvents {
 export type StateListener = (state: HostClientState, prevState: HostClientState) => void;
 
 /**
- * Host client interface.
- * Implemented by McpAppHostClient and ChatGptAppHostClient.
+ * Base host client interface.
+ * Contains only spec-compliant methods that work across all platforms.
  */
-export interface HostClient {
+export interface BaseHostClient {
   /** Get current state */
   getState(): HostClientState;
 
@@ -175,9 +165,6 @@ export interface HostClient {
     args: Record<string, unknown>
   ): Promise<ToolResult<T>>;
 
-  /** Send a notification to the host (MCP Apps only, no-op on ChatGPT) */
-  sendNotification(method: string, params: unknown): void;
-
   /** Set widget state */
   setWidgetState(state: WidgetState | null): void;
 
@@ -187,28 +174,22 @@ export interface HostClient {
    * The host may refuse or coerce the request (e.g., "pip" → "fullscreen" on mobile).
    * Always check `availableDisplayModes` in host context before calling, and handle
    * the returned mode differing from the requested mode.
-   *
-   * @param params - Object containing the requested display mode
-   * @returns Promise resolving to the actual display mode granted by the host
    */
   requestDisplayMode(params: { mode: DisplayMode }): Promise<{ mode: DisplayMode }>;
 
   /**
-   * Send a log message to the host's DevConsole.
+   * Send a log message.
    *
-   * Logs are sent via the MCP protocol's `notifications/message` notification
+   * On MCP Apps hosts, logs are sent via the MCP protocol's `notifications/message`
    * and displayed in the host's unified log viewer alongside server logs.
-   *
-   * @param level - Log severity level
-   * @param message - Log message
-   * @param data - Optional structured data to include
+   * On ChatGPT, logs go to browser console only.
    */
   log(level: LogLevel, message: string, data?: Record<string, unknown>): void;
 
   /** Register an event handler. Returns unsubscribe function. */
-  on<K extends keyof HostClientEvents>(
+  on<K extends keyof BaseHostClientEvents>(
     event: K,
-    handler: HostClientEvents[K]
+    handler: BaseHostClientEvents[K]
   ): () => void;
 
   /** Start listening for host messages */
@@ -219,7 +200,7 @@ export interface HostClient {
 }
 
 // ============================================================================
-// WebSocket
+// WebSocket (optional, Creature-specific)
 // ============================================================================
 
 /**
@@ -256,6 +237,3 @@ export interface WebSocketClient<TSend = unknown, TReceive = unknown> {
   /** Send a message to the server */
   send(message: TSend): void;
 }
-=======
-export type HostClientEvents = UnifiedHostClientEvents;
->>>>>>> Stashed changes

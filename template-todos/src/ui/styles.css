@@ -272,3 +272,19 @@ body,
 .todo-list::-webkit-scrollbar-thumb:hover {
   background: var(--color-border-secondary);
 }
+
+/* =============================================================================
+   Environment Badge (Development)
+============================================================================= */
+
+.environment-badge {
+  position: fixed;
+  bottom: 8px;
+  right: 8px;
+  padding: 4px 8px;
+  background: var(--color-background-tertiary);
+  color: var(--color-text-secondary);
+  font-size: var(--font-text-xs-size);
+  border-radius: var(--border-radius-sm);
+  opacity: 0.7;
+}

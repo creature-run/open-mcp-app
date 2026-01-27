@@ -3,6 +3,11 @@
  *
  * Shared helper functions used by note tools.
  * Handles ID generation, authentication, and store creation.
+ *
+ * Cross-Platform Support:
+ * - Creature (MCP Apps): Uses creatureToken for user identity and cloud storage
+ * - ChatGPT Apps: Uses OAuth token (via creatureToken) for identity
+ * - Generic MCP Apps: Falls back to local/anonymous storage (instanceId-scoped)
  */
 
 import { getIdentity } from "@creature-ai/sdk/server";
@@ -35,37 +40,51 @@ export const getAllNotes = async (store: DataStore<Note>): Promise<Note[]> => {
 };
 
 // =============================================================================
-// Authentication
+// Authentication & Scope
 // =============================================================================
 
 /**
- * Extract scope from Creature identity token.
- * Returns orgId and optionally projectId for data isolation.
- * 
- * - Creature with project: Returns { orgId, projectId }
- * - ChatGPT/OAuth: Returns { orgId } only (org-level data via personal org)
- * 
- * Throws if token is missing or invalid.
+ * Extract scope from authentication context.
+ *
+ * Supports multiple authentication modes:
+ * 1. Creature with project: Returns { orgId, projectId } for cloud storage
+ * 2. ChatGPT/OAuth: Returns { orgId } for org-level cloud storage
+ * 3. Anonymous/Local: Returns { localId } for local/session storage
+ *
+ * @param creatureToken - Token from Creature or OAuth bearer token
+ * @param instanceId - Instance ID for fallback local scope
+ * @returns DataScope for store creation
  */
-export const extractScope = async (creatureToken?: string): Promise<DataScope> => {
-  if (!creatureToken) {
-    throw new Error("Authentication required: No Creature token provided");
+export const extractScope = async (
+  creatureToken?: string,
+  instanceId?: string
+): Promise<DataScope> => {
+  // If we have a token, try to get identity for cloud storage
+  if (creatureToken) {
+    try {
+      const identity = await getIdentity(creatureToken);
+
+      if (identity.organization) {
+        return {
+          orgId: identity.organization.id,
+          projectId: identity.project?.id,
+        };
+      }
+    } catch (err) {
+      // Token invalid or API unavailable - fall through to local mode
+      console.warn("[Notes] Failed to get identity, using local storage:", err);
+    }
   }
 
-  const identity = await getIdentity(creatureToken);
-
-  if (!identity.organization) {
-    throw new Error("Authentication required: No organization context");
-  }
-
+  // Fall back to local/anonymous mode using a stable local ID
+  // This allows the app to work in generic MCP Apps hosts without auth
   return {
-    orgId: identity.organization.id,
-    projectId: identity.project?.id,
+    localId: instanceId || "anonymous",
   };
 };
 
 /**
- * Create a scoped note store based on identity.
+ * Create a scoped note store based on scope.
  */
 export const createNoteStore = (scope: DataScope): DataStore<Note> => {
   return createDataStore<Note>({
@@ -75,25 +94,17 @@ export const createNoteStore = (scope: DataScope): DataStore<Note> => {
 };
 
 /**
- * Handle authentication and return store, or return error result.
+ * Handle authentication and return store.
  * Wraps tool handlers with auth logic to reduce boilerplate.
+ *
+ * Unlike previous versions, this no longer fails if auth is unavailable.
+ * Instead, it falls back to local storage mode for generic MCP Apps hosts.
  */
 export const withAuth = async (
   context: ToolContext,
   handler: (store: DataStore<Note>) => Promise<ToolResult>
 ): Promise<ToolResult> => {
-  let scope: DataScope;
-  try {
-    scope = await extractScope(context.creatureToken);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Authentication failed";
-    return {
-      data: { error: message },
-      text: message,
-      isError: true,
-    };
-  }
-
+  const scope = await extractScope(context.creatureToken, context.instanceId);
   const store = createNoteStore(scope);
   return handler(store);
 };

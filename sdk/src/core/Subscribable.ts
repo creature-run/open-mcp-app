@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 import type { HostClientState, HostClientEvents, StateListener } from "./types.js";
 
 type EventHandler = HostClientEvents[keyof HostClientEvents];
@@ -52,3 +53,9 @@ export abstract class Subscribable {
   protected onSubscribe(): void {}
   protected onUnsubscribe(): void {}
 }
+=======
+/**
+ * @deprecated Import from "./base/Subscribable.js" instead
+ */
+export { Subscribable, McpAppsSubscribable } from "./base/Subscribable.js";
+>>>>>>> Stashed changes

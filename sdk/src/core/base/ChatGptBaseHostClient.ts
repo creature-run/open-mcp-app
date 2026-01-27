@@ -1,20 +1,60 @@
-/**
- * Legacy ChatGPT App Host Client
- *
- * @deprecated This file is kept for backward compatibility.
- * New code should import ChatGptAdapter from "./providers/chatgpt/ChatGptAdapter.js"
- */
+import { Subscribable } from "./Subscribable.js";
+import type {
+  DisplayMode,
+  BaseHostClient,
+  HostClientConfig,
+  HostClientState,
+  LogLevel,
+  ToolResult,
+  WidgetState,
+} from "./types.js";
 
-<<<<<<< Updated upstream
+/**
+ * OpenAI bridge interface exposed by ChatGPT Apps SDK.
+ * Available on `window.openai` when running inside ChatGPT.
+ */
+interface OpenAIBridge {
+  toolOutput?: Record<string, unknown>;
+  widgetState?: WidgetState;
+  setWidgetState?: (state: WidgetState) => void;
+  callTool?: (
+    name: string,
+    args: Record<string, unknown>
+  ) => Promise<{
+    structuredContent?: Record<string, unknown>;
+    content?: Array<{ type: string; text?: string }>;
+  }>;
+  requestDisplayMode?: (args: { mode: string }) => Promise<{ mode: string }>;
+}
+
+declare global {
+  interface Window {
+    openai?: OpenAIBridge;
+  }
+}
+
+/**
+ * ChatGPT Apps base host client implementation.
+ *
+ * Bridges the ChatGPT Apps SDK (`window.openai`) to provide a spec-compliant interface.
+ * Handles initial data processing, globals updates, and widget state synchronization.
+ */
+export class ChatGptBaseHostClient extends Subscribable implements BaseHostClient {
+  // ============================================================================
+  // Private Properties
+  // ============================================================================
+
   private state: HostClientState = {
     isReady: false,
     environment: "chatgpt",
     widgetState: null,
   };
-  private config: HostClientConfig;
+  protected config: HostClientConfig;
   private connected = false;
   private hasProcessedInitialData = false;
   private globalsHandler: ((event: Event) => void) | null = null;
+  private lastToolOutputJson: string | null = null;
+  private lastWidgetStateJson: string | null = null;
 
   // ============================================================================
   // Constructor
@@ -53,7 +93,7 @@
   /**
    * Disconnect from the host.
    *
-   * Removes the globals event listener.
+   * Removes the globals event listener and cleanup.
    */
   disconnect(): void {
     if (!this.connected) return;
@@ -67,10 +107,6 @@
 
   /**
    * Call a tool on the MCP server via the ChatGPT bridge.
-   *
-   * @param toolName - Name of the tool to call
-   * @param args - Arguments to pass to the tool
-   * @returns Tool result with content and structuredContent
    */
   async callTool<T = Record<string, unknown>>(
     toolName: string,
@@ -98,18 +134,7 @@
   }
 
   /**
-   * Send a notification to the host.
-   *
-   * No-op on ChatGPT — notifications are not supported.
-   */
-  sendNotification(_method: string, _params: unknown): void {
-    // No-op on ChatGPT
-  }
-
-  /**
    * Set widget state and sync with the ChatGPT host.
-   *
-   * @param state - New widget state (or null to clear)
    */
   setWidgetState(state: WidgetState | null): void {
     this.setState({ widgetState: state });
@@ -126,15 +151,24 @@
    * Log a message to the console.
    *
    * ChatGPT doesn't have a DevConsole, so logs go to browser console only.
-   * This provides API parity with McpAppHostClient.
-   *
-   * @param level - Log severity level
-   * @param message - Log message
-   * @param data - Optional structured data
    */
   log(level: LogLevel, message: string, data?: Record<string, unknown>): void {
     const consoleMethod = level === "error" ? "error" : level === "warning" ? "warn" : "log";
     console[consoleMethod](`[${this.config.name}]`, message, data ?? "");
+  }
+
+  /**
+   * Request a display mode change from the ChatGPT host.
+   */
+  async requestDisplayMode(params: { mode: DisplayMode }): Promise<{ mode: DisplayMode }> {
+    const openai = window.openai;
+
+    if (openai?.requestDisplayMode) {
+      const result = await openai.requestDisplayMode({ mode: params.mode });
+      return { mode: result.mode as DisplayMode };
+    }
+
+    return { mode: params.mode };
   }
 
   // ============================================================================
@@ -144,7 +178,7 @@
   /**
    * Update internal state and notify listeners.
    */
-  private setState(partial: Partial<HostClientState>): void {
+  protected setState(partial: Partial<HostClientState>): void {
     const prev = this.state;
     this.state = { ...this.state, ...partial };
     this.notifyStateChange(this.state, prev);
@@ -183,7 +217,8 @@
    * Set up listener for `openai:set_globals` events.
    *
    * ChatGPT dispatches this event when tool output or widget state
-   * changes after initial load.
+   * changes after initial load. Uses JSON comparison to prevent
+   * infinite loops from unchanged data.
    */
   private setupGlobalsListener(): void {
     this.globalsHandler = (event: Event) => {
@@ -196,36 +231,24 @@
       const globals = customEvent.detail?.globals;
 
       if (globals?.toolOutput) {
-        this.emit("tool-input", globals.toolOutput);
-        this.emit("tool-result", { structuredContent: globals.toolOutput });
+        const toolOutputJson = JSON.stringify(globals.toolOutput);
+        if (toolOutputJson !== this.lastToolOutputJson) {
+          this.lastToolOutputJson = toolOutputJson;
+          this.emit("tool-input", globals.toolOutput);
+          this.emit("tool-result", { structuredContent: globals.toolOutput });
+        }
       }
 
       if (globals?.widgetState !== undefined) {
-        this.setState({ widgetState: globals.widgetState });
-        this.emit("widget-state-change", globals.widgetState);
+        const widgetStateJson = JSON.stringify(globals.widgetState);
+        if (widgetStateJson !== this.lastWidgetStateJson) {
+          this.lastWidgetStateJson = widgetStateJson;
+          this.setState({ widgetState: globals.widgetState });
+          this.emit("widget-state-change", globals.widgetState);
+        }
       }
     };
 
     window.addEventListener("openai:set_globals", this.globalsHandler, { passive: true });
   }
-
-  /**
-   * Request a display mode change from the ChatGPT host.
-   *
-   * @param params - Display mode to request
-   * @returns The resulting display mode
-   */
-  async requestDisplayMode(params: { mode: DisplayMode }): Promise<{ mode: DisplayMode }> {
-    const openai = window.openai;
-
-    if (openai?.requestDisplayMode) {
-      const result = await openai.requestDisplayMode({ mode: params.mode });
-      return { mode: result.mode as DisplayMode };
-    }
-
-    return { mode: params.mode };
-  }
 }
-=======
-export { ChatGptAdapter as ChatGptAppHostClient } from "./providers/chatgpt/ChatGptAdapter.js";
->>>>>>> Stashed changes

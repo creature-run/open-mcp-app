@@ -35,6 +35,8 @@ import type { WebSocketConnection } from "./types.js";
  */
 interface RequestContext {
   authorizationHeader?: string;
+  /** Creature token extracted from raw request before MCP SDK validation */
+  creatureToken?: string;
 }
 
 /**
@@ -829,10 +831,11 @@ export class App {
           type: "object",
           properties,
           ...(required.length > 0 && { required }),
+          additionalProperties: true, // Allow _creatureToken and other injected args
         };
       }
     }
-    return { type: "object" };
+    return { type: "object", additionalProperties: true };
   }
 
   /**
@@ -1022,8 +1025,15 @@ export class App {
     const transportSessionId = req.headers["mcp-session-id"] as string | undefined;
     const authorizationHeader = req.headers["authorization"] as string | undefined;
 
+    // Extract Creature token from raw request body BEFORE MCP SDK validation strips it
+    // This handles tools/call requests where _creatureToken is in params.arguments
+    let creatureToken: string | undefined;
+    if (req.body?.method === "tools/call" && req.body?.params?.arguments?._creatureToken) {
+      creatureToken = req.body.params.arguments._creatureToken;
+    }
+
     // Run MCP handling within request context so tool handlers can access auth
-    const context: RequestContext = { authorizationHeader };
+    const context: RequestContext = { authorizationHeader, creatureToken };
 
     await requestContextStorage.run(context, async () => {
       try {
@@ -1230,11 +1240,12 @@ export class App {
         },
         async (args: Record<string, unknown>) => {
           try {
-            // Extract Creature token from args (injected by Creature host)
-            // or from Authorization header (OAuth bearer token from ChatGPT/other hosts)
-            let creatureToken = args._creatureToken as string | undefined;
+            // Get request context which stores the raw creatureToken extracted before MCP SDK validation
+            const reqContext = requestContextStorage.getStore();
+            
+            // Try to get token from: 1) Context (extracted before validation), 2) Args (if passthrough worked), 3) Auth header
+            let creatureToken = reqContext?.creatureToken || (args._creatureToken as string | undefined);
             if (!creatureToken) {
-              const reqContext = requestContextStorage.getStore();
               creatureToken = extractBearerToken(reqContext?.authorizationHeader);
             }
             const { _creatureToken: _, ...cleanArgs } = args;
@@ -1430,12 +1441,25 @@ export class App {
 /**
  * Detect if a file path is within the SDK package.
  */
+<<<<<<< Updated upstream
+=======
+/**
+ * Checks if a filename belongs to the SDK itself.
+ * Matches various SDK installation patterns:
+ * - Published: node_modules/@creature-ai/sdk/
+ * - Local development: desktop/artifacts/sdk/
+ * - Public SDK: public/sdk/
+ */
+>>>>>>> Stashed changes
 function isSDKPath(filename: string): boolean {
   return (
     filename.includes("/public/sdk/") ||
     filename.includes("\\public\\sdk\\") ||
     filename.includes("/@creature-ai/sdk/") ||
-    filename.includes("\\@creature-ai\\sdk\\")
+    filename.includes("\\@creature-ai\\sdk\\") ||
+    // Local SDK development paths
+    filename.includes("/artifacts/sdk/") ||
+    filename.includes("\\artifacts\\sdk\\")
   );
 }
 

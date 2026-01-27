@@ -1,6 +1,6 @@
 import { useSyncExternalStore, useEffect, useRef, useMemo } from "react";
 import { createHost, detectEnvironment } from "../core/index.js";
-import type { HostClient, Environment } from "../core/index.js";
+import type { UnifiedHostClient, Environment } from "../core/index.js";
 import type { UseHostConfig, UseHostReturn, Logger } from "./types.js";
 
 export { detectEnvironment };
@@ -31,7 +31,7 @@ export type { Environment };
  * ```
  */
 export function useHost(config: UseHostConfig): UseHostReturn {
-  const clientRef = useRef<HostClient | null>(null);
+  const clientRef = useRef<UnifiedHostClient | null>(null);
 
   if (!clientRef.current) {
     clientRef.current = createHost({ name: config.name, version: config.version });
