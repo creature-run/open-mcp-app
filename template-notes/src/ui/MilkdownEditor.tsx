@@ -79,6 +79,9 @@ const MilkdownEditorInner = ({
 }: MilkdownEditorInnerProps) => {
   /** Track current content for getContent */
   const currentContentRef = useRef(defaultValue);
+  
+  /** Ref to the wrapper element for click handling */
+  const wrapperRef = useRef<HTMLDivElement>(null);
 
   const { get } = useEditor((root) =>
     Editor.make()
@@ -130,12 +133,29 @@ const MilkdownEditorInner = ({
     return currentContentRef.current;
   }, []);
 
+  /**
+   * Handle clicks on the wrapper to focus the editor.
+   * This allows clicking anywhere in the content area (even when empty)
+   * to start editing, not just on the text itself.
+   */
+  const handleWrapperClick = useCallback(() => {
+    const editorEl = wrapperRef.current?.querySelector('.ProseMirror');
+    if (editorEl instanceof HTMLElement) {
+      editorEl.focus();
+    }
+  }, []);
+
   // Expose functions to parent via refs
   setContentRef.current = setContent;
   getContentRef.current = getContent;
 
   return (
-    <div className="milkdown-wrapper" data-placeholder={placeholder}>
+    <div 
+      ref={wrapperRef}
+      className="milkdown-wrapper" 
+      data-placeholder={placeholder}
+      onClick={handleWrapperClick}
+    >
       <Milkdown />
     </div>
   );

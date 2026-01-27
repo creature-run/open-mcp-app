@@ -1,6 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
-import { generateHmrClientScriptTag, type HmrConfig } from "../vite/index.js";
+import { generateHmrClientScriptTag, HMR_PORT_OFFSET, type HmrConfig } from "../vite/index.js";
+
+export { HMR_PORT_OFFSET };
 
 export function svgToDataUri(svg: string): string {
   const base64 = Buffer.from(svg).toString("base64");
@@ -81,7 +83,6 @@ export function loadHtml(filePath: string, basePath?: string): string {
     }
   }
 
-  console.error(`[SDK] HTML file not found. Searched:\n  - ${uniquePaths.join("\n  - ")}`);
   return `<!DOCTYPE html>
 <html><body>
 <h1>Error: UI not found</h1>

@@ -49,7 +49,7 @@ const NotesSchema = z.object({
   instanceId: z
     .string()
     .optional()
-    .describe("Tab instance ID. NEVER pass for 'create' action. ALWAYS pass for 'save' action. For 'open', only pass to replace current tab."),
+    .describe("PIP Tab instance ID. NEVER pass for 'create'. IF you already have a PIP tab open for one or mulitple noteIds,ALWAYS pass the instanceId of the PIP tab for that noteId into the 'read', 'save', 'open', 'delete' actions to target existing tab showing that note."),
 });
 
 type NotesInput = z.infer<typeof NotesSchema>;
