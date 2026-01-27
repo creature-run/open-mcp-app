@@ -224,32 +224,3 @@ export type { Theme, InitStylesOptions } from "./styles.js";
 // ============================================================================
 
 export { createWebSocket } from "./websocket.js";
-
-// ============================================================================
-// Backward Compatibility
-// ============================================================================
-
-// Import types needed for aliases
-import type { UnifiedHostClient as _UnifiedHostClient, UnifiedHostClientEvents as _UnifiedHostClientEvents } from "./providers/types.js";
-
-/**
- * @deprecated Use UnifiedHostClient instead
- */
-export type HostClient = _UnifiedHostClient;
-
-/**
- * @deprecated Use UnifiedHostClientEvents instead
- */
-export type HostClientEvents = _UnifiedHostClientEvents;
-
-/**
- * Legacy export - McpAppHostClient is now McpAppsAdapter
- * @deprecated Use McpAppsAdapter or CreatureAdapter instead
- */
-export { McpAppsAdapter as McpAppHostClient } from "./providers/index.js";
-
-/**
- * Legacy export - ChatGptAppHostClient is now ChatGptAdapter
- * @deprecated Use ChatGptAdapter instead
- */
-export { ChatGptAdapter as ChatGptAppHostClient } from "./providers/index.js";

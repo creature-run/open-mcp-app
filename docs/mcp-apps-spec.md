@@ -231,8 +231,6 @@ The Creature SDK provides abstractions for building cross-platform MCP Apps:
 | `UpgradingMcpAppsClient` | ✅ | Default MCP Apps client (detects Creature via `hostContext.userAgent`) |
 | `ChatGptAdapter` | ✅ | ChatGPT Apps SDK bridge (explicit adapter) |
 | `CreatureAdapter` | ✅ | Creature-specific extensions (for MCP Apps hosts that are Creature) |
-| `McpAppHostClient` | ✅ | Deprecated alias for `McpAppsAdapter` |
-| `ChatGptAppHostClient` | ✅ | Deprecated alias for `ChatGptAdapter` |
 | `detectEnvironment()` | ✅ | Runtime environment detection |
 | `createWebSocket()` | ✅ | WebSocket client |
 | `host.callTool()` | ✅ | Call tools from UI |

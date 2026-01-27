@@ -944,9 +944,6 @@ import type {
   WebSocketStatus,
   WebSocketClient,
   WebSocketClientConfig,
-  // Legacy (deprecated)
-  HostClient,
-  HostClientEvents,
 } from "@creature-ai/sdk/core";
 ```
 

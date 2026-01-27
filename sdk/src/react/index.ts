@@ -21,7 +21,7 @@ export type {
   WebSocketStatus,
 } from "./types.js";
 
-// New adapter-based exports
+// Adapter-based exports
 export {
   createHost,
   createHostAsync,
@@ -42,13 +42,10 @@ export {
   applyHostFonts,
   getDocumentTheme,
   createWebSocket,
-  // Legacy aliases (deprecated)
-  McpAppHostClient,
-  ChatGptAppHostClient,
 } from "../core/index.js";
 
 export type {
-  // New types
+  // Unified types
   UnifiedHostClient,
   UnifiedHostClientEvents,
   AdapterKind,
@@ -61,7 +58,4 @@ export type {
   BaseHostClientEvents,
   WebSocketClient,
   WebSocketClientConfig,
-  // Legacy aliases (deprecated)
-  HostClient,
-  HostClientEvents,
 } from "../core/index.js";

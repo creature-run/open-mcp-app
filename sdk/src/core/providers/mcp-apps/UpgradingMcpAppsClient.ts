@@ -46,17 +46,11 @@ class CreatureCapableBaseHostClient extends McpAppsBaseHostClient {
 
   /**
    * Check if connected to a Creature host.
-   * Uses hostContext.userAgent (spec-compliant) with creatureStyles fallback.
+   * Uses hostContext.userAgent (spec-compliant).
    */
   isCreatureHost(): boolean {
     const context = this.getHostContext();
-    // Primary: check userAgent (spec-compliant)
-    if (isHost(context, KNOWN_HOSTS.CREATURE)) {
-      return true;
-    }
-    // Fallback: check for creatureStyles (backward compatibility)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (context as any)?.creatureStyles !== undefined;
+    return isHost(context, KNOWN_HOSTS.CREATURE);
   }
 
   /**

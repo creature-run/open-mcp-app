@@ -1,7 +1,7 @@
 /**
  * Core Types
  *
- * Re-exports base types and adds backward-compatible aliases.
+ * Re-exports base types and provider types.
  */
 
 // Re-export all base types
@@ -32,17 +32,3 @@ export type {
   HostAdapter,
   AdapterFactory,
 } from "./providers/types.js";
-
-// ============================================================================
-// Backward Compatibility Aliases
-// ============================================================================
-
-/**
- * @deprecated Use BaseHostClient instead
- */
-export type { BaseHostClient as HostClient } from "./base/types.js";
-
-/**
- * @deprecated Use UnifiedHostClientEvents instead
- */
-export type { UnifiedHostClientEvents as HostClientEvents } from "./providers/types.js";
