@@ -468,6 +468,9 @@ function App() {
 | `isReady` | `boolean` | Host connection established |
 | `environment` | `Environment` | `"mcp-apps"`, `"chatgpt"`, or `"standalone"` |
 | `widgetState` | `WidgetState` | Persisted widget state |
+| `adapterKind` | `"mcp-apps" \| "creature" \| "chatgpt" \| "standalone"` | Adapter currently in use. For MCP Apps, this is determined after connection via `hostContext.userAgent`. |
+| `isCreature` | `boolean` | Whether the host is Creature (Creature-specific extensions available). Determined after connection via `hostContext.userAgent`. |
+| `hostContext` | `HostContext \| null` | Host context (theme, styles, `userAgent`, etc). `null` before connection. |
 | `callTool` | `(name, args) => Promise` | Invoke a tool |
 | `setWidgetState` | `(state) => void` | Persist state |
 | `requestDisplayMode` | `({ mode }) => Promise` | Request display change |
@@ -611,6 +614,8 @@ Low-level APIs for vanilla JS or non-React frameworks.
 
 ### `createHost(config)`
 
+`createHost()` auto-detects the current environment. In MCP Apps iframes, it uses a client that determines **Creature vs generic MCP Apps** after the `ui/initialize` handshake (via `hostContext.userAgent`). If you need `adapterKind/isCreature` to be correct immediately, use `createHostAsync()`.
+
 ```typescript
 import { createHost } from "@creature-ai/sdk/core";
 
@@ -653,6 +658,8 @@ host.disconnect();
 | `on(event, handler)` | Register event handler. Returns unsubscribe |
 | `callTool(name, args)` | Invoke tool, returns `Promise<ToolResult>` |
 | `setWidgetState(state)` | Persist widget state |
+| `getHostContext()` | Get host context (`HostContext`) or `null` before ready |
+| `setTitle(title)` | Set pip/widget title (Creature extension). No-op on ChatGPT and generic MCP Apps hosts |
 | `requestDisplayMode({ mode })` | Request display change |
 | `sendNotification(method, params)` | Send MCP notification |
 | `log(level, message, data?)` | Log to DevConsole |
@@ -666,6 +673,22 @@ host.disconnect();
 | `theme-change` | `"light" \| "dark"` | Theme changed (MCP Apps) |
 | `teardown` | — | Widget closing (MCP Apps) |
 | `widget-state-change` | `WidgetState` | State restored/updated |
+
+---
+
+### `createHostAsync(config)`
+
+If you need `adapterKind`, `isCreature`, or `hostContext` to be accurate immediately, use the async factory. It waits for the MCP Apps `ui/initialize` handshake before resolving.
+
+```typescript
+import { createHostAsync } from "@creature-ai/sdk/core";
+
+const host = await createHostAsync({ name: "my-app", version: "1.0.0" });
+
+if (host.isCreature) {
+  // Creature-specific initialization
+}
+```
 
 ---
 
@@ -699,24 +722,45 @@ const env = detectEnvironment();
 
 ---
 
+### Host Identity Utilities
+
+For MCP Apps environments, the spec-compliant way to identify the host is via `hostContext.userAgent` (received after `ui/initialize`).
+
+```typescript
+import { createHostAsync, isHost, KNOWN_HOSTS } from "@creature-ai/sdk/core";
+
+const host = await createHostAsync({ name: "my-app", version: "1.0.0" });
+const hostContext = host.getHostContext();
+
+if (isHost(hostContext, KNOWN_HOSTS.CREATURE)) {
+  // Running in Creature
+}
+```
+
+---
+
 ### Theme Utilities
 
 ```typescript
 import {
+  createHost,
   applyDocumentTheme,
   applyHostStyleVariables,
-  applyHostFonts,
   getDocumentTheme,
 } from "@creature-ai/sdk/core";
+
+const host = createHost({ name: "my-app", version: "1.0.0" });
+host.connect();
+
+// In MCP Apps, the host provides theme + style variables via hostContext.
+// Note: the SDK already applies these automatically; use these utilities only for advanced/custom setups.
+const hostContext = host.getHostContext();
 
 applyDocumentTheme("dark");
 // Sets data-theme="dark" on <html>
 
-applyHostStyleVariables(hostContext.styles?.variables);
+applyHostStyleVariables(hostContext?.styles?.variables);
 // Injects CSS custom properties
-
-applyHostFonts(hostContext.fonts);
-// Loads host fonts
 
 const theme = getDocumentTheme();
 // "light" | "dark"
@@ -729,11 +773,11 @@ const theme = getDocumentTheme();
 For advanced cases, use platform-specific clients:
 
 ```typescript
-import { McpAppHostClient, ChatGptAppHostClient, detectEnvironment } from "@creature-ai/sdk/core";
+import { McpAppsAdapter, ChatGptAdapter, detectEnvironment } from "@creature-ai/sdk/core";
 
 const client = detectEnvironment() === "chatgpt"
-  ? new ChatGptAppHostClient({ name: "my-app", version: "1.0.0" })
-  : new McpAppHostClient({ name: "my-app", version: "1.0.0" });
+  ? ChatGptAdapter.create({ name: "my-app", version: "1.0.0" })
+  : McpAppsAdapter.create({ name: "my-app", version: "1.0.0" });
 
 client.connect();
 ```
@@ -878,6 +922,8 @@ import type {
   UseWebSocketConfig,
   UseWebSocketReturn,
   Logger,
+  AdapterKind,
+  HostContext,
 } from "@creature-ai/sdk/react";
 
 // Core
@@ -888,13 +934,19 @@ import type {
   WidgetState,
   StructuredWidgetState,
   ToolResult,
-  HostClient,
   HostClientConfig,
   HostClientState,
-  HostClientEvents,
+  HostContext,
+  AdapterKind,
+  HostIdentity,
+  UnifiedHostClient,
+  UnifiedHostClientEvents,
   WebSocketStatus,
   WebSocketClient,
   WebSocketClientConfig,
+  // Legacy (deprecated)
+  HostClient,
+  HostClientEvents,
 } from "@creature-ai/sdk/core";
 ```
 

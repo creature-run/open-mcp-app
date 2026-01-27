@@ -160,18 +160,18 @@ app.tool("add_item", {
 
 ### Rule 5: Gracefully Handle Platform-Specific Features
 
-Some features only work on Creature. Check the environment and degrade gracefully:
+Some features only work on Creature. Check `isCreature` (and `environment`) and degrade gracefully:
 
 ```tsx
-const { environment } = useHost({ ... });
+const { environment, isCreature } = useHost({ ... });
 
 // WebSocket - Creature only
 const { status, send } = useWebSocket(
-  environment === "mcp-apps" ? websocketUrl : undefined,
+  isCreature ? websocketUrl : undefined,
   { onMessage: handleMessage }
 );
 
-// Teardown handlers - Creature only
+// Teardown handlers - MCP Apps only (no-op on ChatGPT)
 useHost({
   onTeardown: environment === "mcp-apps" 
     ? () => saveState() 
@@ -179,11 +179,12 @@ useHost({
 });
 ```
 
-**Creature-only features:**
+**Creature-only extensions:**
 - WebSocket communication (`useWebSocket`)
-- Teardown notifications (`onTeardown`)
 - PIP tabs and multi-instance
-- DevConsole logging (`log()`)
+
+**MCP Apps-only features (Creature + any MCP Apps host):**
+- Teardown notifications (`onTeardown`)
 - Theme change events (`onThemeChange`)
 
 ---
@@ -470,10 +471,10 @@ import { useHost, useToolResult, useWebSocket } from "@creature-ai/sdk/react";
 
 function Terminal() {
   const { data, onToolResult } = useToolResult<{ websocketUrl?: string }>();
-  const { environment } = useHost({ name: "my-app", version: "1.0.0", onToolResult });
+  const { isCreature } = useHost({ name: "my-app", version: "1.0.0", onToolResult });
 
   // Only connect on Creature (WebSocket not available on ChatGPT)
-  const wsUrl = environment === "mcp-apps" ? data?.websocketUrl : undefined;
+  const wsUrl = isCreature ? data?.websocketUrl : undefined;
 
   const { status, send } = useWebSocket<ClientMsg, ServerMsg>(wsUrl, {
     onMessage: (msg) => {
@@ -741,12 +742,15 @@ await db.notes.insert({
 The SDK's `environment` detection tells you where you're running:
 
 ```tsx
-const { environment } = useHost({ ... });
+const { environment, isCreature } = useHost({ ... });
 
 console.log(environment);
-// "mcp-apps"   - Running in Creature
+// "mcp-apps"   - Running in an MCP Apps host (Creature or other)
 // "chatgpt"    - Running in ChatGPT
 // "standalone" - Running in browser directly (dev/test)
+
+console.log(isCreature);
+// true when `hostContext.userAgent` indicates Creature
 ```
 
 Use this to:

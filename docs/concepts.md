@@ -117,6 +117,7 @@ Inline Widgets are:
 | `styles.variables` | CSS custom properties for theming |
 | `platform` | `"desktop"`, `"web"`, or `"mobile"` |
 | `displayMode` | Current display mode |
+| `userAgent` | Host identifier in format `"<host>/<version>"` (e.g. `"creature/1.0.0"`). Use this for spec-compliant host detection. |
 
 The SDK automatically applies theme and styles.
 

@@ -107,7 +107,7 @@ The `hostContext` object is sent during initialization and via `host-context-cha
 | `containerDimensions` | ⚠️ | Sent on init only, not on resize |
 | `locale` | ❌ | Not included |
 | `timeZone` | ❌ | Not included |
-| `userAgent` | ✅ | Set to "Creature" |
+| `userAgent` | ✅ | Host identifier in format `"<host>/<version>"` (e.g. `"creature/1.0.0"`) |
 | `platform` | ✅ | Always `"desktop"` |
 | `availableDisplayModes` | ✅ | Currently `["pip"]` for pips, `["inline"]` for inline widgets |
 | `deviceCapabilities` | ❌ | Not included |
@@ -226,8 +226,13 @@ The Creature SDK provides abstractions for building cross-platform MCP Apps:
 | Feature | Status | Notes |
 |---------|--------|-------|
 | `createHost()` | ✅ | Auto-detecting host client factory |
-| `McpAppHostClient` | ✅ | MCP Apps protocol implementation |
-| `ChatGPTHostClient` | ✅ | ChatGPT Apps SDK bridge |
+| `createHostAsync()` | ✅ | Async host factory (waits for `hostContext` on MCP Apps) |
+| `McpAppsAdapter` | ✅ | MCP Apps protocol implementation (explicit adapter) |
+| `UpgradingMcpAppsClient` | ✅ | Default MCP Apps client (detects Creature via `hostContext.userAgent`) |
+| `ChatGptAdapter` | ✅ | ChatGPT Apps SDK bridge (explicit adapter) |
+| `CreatureAdapter` | ✅ | Creature-specific extensions (for MCP Apps hosts that are Creature) |
+| `McpAppHostClient` | ✅ | Deprecated alias for `McpAppsAdapter` |
+| `ChatGptAppHostClient` | ✅ | Deprecated alias for `ChatGptAdapter` |
 | `detectEnvironment()` | ✅ | Runtime environment detection |
 | `createWebSocket()` | ✅ | WebSocket client |
 | `host.callTool()` | ✅ | Call tools from UI |
