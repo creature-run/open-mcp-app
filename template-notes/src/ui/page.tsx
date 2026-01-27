@@ -29,12 +29,12 @@
  */
 
 // MUST be first - injects environment-specific CSS variable defaults before CSS loads
-import { detectEnvironment, initStyles } from "@creature-ai/sdk/core";
+import { detectEnvironment, initStyles } from "open-mcp-app/core";
 const environment = detectEnvironment();
 initStyles({ environment });
 
 import { useEffect, useCallback, useState, useRef, useMemo } from "react";
-import { useHost, useToolResult, type Environment } from "@creature-ai/sdk/react";
+import { useHost, useToolResult, type Environment } from "open-mcp-app/react";
 import MilkdownEditor, { type MilkdownEditorRef } from "./MilkdownEditor";
 import "./styles.css";
 

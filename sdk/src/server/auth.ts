@@ -130,7 +130,7 @@ const extractToken = (tokenOrHeader: string): string => {
  *
  * @example
  * ```typescript
- * import { getIdentity } from "@creature-ai/sdk/server";
+ * import { getIdentity } from "open-mcp-app/server";
  *
  * app.tool("save_note", { ... }, async ({ content }, context) => {
  *   if (!context.creatureToken) {

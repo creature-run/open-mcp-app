@@ -43,4 +43,4 @@ export interface NoteInstanceState {
 // =============================================================================
 
 // Re-export ToolContext from SDK - includes instanceId, setState, getState, etc.
-export type { ToolContext, ToolResult } from "@creature-ai/sdk/server";
+export type { ToolContext, ToolResult } from "open-mcp-app/server";

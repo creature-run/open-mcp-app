@@ -1,6 +1,6 @@
 # Building MCP Apps
 
-Build interactive AI apps with `@creature-ai/sdk` that work on both **Creature** and **ChatGPT**. This guide covers everything from quick start to designing for cross-platform compatibility.
+Build interactive AI apps with `open-mcp-app` that work on both **Creature** and **ChatGPT**. This guide covers everything from quick start to designing for cross-platform compatibility.
 
 ## Prerequisites
 
@@ -195,7 +195,7 @@ useHost({
 
 ```typescript
 // src/server/app.ts
-import { createApp } from "@creature-ai/sdk/server";
+import { createApp } from "open-mcp-app/server";
 import { ICON_SVG, ICON_ALT } from "./icon.js";
 
 const app = createApp({
@@ -230,7 +230,7 @@ The recommended pattern is a consolidated tool with an `action` parameter:
 ```typescript
 // src/server/tools/todo.ts
 import { z } from "zod";
-import type { App } from "@creature-ai/sdk/server";
+import type { App } from "open-mcp-app/server";
 
 const TodoSchema = z.object({
   action: z.enum(["list", "add", "toggle", "remove"])
@@ -308,7 +308,7 @@ Run with `npm run dev` which typically uses:
 ```tsx
 // src/ui/page.tsx
 import { useEffect, useState } from "react";
-import { useHost, useToolResult } from "@creature-ai/sdk/react";
+import { useHost, useToolResult } from "open-mcp-app/react";
 import "./styles.css";
 
 interface Todo {
@@ -467,7 +467,7 @@ app.tool("terminal_run", {
 ### UI
 
 ```tsx
-import { useHost, useToolResult, useWebSocket } from "@creature-ai/sdk/react";
+import { useHost, useToolResult, useWebSocket } from "open-mcp-app/react";
 
 function Terminal() {
   const { data, onToolResult } = useToolResult<{ websocketUrl?: string }>();
@@ -614,7 +614,7 @@ Provide fallbacks for standalone testing:
 Enable Creature-managed authentication for verified user identity:
 
 ```typescript
-import { getIdentity } from "@creature-ai/sdk/server";
+import { getIdentity } from "open-mcp-app/server";
 
 const app = createApp({
   name: "my-app",
@@ -828,7 +828,7 @@ Enable `generateBundle: true` in Vite config to create the embedded HTML:
 
 ```typescript
 // vite.config.ts
-import { creature } from "@creature-ai/sdk/vite";
+import { creature } from "open-mcp-app/vite";
 
 export default {
   plugins: [creature({ generateBundle: true })],

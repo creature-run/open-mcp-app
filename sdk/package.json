@@ -1,6 +1,6 @@
 {
-  "name": "@creature-ai/sdk",
-  "version": "0.1.24",
+  "name": "open-mcp-app",
+  "version": "0.1.1",
   "description": "SDK for building MCP Apps that work on both Creature and ChatGPT",
   "type": "module",
   "exports": {

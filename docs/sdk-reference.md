@@ -1,4 +1,4 @@
-# @creature-ai/sdk
+# open-mcp-app
 
 Build cross-platform AI apps with rich, interactive UIs. Write once, run on both **Creature** and **ChatGPT**.
 
@@ -14,21 +14,21 @@ npm run dev
 
 | Entry Point | Purpose |
 |-------------|---------|
-| `@creature-ai/sdk/server` | MCP server: define tools, resources, WebSockets |
-| `@creature-ai/sdk/react` | React hooks: `useHost`, `useToolResult`, `useWebSocket` |
-| `@creature-ai/sdk/core` | Vanilla JS: host clients, environment detection, theming |
-| `@creature-ai/sdk/vite` | Build plugin: page discovery, HMR, serverless bundles |
+| `open-mcp-app/server` | MCP server: define tools, resources, WebSockets |
+| `open-mcp-app/react` | React hooks: `useHost`, `useToolResult`, `useWebSocket` |
+| `open-mcp-app/core` | Vanilla JS: host clients, environment detection, theming |
+| `open-mcp-app/vite` | Build plugin: page discovery, HMR, serverless bundles |
 
 ---
 
-## Server (`@creature-ai/sdk/server`)
+## Server (`open-mcp-app/server`)
 
 ### `createApp(config)`
 
 Creates and starts an MCP server.
 
 ```typescript
-import { createApp } from "@creature-ai/sdk/server";
+import { createApp } from "open-mcp-app/server";
 
 const app = createApp({
   name: "my-app",
@@ -303,7 +303,7 @@ export default app.toVercelFunctionHandler({
 When `auth: { creatureManaged: true }`, Creature provides verified user identity via tokens injected into tool contexts.
 
 ```typescript
-import { getIdentity, CreatureIdentityError } from "@creature-ai/sdk/server";
+import { getIdentity, CreatureIdentityError } from "open-mcp-app/server";
 
 app.tool("save_note", { ... }, async ({ content }, context) => {
   if (!context.creatureToken) {
@@ -409,7 +409,7 @@ const projectId = identity.project?.id || 'default';
 ### Utilities
 
 ```typescript
-import { svgToDataUri } from "@creature-ai/sdk/server";
+import { svgToDataUri } from "open-mcp-app/server";
 
 // Convert SVG to data URI for icons
 const iconUri = svgToDataUri("<svg>...</svg>");
@@ -417,14 +417,14 @@ const iconUri = svgToDataUri("<svg>...</svg>");
 
 ---
 
-## React (`@creature-ai/sdk/react`)
+## React (`open-mcp-app/react`)
 
 ### `useHost(config)`
 
 Connect your widget to the host.
 
 ```tsx
-import { useHost, useToolResult } from "@creature-ai/sdk/react";
+import { useHost, useToolResult } from "open-mcp-app/react";
 
 function App() {
   const { data, title, instanceId, onToolResult } = useToolResult<MyData>();
@@ -595,7 +595,7 @@ async function goFullscreen() {
 Creature logo component:
 
 ```tsx
-import { CreatureIcon } from "@creature-ai/sdk/react";
+import { CreatureIcon } from "open-mcp-app/react";
 
 <CreatureIcon
   isDarkMode={true}
@@ -608,7 +608,7 @@ import { CreatureIcon } from "@creature-ai/sdk/react";
 
 ---
 
-## Core (`@creature-ai/sdk/core`)
+## Core (`open-mcp-app/core`)
 
 Low-level APIs for vanilla JS or non-React frameworks.
 
@@ -617,7 +617,7 @@ Low-level APIs for vanilla JS or non-React frameworks.
 `createHost()` auto-detects the current environment. In MCP Apps iframes, it uses a client that determines **Creature vs generic MCP Apps** after the `ui/initialize` handshake (via `hostContext.userAgent`). If you need `adapterKind/isCreature` to be correct immediately, use `createHostAsync()`.
 
 ```typescript
-import { createHost } from "@creature-ai/sdk/core";
+import { createHost } from "open-mcp-app/core";
 
 const host = createHost({ name: "my-app", version: "1.0.0" });
 
@@ -681,7 +681,7 @@ host.disconnect();
 If you need `adapterKind`, `isCreature`, or `hostContext` to be accurate immediately, use the async factory. It waits for the MCP Apps `ui/initialize` handshake before resolving.
 
 ```typescript
-import { createHostAsync } from "@creature-ai/sdk/core";
+import { createHostAsync } from "open-mcp-app/core";
 
 const host = await createHostAsync({ name: "my-app", version: "1.0.0" });
 
@@ -695,7 +695,7 @@ if (host.isCreature) {
 ### `createWebSocket(url, config)`
 
 ```typescript
-import { createWebSocket } from "@creature-ai/sdk/core";
+import { createWebSocket } from "open-mcp-app/core";
 
 const ws = createWebSocket<ClientMsg, ServerMsg>(url, {
   onMessage: (msg) => console.log("Received:", msg),
@@ -714,7 +714,7 @@ ws.disconnect();
 ### `detectEnvironment()`
 
 ```typescript
-import { detectEnvironment } from "@creature-ai/sdk/core";
+import { detectEnvironment } from "open-mcp-app/core";
 
 const env = detectEnvironment();
 // "mcp-apps" | "chatgpt" | "standalone"
@@ -727,7 +727,7 @@ const env = detectEnvironment();
 For MCP Apps environments, the spec-compliant way to identify the host is via `hostContext.userAgent` (received after `ui/initialize`).
 
 ```typescript
-import { createHostAsync, isHost, KNOWN_HOSTS } from "@creature-ai/sdk/core";
+import { createHostAsync, isHost, KNOWN_HOSTS } from "open-mcp-app/core";
 
 const host = await createHostAsync({ name: "my-app", version: "1.0.0" });
 const hostContext = host.getHostContext();
@@ -747,7 +747,7 @@ import {
   applyDocumentTheme,
   applyHostStyleVariables,
   getDocumentTheme,
-} from "@creature-ai/sdk/core";
+} from "open-mcp-app/core";
 
 const host = createHost({ name: "my-app", version: "1.0.0" });
 host.connect();
@@ -773,7 +773,7 @@ const theme = getDocumentTheme();
 For advanced cases, use platform-specific clients:
 
 ```typescript
-import { McpAppsAdapter, ChatGptAdapter, detectEnvironment } from "@creature-ai/sdk/core";
+import { McpAppsAdapter, ChatGptAdapter, detectEnvironment } from "open-mcp-app/core";
 
 const client = detectEnvironment() === "chatgpt"
   ? ChatGptAdapter.create({ name: "my-app", version: "1.0.0" })
@@ -784,7 +784,7 @@ client.connect();
 
 ---
 
-## Vite Plugin (`@creature-ai/sdk/vite`)
+## Vite Plugin (`open-mcp-app/vite`)
 
 ### `creature(options)`
 
@@ -794,7 +794,7 @@ Build plugin for MCP App UIs.
 // vite.config.ts
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import { creature } from "@creature-ai/sdk/vite";
+import { creature } from "open-mcp-app/vite";
 
 export default defineConfig({
   plugins: [react(), creature()],
@@ -912,7 +912,7 @@ import type {
   WebSocketConnection,
   StateAdapter,
   RealtimeAdapter,
-} from "@creature-ai/sdk/server";
+} from "open-mcp-app/server";
 
 // React
 import type {
@@ -924,7 +924,7 @@ import type {
   Logger,
   AdapterKind,
   HostContext,
-} from "@creature-ai/sdk/react";
+} from "open-mcp-app/react";
 
 // Core
 import type {
@@ -944,7 +944,7 @@ import type {
   WebSocketStatus,
   WebSocketClient,
   WebSocketClientConfig,
-} from "@creature-ai/sdk/core";
+} from "open-mcp-app/core";
 ```
 
 ---

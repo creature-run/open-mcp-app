@@ -46,7 +46,7 @@ jobs:
         run: |
           cd sdk
           LOCAL_VERSION=$(node -p "require('./package.json').version")
-          NPM_VERSION=$(npm view @creature-ai/sdk version 2>/dev/null || echo "0.0.0")
+          NPM_VERSION=$(npm view open-mcp-app version 2>/dev/null || echo "0.0.0")
           
           echo "Local version: $LOCAL_VERSION"
           echo "npm version: $NPM_VERSION"
@@ -97,11 +97,11 @@ jobs:
           tag_name: sdk-${{ steps.version.outputs.version }}
           name: SDK ${{ steps.version.outputs.version }}
           body: |
-            ## @creature-ai/sdk ${{ steps.version.outputs.version }}
+            ## open-mcp-app ${{ steps.version.outputs.version }}
             
             Install with:
             ```bash
-            npm install @creature-ai/sdk@${{ steps.version.outputs.version }}
+            npm install open-mcp-app@${{ steps.version.outputs.version }}
             ```
           draft: false
         env:

@@ -10,7 +10,7 @@
  * - Generic MCP Apps: Falls back to local/anonymous storage (instanceId-scoped)
  */
 
-import { getIdentity } from "@creature-ai/sdk/server";
+import { getIdentity } from "open-mcp-app/server";
 import { createDataStore, type DataScope, type DataStore } from "./data.js";
 import type { Note, ToolContext, ToolResult } from "./types.js";
 

@@ -1,7 +1,7 @@
 import { defineConfig } from "tsup";
 
 /**
- * Build configuration for @creature-ai/sdk.
+ * Build configuration for open-mcp-app.
  * 
  * Single config to avoid parallel build race conditions.
  * Each subpath has specific bundling requirements handled via esbuild plugins.

@@ -2,7 +2,7 @@
  * MCP Notes Styles
  *
  * Uses MCP Apps CSS variables for theming consistency with the host.
- * Variables are injected by initStyles() from @creature-ai/sdk/core
+ * Variables are injected by initStyles() from open-mcp-app/core
  * and overridden by host at runtime via hostContext.styles.variables.
  *
  * @see https://github.com/modelcontextprotocol/ext-apps specification

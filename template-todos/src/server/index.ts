@@ -9,7 +9,7 @@
  * The app runs as an Express server at /mcp endpoint.
  */
 
-import { createApp } from "@creature-ai/sdk/server";
+import { createApp } from "open-mcp-app/server";
 import { registerTodosTool } from "./tools/todos.js";
 import { MCP_NAME, TODOS_UI_URI } from "./lib/types.js";
 import { ICON_SVG, ICON_ALT } from "./lib/icon.js";

@@ -1473,19 +1473,16 @@ export class App {
 /**
  * Checks if a filename belongs to the SDK itself.
  * Matches various SDK installation patterns:
- * - Published: node_modules/@creature-ai/sdk/
+ * - Published: node_modules/open-mcp-app/
  * - Local development: desktop/artifacts/sdk/
  * - Public SDK: public/sdk/
- */
-/**
- * Checks if a filename belongs to the SDK itself.
  */
 function isSDKPath(filename: string): boolean {
   return (
     filename.includes("/public/sdk/") ||
     filename.includes("\\public\\sdk\\") ||
-    filename.includes("/@creature-ai/sdk/") ||
-    filename.includes("\\@creature-ai\\sdk\\") ||
+    filename.includes("/open-mcp-app/") ||
+    filename.includes("\\open-mcp-app\\") ||
     // Local SDK development paths
     filename.includes("/artifacts/sdk/") ||
     filename.includes("\\artifacts\\sdk\\")
