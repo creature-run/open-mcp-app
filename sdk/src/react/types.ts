@@ -7,8 +7,9 @@ import type {
   HostContext,
   WebSocketStatus,
 } from "../core/types.js";
+import type { AdapterKind } from "../core/providers/types.js";
 
-export type { DisplayMode, Environment, LogLevel, ToolResult, WidgetState, HostContext, WebSocketStatus };
+export type { DisplayMode, Environment, LogLevel, ToolResult, WidgetState, HostContext, WebSocketStatus, AdapterKind };
 
 export { type StructuredWidgetState } from "../core/types.js";
 
@@ -78,6 +79,26 @@ export interface UseHostReturn {
   widgetState: WidgetState | null;
   setWidgetState: (state: WidgetState | null) => void;
   requestDisplayMode: (params: { mode: DisplayMode }) => Promise<{ mode: DisplayMode }>;
+
+  /**
+   * The adapter kind currently in use.
+   * For MCP Apps, this is determined after connection based on hostContext.userAgent.
+   * Values: "mcp-apps" | "creature" | "chatgpt" | "standalone"
+   */
+  adapterKind: AdapterKind;
+
+  /**
+   * Whether this host is Creature (supports Creature-specific extensions).
+   * Determined via hostContext.userAgent after connection.
+   */
+  isCreature: boolean;
+
+  /**
+   * Get the host context received from the host.
+   * Contains theme, styles, userAgent, and host-specific properties.
+   * Returns null before connection is established.
+   */
+  hostContext: HostContext | null;
 
   /**
    * Logger for sending messages to the host's DevConsole.

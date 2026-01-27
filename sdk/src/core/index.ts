@@ -8,6 +8,7 @@
 import { ChatGptAdapter } from "./providers/chatgpt/ChatGptAdapter.js";
 import { CreatureAdapter } from "./providers/creature/CreatureAdapter.js";
 import { StandaloneAdapter } from "./providers/standalone/StandaloneAdapter.js";
+import { UpgradingMcpAppsClient } from "./providers/mcp-apps/UpgradingMcpAppsClient.js";
 import type { UnifiedHostClient } from "./providers/types.js";
 import type { HostClientConfig, Environment } from "./base/types.js";
 
@@ -45,31 +46,78 @@ export function detectEnvironment(): Environment {
 // Host Client Factory
 // ============================================================================
 
+import { McpAppsAdapter } from "./providers/mcp-apps/McpAppsAdapter.js";
+
 /**
  * Create a host client for the detected environment.
  *
  * Automatically selects the appropriate adapter based on runtime detection:
- * - ChatGPT: Uses ChatGptAdapter with window.openai bridge
- * - MCP Apps: Uses CreatureAdapter (compatible with Creature and generic MCP hosts)
+ * - ChatGPT: Uses ChatGptAdapter (detects window.openai)
+ * - MCP Apps: Uses UpgradingMcpAppsClient (determines Creature vs generic after connection)
  * - Standalone: Uses StandaloneAdapter for development/testing
+ *
+ * For MCP Apps hosts, the returned client uses spec-compliant host identification
+ * via hostContext.userAgent. The adapterKind and isCreature properties will
+ * reflect the actual host after connection.
  *
  * @param config - Configuration for the host client
  * @returns The appropriate host client adapter for the environment
  */
 export function createHost(config: HostClientConfig): UnifiedHostClient {
-  const environment = detectEnvironment();
-
-  if (environment === "chatgpt") {
+  // 1. ChatGPT (most specific - has window.openai)
+  if (ChatGptAdapter.detect()) {
     return ChatGptAdapter.create(config);
   }
 
-  if (environment === "mcp-apps") {
-    // Use CreatureAdapter which is compatible with both Creature and generic MCP hosts
-    // It detects Creature-specific features via hostContext after connection
-    return CreatureAdapter.create(config);
+  // 2. MCP Apps (iframe-based host)
+  // Uses UpgradingMcpAppsClient for spec-compliant host detection via userAgent
+  if (UpgradingMcpAppsClient.detect()) {
+    return UpgradingMcpAppsClient.create(config);
   }
 
+  // 3. Standalone fallback
   return StandaloneAdapter.create(config);
+}
+
+/**
+ * Create a host client asynchronously, waiting for host identification.
+ *
+ * Unlike createHost(), this function waits for the connection to establish
+ * and hostContext to be received before returning. This guarantees that
+ * adapterKind and isCreature are accurate when the promise resolves.
+ *
+ * Use this when you need to know the exact host type before proceeding.
+ *
+ * @param config - Configuration for the host client
+ * @returns Promise that resolves to the configured host client after connection
+ *
+ * @example
+ * ```typescript
+ * const host = await createHostAsync({ name: "my-app", version: "1.0.0" });
+ * if (host.isCreature) {
+ *   // Creature-specific initialization
+ * }
+ * ```
+ */
+export async function createHostAsync(config: HostClientConfig): Promise<UnifiedHostClient> {
+  const host = createHost(config);
+
+  // For ChatGPT and Standalone, connection is immediate
+  if (host.environment !== "mcp-apps") {
+    host.connect();
+    return host;
+  }
+
+  // For MCP Apps, wait for hostContext to be available
+  return new Promise((resolve) => {
+    const unsubscribe = host.subscribe((state) => {
+      if (state.isReady) {
+        unsubscribe();
+        resolve(host);
+      }
+    });
+    host.connect();
+  });
 }
 
 // ============================================================================
@@ -94,6 +142,16 @@ export type {
   WebSocketStatus,
   WebSocketClientConfig,
   WebSocketClient,
+  // Host identity
+  HostIdentity,
+} from "./base/index.js";
+
+// Host identity utilities (for spec-compliant host detection via userAgent)
+export {
+  parseHostUserAgent,
+  getHostIdentity,
+  isHost,
+  KNOWN_HOSTS,
 } from "./base/index.js";
 
 // Base classes (for advanced/custom usage)
@@ -118,6 +176,7 @@ export type {
 // Adapter classes (for explicit adapter selection)
 export {
   McpAppsAdapter,
+  UpgradingMcpAppsClient,
   CreatureAdapter,
   ChatGptAdapter,
   StandaloneAdapter,
@@ -184,10 +243,10 @@ export type HostClient = _UnifiedHostClient;
 export type HostClientEvents = _UnifiedHostClientEvents;
 
 /**
- * Legacy export - McpAppHostClient is now CreatureAdapter
- * @deprecated Use CreatureAdapter instead
+ * Legacy export - McpAppHostClient is now McpAppsAdapter
+ * @deprecated Use McpAppsAdapter or CreatureAdapter instead
  */
-export { CreatureAdapter as McpAppHostClient } from "./providers/index.js";
+export { McpAppsAdapter as McpAppHostClient } from "./providers/index.js";
 
 /**
  * Legacy export - ChatGptAppHostClient is now ChatGptAdapter

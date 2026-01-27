@@ -10,6 +10,7 @@ import type {
   DisplayMode,
   HostClientConfig,
   HostClientState,
+  HostContext,
   LogLevel,
   StateListener,
   ToolResult,
@@ -65,6 +66,13 @@ export class ChatGptAdapter implements HostAdapter {
 
   get isCreature(): boolean {
     return false;
+  }
+
+  /**
+   * Get host context - returns null for ChatGPT as it doesn't use MCP Apps protocol.
+   */
+  getHostContext(): HostContext | null {
+    return null;
   }
 
   getState(): HostClientState {

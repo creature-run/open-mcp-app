@@ -10,6 +10,15 @@ export { McpAppsBaseHostClient } from "./McpAppsBaseHostClient.js";
 export { ChatGptBaseHostClient } from "./ChatGptBaseHostClient.js";
 export { StandaloneBaseHostClient } from "./StandaloneBaseHostClient.js";
 
+// Host identity utilities
+export {
+  parseHostUserAgent,
+  getHostIdentity,
+  isHost,
+  KNOWN_HOSTS,
+} from "./hostIdentity.js";
+export type { HostIdentity } from "./hostIdentity.js";
+
 export type {
   // Environment & Logging
   Environment,

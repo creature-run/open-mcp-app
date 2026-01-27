@@ -13,6 +13,7 @@ import type {
   Environment,
   HostClientConfig,
   HostClientState,
+  HostContext,
   LogLevel,
   StateListener,
   ToolResult,
@@ -108,6 +109,13 @@ export interface UnifiedHostClient {
    * Checked via hostContext after connection.
    */
   readonly isCreature: boolean;
+
+  /**
+   * Get the host context received from the host.
+   * Contains theme, styles, userAgent, and host-specific properties.
+   * Returns null before connection is established.
+   */
+  getHostContext(): HostContext | null;
 }
 
 // ============================================================================

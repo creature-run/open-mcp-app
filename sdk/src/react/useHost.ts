@@ -1,6 +1,6 @@
-import { useSyncExternalStore, useEffect, useRef, useMemo } from "react";
+import { useSyncExternalStore, useEffect, useRef, useMemo, useState } from "react";
 import { createHost, detectEnvironment } from "../core/index.js";
-import type { UnifiedHostClient, Environment } from "../core/index.js";
+import type { UnifiedHostClient, Environment, HostContext, AdapterKind } from "../core/index.js";
 import type { UseHostConfig, UseHostReturn, Logger } from "./types.js";
 
 export { detectEnvironment };
@@ -145,5 +145,9 @@ export function useHost(config: UseHostConfig): UseHostReturn {
     setWidgetState: boundMethods.setWidgetState,
     requestDisplayMode: boundMethods.requestDisplayMode,
     log,
+    // Host detection properties (may change after connection for MCP Apps)
+    adapterKind: client.adapterKind,
+    isCreature: client.isCreature,
+    hostContext: client.getHostContext(),
   };
 }

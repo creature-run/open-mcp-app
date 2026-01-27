@@ -1,8 +1,10 @@
 /**
- * MCP Apps Adapter
+ * MCP Apps Adapter (Base)
  *
- * Wraps the MCP Apps base host client with the unified interface.
- * Provides MCP-specific features like notifications and teardown events.
+ * Base adapter for all MCP Apps hosts. This is the foundation that other
+ * host-specific adapters (like CreatureAdapter) extend.
+ *
+ * Works with any MCP Apps-compliant host out of the box.
  */
 
 import { McpAppsBaseHostClient } from "../../base/McpAppsBaseHostClient.js";
@@ -15,7 +17,7 @@ import type {
   ToolResult,
   WidgetState,
   Environment,
-  BaseHostClient,
+  HostContext,
 } from "../../base/types.js";
 import type {
   AdapterKind,
@@ -26,15 +28,26 @@ import type {
 /**
  * MCP Apps adapter implementation.
  *
- * Wraps McpAppsBaseHostClient and exposes the unified interface.
- * This adapter is used for generic MCP Apps hosts (not specifically Creature).
+ * This is the base adapter for all MCP Apps hosts. It provides the standard
+ * MCP Apps functionality that works across all compliant hosts.
+ *
+ * Host-specific adapters (like CreatureAdapter) should extend this class
+ * to add their own extensions while maintaining compatibility.
  */
 export class McpAppsAdapter implements HostAdapter {
   readonly base: McpAppsBaseHostClient;
   readonly adapterKind: AdapterKind = "mcp-apps";
 
   constructor(config: HostClientConfig) {
-    this.base = new McpAppsBaseHostClient(config);
+    this.base = this.createBaseClient(config);
+  }
+
+  /**
+   * Factory method for creating the base client.
+   * Subclasses can override this to use a custom base client.
+   */
+  protected createBaseClient(config: HostClientConfig): McpAppsBaseHostClient {
+    return new McpAppsBaseHostClient(config);
   }
 
   // ============================================================================
@@ -65,10 +78,20 @@ export class McpAppsAdapter implements HostAdapter {
     return this.base.getState().environment;
   }
 
+  /**
+   * Whether this is a Creature host.
+   * Base MCP Apps adapter returns false - CreatureAdapter overrides this.
+   */
   get isCreature(): boolean {
-    // Generic MCP Apps adapter - not Creature
-    // Creature-specific detection happens in CreatureAdapter
     return false;
+  }
+
+  /**
+   * Get the host context received from the host.
+   * Useful for checking host-specific capabilities.
+   */
+  getHostContext(): HostContext | null {
+    return this.base.getHostContext();
   }
 
   getState(): HostClientState {
@@ -95,8 +118,8 @@ export class McpAppsAdapter implements HostAdapter {
   }
 
   /**
-   * Set pip/widget title - available on MCP Apps hosts that support it.
-   * Generic MCP Apps hosts may or may not support this notification.
+   * Set pip/widget title.
+   * Sends a notification - hosts that support it will update the title.
    */
   setTitle(title: string): void {
     this.base.sendNotification("ui/notifications/title-changed", { title });

@@ -83,6 +83,12 @@ export interface HostContext {
   viewport?: { width: number; height: number };
   platform?: string;
   /**
+   * Host application identifier per MCP Apps spec.
+   * Format: "<host>/<version>" (e.g. "creature/1.0.0", "chatgpt/2.0.0").
+   * Use this for spec-compliant host detection after ui/initialize.
+   */
+  userAgent?: string;
+  /**
    * Widget state restored from previous widget instance.
    * Supported on both MCP Apps and ChatGPT.
    */

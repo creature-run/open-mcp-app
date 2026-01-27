@@ -10,6 +10,7 @@ import type {
   DisplayMode,
   HostClientConfig,
   HostClientState,
+  HostContext,
   LogLevel,
   StateListener,
   ToolResult,
@@ -74,6 +75,13 @@ export class StandaloneAdapter implements HostAdapter {
 
   get isCreature(): boolean {
     return false;
+  }
+
+  /**
+   * Get host context - returns null for standalone mode.
+   */
+  getHostContext(): HostContext | null {
+    return null;
   }
 
   getState(): HostClientState {

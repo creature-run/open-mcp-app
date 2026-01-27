@@ -1439,18 +1439,12 @@ export class App {
 // ============================================================================
 
 /**
- * Detect if a file path is within the SDK package.
- */
-<<<<<<< Updated upstream
-=======
-/**
  * Checks if a filename belongs to the SDK itself.
  * Matches various SDK installation patterns:
  * - Published: node_modules/@creature-ai/sdk/
  * - Local development: desktop/artifacts/sdk/
  * - Public SDK: public/sdk/
  */
->>>>>>> Stashed changes
 function isSDKPath(filename: string): boolean {
   return (
     filename.includes("/public/sdk/") ||

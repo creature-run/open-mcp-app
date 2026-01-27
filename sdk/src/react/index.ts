@@ -24,12 +24,19 @@ export type {
 // New adapter-based exports
 export {
   createHost,
+  createHostAsync,
   // Adapters
   CreatureAdapter,
   ChatGptAdapter,
   McpAppsAdapter,
+  UpgradingMcpAppsClient,
   StandaloneAdapter,
-  // Utilities
+  // Host identity utilities
+  parseHostUserAgent,
+  getHostIdentity,
+  isHost,
+  KNOWN_HOSTS,
+  // Style utilities
   applyDocumentTheme,
   applyHostStyleVariables,
   applyHostFonts,
@@ -46,6 +53,7 @@ export type {
   UnifiedHostClientEvents,
   AdapterKind,
   HostAdapter,
+  HostIdentity,
   // Base types
   HostClientConfig,
   HostClientState,
