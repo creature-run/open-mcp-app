@@ -37,7 +37,9 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@modelcontextprotocol/ext-apps": "^0.2.2",
@@ -55,7 +57,8 @@
     "react": "^19.1.0",
     "tsup": "^8.5.1",
     "typescript": "^5.8.3",
-    "vite": "^6.3.5"
+    "vite": "^6.3.5",
+    "vitest": "^3.1.0"
   },
   "peerDependencies": {
     "react": ">=18.0.0"
