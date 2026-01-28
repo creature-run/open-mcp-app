@@ -92,6 +92,9 @@ export class App {
   /** Whether the connected host supports multiInstance. ChatGPT doesn't, Creature does. */
   private hostSupportsMultiInstance = false;
 
+  /** The connected client type for format-specific responses. */
+  private clientType: "creature" | "claude" | "chatgpt" | "unknown" = "unknown";
+
   /** OAuth discovery endpoint configuration. */
   private oauthDiscoveryConfig: { path: string; body: Record<string, unknown> } | null = null;
 
@@ -1065,11 +1068,22 @@ export class App {
         if (transportSessionId && this.transports.has(transportSessionId)) {
           transport = this.transports.get(transportSessionId)!;
         } else if (!transportSessionId && isInitializeRequest(req.body)) {
-          // Detect if host supports multiInstance based on client name
-          // Creature clients support multiInstance, ChatGPT clients don't
-          const clientName = req.body?.params?.clientInfo?.name;
-          this.hostSupportsMultiInstance = clientName === "creature";
-          console.log(`[MCP] Client: ${clientName}, multiInstance support: ${this.hostSupportsMultiInstance}`);
+          // Detect client type for format-specific responses
+          const clientName = req.body?.params?.clientInfo?.name?.toLowerCase() || "";
+          if (clientName === "creature") {
+            this.clientType = "creature";
+            this.hostSupportsMultiInstance = true;
+          } else if (clientName.includes("claude")) {
+            this.clientType = "claude";
+            this.hostSupportsMultiInstance = false;
+          } else if (clientName.includes("chatgpt") || clientName.includes("openai")) {
+            this.clientType = "chatgpt";
+            this.hostSupportsMultiInstance = false;
+          } else {
+            this.clientType = "unknown";
+            this.hostSupportsMultiInstance = false;
+          }
+          console.log(`[MCP] Client: ${clientName}, type: ${this.clientType}, multiInstance: ${this.hostSupportsMultiInstance}`);
 
           transport = this.createTransport();
           const server = this.createMcpServer();
@@ -1226,6 +1240,35 @@ export class App {
             "openai/widgetPrefersBorder": true,
           };
 
+          // Claude Desktop/Claude.ai only supports 1 content item in resource responses
+          // Return format-specific content based on detected client type
+          if (this.clientType === "claude" || this.clientType === "creature") {
+            return {
+              contents: [
+                {
+                  uri,
+                  mimeType: MIME_TYPES.MCP_APPS,
+                  text: html,
+                  _meta: mcpAppsMeta,
+                },
+              ],
+            };
+          }
+
+          if (this.clientType === "chatgpt") {
+            return {
+              contents: [
+                {
+                  uri,
+                  mimeType: MIME_TYPES.CHATGPT,
+                  text: html,
+                  _meta: chatgptMeta,
+                },
+              ],
+            };
+          }
+
+          // Unknown clients: return both formats for compatibility
           return {
             contents: [
               {
@@ -1376,6 +1419,9 @@ export class App {
       toolMeta["openai/outputTemplate"] = config.ui;
       // ChatGPT requires this to allow widget/UI to call the tool
       toolMeta["openai/widgetAccessible"] = visibility.includes("app");
+
+      // TODO: Remove this once Claude.ai follows the spec correctly.
+      toolMeta["ui/resourceUri"] = config.ui;
     }
     
     if (config.loadingMessage) {
