@@ -60,12 +60,17 @@ export const createTodoStore = (localId: string): DataStore<Todo> => {
 
 /**
  * Wrap tool handlers with store creation.
- * Creates a store scoped by instanceId for data isolation.
+ *
+ * For todos (a singleton app), data is global - NOT scoped by instanceId.
+ * All tool calls share the same data store so todos persist across calls.
+ *
+ * Multi-instance apps (like notes) would scope by instanceId for isolation.
  */
 export const withStore = async (
   context: ToolContext,
   handler: (store: DataStore<Todo>) => Promise<ToolResult>
 ): Promise<ToolResult> => {
-  const store = createTodoStore(context.instanceId || "default");
+  // Use fixed "global" scope - todos is a singleton app
+  const store = createTodoStore("global");
   return handler(store);
 };
