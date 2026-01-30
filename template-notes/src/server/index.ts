@@ -60,20 +60,21 @@ app.resource({
   icon: { svg: ICON_SVG, alt: ICON_ALT },
   experimental: {
     /**
-     * Pip routing rules.
-     * 
-     * Routes are matched in order of specificity:
-     * - "notes_open/:noteId": One pip per noteId value (reused when same noteId)
-     * - "notes_create": Always creates a new pip for new notes
-     * - "notes_list": Single list pip, reused (default behavior)
-     * 
-     * The :noteId syntax extracts the value from tool input args.noteId
-     * and uses it as a routing key (e.g., "notes_open:abc123").
+     * Pip routing rules (for agent-initiated calls only).
+     *
+     * UI-initiated calls from a pip don't go through pip management - they return
+     * results to the calling pip, which handles view switching client-side.
+     *
+     * For agent calls:
+     * - "notes_open/:noteId" → find pip where modelContent.noteId matches
+     * - "notes_save/:noteId" → find pip where modelContent.noteId matches
+     * - "notes_create" → always create new pip (each note gets its own editor)
+     * - notes_list → defaults to "single" (reuse any list pip)
      */
     pipRules: {
-      "notes_open/:noteId": "single",  // One pip per noteId, reuse when same note
-      "notes_create": "new",           // Always new pip for create
-      // notes_list: defaults to "single" - one list pip, reused
+      "notes_open/:noteId": "single",
+      "notes_save/:noteId": "single",
+      "notes_create": "new",
     },
   },
 });

@@ -255,10 +255,11 @@ export default function App() {
  */
 function TodoApp() {
   const [todos, setTodos] = useState<Todo[]>([]);
-  const hasLoggedReady = useRef(false);
+  const hasInitialized = useRef(false);
+  const hasRestoredState = useRef(false);
 
   // Get host from context (HostProvider)
-  const { callTool, isReady, log, exp_widgetState, onToolResult, environment: hostEnvironment } = useHost();
+  const { callTool, isReady, log, exp, exp_widgetState, onToolResult, environment: hostEnvironment } = useHost();
 
   // Get widget state tuple for reading and updating
   const [widgetState, setWidgetState] = exp_widgetState<TodoWidgetState>();
@@ -270,28 +271,20 @@ function TodoApp() {
   const [removeTodo, removeState] = callTool<TodoData>("todos_remove");
 
   /**
-   * Log when connection is ready.
-   * On Creature, this appears in DevConsole. On ChatGPT, it goes to browser console.
+   * Restore todos from widget state on mount (before initialization completes).
+   * Shows previous state immediately while fresh data loads.
    */
   useEffect(() => {
-    if (isReady && !hasLoggedReady.current) {
-      hasLoggedReady.current = true;
-      log.info("Todo list connected", { environment: hostEnvironment });
+    if (hasRestoredState.current || !widgetState?.privateContent?.todos) {
+      return;
     }
-  }, [isReady, log, hostEnvironment]);
-
-  /**
-   * Restore todos from widget state on initial load.
-   * The Host persists widget state and restores it when the pip reopens.
-   * Todos are stored in privateContent (not visible to AI).
-   */
-  useEffect(() => {
-    const savedTodos = widgetState?.privateContent?.todos;
-    if (savedTodos && savedTodos.length > 0 && todos.length === 0) {
+    hasRestoredState.current = true;
+    const savedTodos = widgetState.privateContent.todos;
+    if (savedTodos.length > 0) {
       log.debug("Restoring todos from widget state", { count: savedTodos.length });
       setTodos(savedTodos);
     }
-  }, [widgetState, todos.length, log]);
+  }, [widgetState, log]);
 
   /**
    * Helper to update todos from any tool result data.
@@ -341,19 +334,29 @@ function TodoApp() {
   }, [onToolResult, updateTodosFromData]);
 
   /**
-   * Fetch initial data when ready.
-   * 
-   * The UI shows the todo list by default, so we fetch todos on mount.
-   * Agent tool results will update the data via onToolResult.
+   * Initialize app when host is ready.
+   *
+   * Uses getInitialToolResult() to determine how the view was opened:
+   * - If it returns data: Agent opened this view with a tool call - use that data
+   * - If it returns null: User opened this view directly - fetch the list
    */
-  const hasInitiallyFetched = useRef(false);
-  
   useEffect(() => {
-    if (isReady && !hasInitiallyFetched.current) {
-      hasInitiallyFetched.current = true;
+    if (!isReady || hasInitialized.current) return;
+    hasInitialized.current = true;
+
+    log.info("Todo list connected", { environment: hostEnvironment });
+
+    const initialResult = exp.getInitialToolResult();
+    if (initialResult) {
+      // View was opened by agent tool call - use the result data
+      log.debug("Initialized from agent tool result");
+      updateTodosFromData(initialResult.structuredContent as unknown as TodoData);
+    } else {
+      // View was opened by user - fetch initial list
+      log.debug("Initialized by user - fetching list");
       listTodos();
     }
-  }, [isReady, listTodos]);
+  }, [isReady, exp, log, hostEnvironment, updateTodosFromData, listTodos]);
 
   /**
    * Add a new todo item.
@@ -400,6 +403,15 @@ function TodoApp() {
   );
 
   const completedCount = todos.filter((t) => t.completed).length;
+
+  // Show loading spinner until host is ready
+  if (!isReady) {
+    return (
+      <div className="loading-container">
+        <div className="loading-spinner" />
+      </div>
+    );
+  }
 
   return (
     <div className="container">

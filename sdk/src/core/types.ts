@@ -71,6 +71,19 @@ export interface ToolResult<T = Record<string, unknown>> {
 // ============================================================================
 
 /**
+ * Context about how the view was opened.
+ * SDK uses this to determine initialization behavior.
+ */
+export interface OpenContext {
+  /**
+   * How the view was opened:
+   * - "tool": Opened by an agent tool call (expect tool-input/tool-result)
+   * - "user": Opened directly by user (no tool notifications coming)
+   */
+  triggeredBy: "tool" | "user";
+}
+
+/**
  * Host context sent from MCP Apps host.
  * Follows MCP Apps spec with extensions via [key: string]: unknown.
  */
@@ -93,6 +106,11 @@ export interface HostContext {
    * Widget state restored from previous widget instance.
    */
   widgetState?: WidgetState;
+  /**
+   * Context about how the view was opened.
+   * Per MCP Apps spec extensibility, sent in hostContext.
+   */
+  openContext?: OpenContext;
   /**
    * Experimental (non-standard) extensions.
    * Follows the SDK's `experimental` namespace paradigm.
@@ -254,6 +272,31 @@ export interface ExpHostApi {
    * - Generic MCP Apps hosts: false
    */
   supportsMultiInstance(): boolean;
+
+  /**
+   * Get the initial tool result if view was opened by an agent tool call.
+   *
+   * Returns the first tool result received, or null if:
+   * - View was opened directly by user (no tool call)
+   * - Tool result hasn't arrived yet (shouldn't happen after isReady=true)
+   *
+   * This enables clean initialization:
+   * ```typescript
+   * const { isReady, getInitialToolResult } = useHost();
+   * useEffect(() => {
+   *   if (!isReady) return;
+   *   const initial = getInitialToolResult();
+   *   if (initial) {
+   *     // View opened by agent - use the tool result data
+   *     processData(initial.structuredContent);
+   *   } else {
+   *     // View opened by user - fetch initial data
+   *     fetchData();
+   *   }
+   * }, [isReady]);
+   * ```
+   */
+  getInitialToolResult(): ToolResult | null;
 
   // ============================================================================
   // ChatGPT-specific APIs (no-op on MCP Apps hosts)

@@ -33,6 +33,11 @@ import type {
  *
  * Provides a unified interface for MCP Apps hosts. Automatically handles
  * Creature-specific extensions when connected to Creature host.
+ * 
+ * Event Buffering:
+ * Tool-input and tool-result events may arrive before React components
+ * have subscribed (due to useEffect timing). We buffer these events and
+ * replay them when the first subscriber is added, ensuring no data is lost.
  */
 export class McpAppsHostClient extends Subscribable implements UnifiedHostClient {
   readonly environment = "mcp-apps" as const;
@@ -49,17 +54,31 @@ export class McpAppsHostClient extends Subscribable implements UnifiedHostClient
   private instanceId: string | null = null;
 
   /**
-   * Timer for the ready buffer period.
-   * 
-   * After ui/initialize completes, we wait briefly for tool-input/tool-result
-   * messages that may arrive immediately after. This prevents flickering when
-   * pips are opened via tool calls - the app sees the correct initial data
-   * rather than rendering a default view and then switching.
+   * Whether this view was triggered by a tool call.
+   * Determined from openContext.triggeredBy in hostContext.
    */
-  private readyBufferTimer: ReturnType<typeof setTimeout> | null = null;
+  private triggeredByTool = true;
 
-  /** Duration to wait after initialization before setting isReady */
-  private static readonly READY_BUFFER_MS = 500;
+  /**
+   * Whether we've received the initial tool-result notification.
+   * Used to gate isReady when triggeredByTool is true.
+   */
+  private hasReceivedToolResult = false;
+
+  /**
+   * The initial tool result received when view was opened by agent.
+   * Stored for getInitialToolResult() access.
+   */
+  private initialToolResult: ToolResult | null = null;
+
+  /**
+   * Buffered events for replay when subscribers are added.
+   *
+   * Events may arrive before React's useEffect sets up subscriptions.
+   * We buffer them here and replay when the first subscriber is added.
+   */
+  private bufferedToolInput: Record<string, unknown> | null = null;
+  private bufferedToolResult: ToolResult | null = null;
 
   constructor(config: HostClientConfig) {
     super();
@@ -129,16 +148,17 @@ export class McpAppsHostClient extends Subscribable implements UnifiedHostClient
     if (!this.connected) return;
     this.connected = false;
 
-    // Clear any pending ready buffer timer
-    if (this.readyBufferTimer) {
-      clearTimeout(this.readyBufferTimer);
-      this.readyBufferTimer = null;
-    }
-
     if (this.app) {
       this.app.close();
       this.app = null;
     }
+
+    // Clear buffered events and state
+    this.bufferedToolInput = null;
+    this.bufferedToolResult = null;
+    this.hasReceivedToolResult = false;
+    this.initialToolResult = null;
+    this.triggeredByTool = true;
 
     this.setState({ isReady: false });
   }
@@ -217,10 +237,26 @@ export class McpAppsHostClient extends Subscribable implements UnifiedHostClient
         handler as (theme: "light" | "dark") => void | (() => Promise<void> | void)
       );
     }
-    return this.onEvent(
+    
+    // Register the handler
+    const unsubscribe = this.onEvent(
       event as "tool-input" | "tool-result" | "widget-state-change",
       handler as HostClientEvents["tool-input" | "tool-result" | "widget-state-change"]
     );
+    
+    // Replay buffered events to the new subscriber.
+    // Events may have arrived before React's useEffect set up subscriptions.
+    if (event === "tool-input" && this.bufferedToolInput) {
+      const buffered = this.bufferedToolInput;
+      this.bufferedToolInput = null;
+      (handler as HostClientEvents["tool-input"])(buffered);
+    } else if (event === "tool-result" && this.bufferedToolResult) {
+      const buffered = this.bufferedToolResult;
+      this.bufferedToolResult = null;
+      (handler as HostClientEvents["tool-result"])(buffered);
+    }
+    
+    return unsubscribe;
   }
 
   // ============================================================================
@@ -267,6 +303,10 @@ export class McpAppsHostClient extends Subscribable implements UnifiedHostClient
 
       supportsMultiInstance: () => {
         return this.isCreatureHost();
+      },
+
+      getInitialToolResult: () => {
+        return this.initialToolResult;
       },
 
       // ChatGPT-only APIs - no-ops on MCP Apps
@@ -320,35 +360,36 @@ export class McpAppsHostClient extends Subscribable implements UnifiedHostClient
   }
 
   /**
-   * Complete the ready state immediately.
-   * 
-   * Called when tool-input or tool-result arrives during the buffer period.
-   * Since we now have the data, there's no need to wait for the buffer timeout.
+   * Check if there are any subscribers for an event type.
    */
-  private completeReadyState(): void {
-    if (this.readyBufferTimer) {
-      clearTimeout(this.readyBufferTimer);
-      this.readyBufferTimer = null;
-    }
-    if (!this.state.isReady) {
-      this.setState({ isReady: true });
-    }
+  private hasSubscribers(event: keyof HostClientEvents): boolean {
+    return this.getSubscriberCount(event) > 0;
   }
 
   /**
    * Set up notification handlers on the App instance.
+   *
+   * Events are buffered if no subscribers exist yet. When a subscriber
+   * is added via on(), buffered events are replayed immediately.
+   *
+   * For tool-triggered views, isReady is set after tool-result is received.
+   * This ensures getInitialToolResult() has data when the app initializes.
    */
   private setupHandlers(): void {
     if (!this.app) return;
 
     this.app.ontoolinput = (params) => {
       console.debug(`[${this.config.name}] Received tool-input`, { args: params.arguments });
-      
-      // If we receive tool-input during the buffer period, we have the data
-      // we were waiting for - complete ready state immediately
-      this.completeReadyState();
-      
-      this.emit("tool-input", params.arguments || {});
+
+      const args = params.arguments || {};
+
+      if (this.hasSubscribers("tool-input")) {
+        this.emit("tool-input", args);
+      } else {
+        // Buffer for replay when subscriber is added
+        this.bufferedToolInput = args;
+        console.debug(`[${this.config.name}] Buffered tool-input (no subscribers yet)`);
+      }
     };
 
     this.app.ontoolresult = (params) => {
@@ -367,11 +408,26 @@ export class McpAppsHostClient extends Subscribable implements UnifiedHostClient
         }
       }
 
-      // If we receive tool-result during the buffer period, we have the data
-      // we were waiting for - complete ready state immediately
-      this.completeReadyState();
+      // Store initial tool result and set isReady for tool-triggered views
+      if (this.initialToolResult === null && params.source === "agent") {
+        this.initialToolResult = result;
 
-      this.emit("tool-result", result);
+        // Set isReady now that we have the tool result
+        if (!this.hasReceivedToolResult) {
+          this.hasReceivedToolResult = true;
+          if (this.triggeredByTool && !this.state.isReady) {
+            this.setState({ isReady: true });
+          }
+        }
+      }
+
+      if (this.hasSubscribers("tool-result")) {
+        this.emit("tool-result", result);
+      } else {
+        // Buffer for replay when subscriber is added
+        this.bufferedToolResult = result;
+        console.debug(`[${this.config.name}] Buffered tool-result (no subscribers yet)`);
+      }
     };
 
     this.app.onhostcontextchanged = (params) => {
@@ -388,10 +444,12 @@ export class McpAppsHostClient extends Subscribable implements UnifiedHostClient
 
   /**
    * Initiate connection using PostMessageTransport.
-   * 
-   * After ui/initialize completes, we start a buffer period before setting
-   * isReady. This allows tool-input/tool-result messages to arrive first,
-   * preventing flickering when pips are opened via tool calls.
+   *
+   * For user-triggered views: Sets isReady immediately after connection.
+   * For tool-triggered views: Waits for tool-result before setting isReady.
+   * This ensures getInitialToolResult() has data when the app initializes.
+   *
+   * Events that arrive before React subscribes are buffered and replayed.
    */
   private async initiateConnection(): Promise<void> {
     if (!this.app) return;
@@ -407,6 +465,9 @@ export class McpAppsHostClient extends Subscribable implements UnifiedHostClient
         this.hostContext = hostContext;
         this.applyHostContext(hostContext);
 
+        // Determine if view was triggered by tool call
+        this.triggeredByTool = hostContext.openContext?.triggeredBy !== "user";
+
         // Restore widget state if provided by host
         if (hostContext.widgetState) {
           this.setState({ widgetState: hostContext.widgetState });
@@ -414,14 +475,12 @@ export class McpAppsHostClient extends Subscribable implements UnifiedHostClient
         }
       }
 
-      // Start buffer period before setting isReady.
-      // If tool-input/tool-result arrives during this period, isReady will be
-      // set immediately (see completeReadyState). Otherwise, it fires after the timeout.
-      // This prevents flickering when pips are opened via tool calls.
-      this.readyBufferTimer = setTimeout(() => {
-        this.readyBufferTimer = null;
+      // For user-triggered views, set ready immediately.
+      // For tool-triggered views, wait for tool-result (handled in setupHandlers).
+      if (!this.triggeredByTool) {
         this.setState({ isReady: true });
-      }, McpAppsHostClient.READY_BUFFER_MS);
+      }
+      // If tool-triggered, isReady will be set when tool-result arrives
     } catch (error) {
       console.error(`[${this.config.name}] Connection failed`, { error });
     }

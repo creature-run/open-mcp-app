@@ -10,6 +10,13 @@
  * - Processing tool results from agent and UI
  * - Widget state persistence and restoration
  * - Initial data fetching
+ *
+ * Initialization Flow:
+ * When `isReady` becomes true, we check `exp.getInitialToolResult()`:
+ * - If it returns data: View was opened by agent tool call - use that data
+ * - If it returns null: View was opened by user - fetch the list
+ *
+ * This eliminates race conditions between agent-initiated and user-initiated opens.
  */
 
 import { useEffect, useCallback, useState, useRef } from "react";
@@ -22,6 +29,8 @@ import type { Note, NoteSummary, NoteData, NoteWidgetState, ViewType } from "./t
  * Provides everything needed to render the notes UI.
  */
 export interface UseNotesReturn {
+  /** Whether the host connection is ready */
+  isReady: boolean;
   /** Current view mode */
   view: ViewType;
   /** Currently loaded note (for editor view) */
@@ -64,8 +73,7 @@ export const useNotes = (): UseNotesReturn => {
 
   // Refs for tracking state across renders
   const instanceIdRef = useRef<string | null>(null);
-  const hasLoggedReady = useRef(false);
-  const hasInitiallyFetched = useRef(false);
+  const hasInitialized = useRef(false);
   const lastSavedContentRef = useRef<string | null>(null);
   const hasRestoredState = useRef(false);
 
@@ -77,6 +85,7 @@ export const useNotes = (): UseNotesReturn => {
     callTool,
     isReady,
     log,
+    exp,
     exp_widgetState,
     onToolResult,
     environment: hostEnvironment,
@@ -85,15 +94,17 @@ export const useNotes = (): UseNotesReturn => {
   // Widget state for persistence
   const [widgetState, setWidgetState] = exp_widgetState<NoteWidgetState>();
 
-  // Tool callers
+  // Tool callers - all UI-initiated calls return results that we process client-side
   const [listTool, listState] = callTool<NoteData>("notes_list");
-  const [createTool] = callTool<NoteData>("notes_create");
+  const [createTool, createState] = callTool<NoteData>("notes_create");
   const [openTool, openState] = callTool<NoteData>("notes_open");
-  const [saveTool] = callTool<NoteData>("notes_save");
+  const [saveTool, saveState] = callTool<NoteData>("notes_save");
 
   /**
    * Process incoming note data from any source (agent or UI tool calls).
-   * Updates view, notes list, or note editor based on the data shape.
+   *
+   * List results should not override an active editor view, so list updates
+   * only switch views when the app is already in list mode.
    */
   const processNoteData = useCallback(
     (data: NoteData | null) => {
@@ -104,11 +115,15 @@ export const useNotes = (): UseNotesReturn => {
         instanceIdRef.current = data.instanceId;
       }
 
-      // List view data - switch to list and update notes
+      // List view data - update notes, only switch view if already in list
       if (data.view === "list" && data.notes) {
-        setView("list");
         setNotes(data.notes);
-        log.debug("List view updated", { count: data.notes.length });
+        if (view === "list") {
+          setView("list");
+          log.debug("List view updated", { count: data.notes.length });
+        } else {
+          log.debug("List data updated while editing", { count: data.notes.length });
+        }
         return;
       }
 
@@ -137,7 +152,7 @@ export const useNotes = (): UseNotesReturn => {
         }
       }
     },
-    [log, note?.id]
+    [log, note?.id, view]
   );
 
   // ===========================================================================
@@ -198,49 +213,55 @@ export const useNotes = (): UseNotesReturn => {
   /**
    * Refresh the notes list (for polling).
    * Silent - no logging to keep console clean.
+   *
+   * Only runs while in list view to avoid overriding editor state.
    */
   const refreshList = useCallback(async () => {
+    if (view !== "list") {
+      return;
+    }
     try {
       await listTool({});
     } catch {
       // Silent failure for polling
     }
-  }, [listTool]);
+  }, [listTool, view]);
 
   // ===========================================================================
   // Effects
   // ===========================================================================
 
   /**
-   * Log when connection is ready.
+   * Initialize app when host is ready.
+   *
+   * Uses getInitialToolResult() to determine how the view was opened:
+   * - If it returns data: Agent opened this view with a tool call - use that data
+   * - If it returns null: User opened this view directly - fetch the list
+   *
+   * This single check replaces the previous complex logic with multiple refs
+   * and race condition handling.
    */
   useEffect(() => {
-    if (isReady && !hasLoggedReady.current) {
-      hasLoggedReady.current = true;
-      log.info("Notes app connected", { environment: hostEnvironment });
-    }
-  }, [isReady, log, hostEnvironment]);
+    if (!isReady || hasInitialized.current) return;
+    hasInitialized.current = true;
 
-  /**
-   * Fetch initial data when ready and in list view.
-   *
-   * Only fetches if the current view is "list" when isReady becomes true.
-   * This prevents overwriting editor view when pip is opened via agent tool call
-   * (e.g., notes_create sets view to "editor" via onToolResult before isReady).
-   *
-   * If pip opens to editor view (agent tool call), the list fetch is skipped.
-   * When user later navigates to list view, this effect re-runs and fetches.
-   */
-  useEffect(() => {
-    if (isReady && !hasInitiallyFetched.current && view === "list") {
-      hasInitiallyFetched.current = true;
+    log.info("Notes app connected", { environment: hostEnvironment });
+
+    const initialResult = exp.getInitialToolResult();
+    if (initialResult) {
+      // View was opened by agent tool call - use the result data
+      log.debug("Initialized from agent tool result");
+      processNoteData(initialResult.structuredContent as unknown as NoteData);
+    } else {
+      // View was opened by user - fetch initial list
+      log.debug("Initialized by user - fetching list");
       listTool();
     }
-  }, [isReady, listTool, view]);
+  }, [isReady, exp, log, hostEnvironment, processNoteData, listTool]);
 
   /**
-   * Subscribe to agent-initiated tool calls.
-   * When the agent calls a tool (not the UI), we receive a tool-result notification.
+   * Subscribe to subsequent agent-initiated tool calls.
+   * After initialization, agent may call additional tools (e.g., open a different note).
    */
   useEffect(() => {
     return onToolResult((result) => {
@@ -251,22 +272,32 @@ export const useNotes = (): UseNotesReturn => {
   }, [onToolResult, processNoteData]);
 
   /**
-   * Handle data from UI-initiated list tool calls.
+   * Handle data from UI-initiated tool calls.
+   * Each tool's result is processed to update the view accordingly.
+   * This is the simple SPA approach - UI calls tool, processes result, updates view.
    */
   useEffect(() => {
     processNoteData(listState.data);
   }, [listState.data, processNoteData]);
 
-  /**
-   * Handle data from UI-initiated open tool calls.
-   */
+  useEffect(() => {
+    processNoteData(createState.data);
+  }, [createState.data, processNoteData]);
+
   useEffect(() => {
     processNoteData(openState.data);
   }, [openState.data, processNoteData]);
 
+  useEffect(() => {
+    processNoteData(saveState.data);
+  }, [saveState.data, processNoteData]);
+
   /**
-   * Restore from widget state on mount.
+   * Restore from widget state on mount (before initialization completes).
    * Shows previous state immediately while fresh data loads.
+   *
+   * This runs independently of the initialization effect to provide
+   * instant UI feedback while actual data is being fetched.
    */
   useEffect(() => {
     if (hasRestoredState.current || !widgetState?.privateContent) {
@@ -321,6 +352,7 @@ export const useNotes = (): UseNotesReturn => {
   }, [view, note, notes, setWidgetState]);
 
   return {
+    isReady,
     view,
     note,
     notes,

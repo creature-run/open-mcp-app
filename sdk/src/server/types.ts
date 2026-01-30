@@ -115,18 +115,6 @@ export interface ResourceExperimentalConfig {
   pipRules?: PipRules;
 
   /**
-   * Allow multiple instances of this resource.
-   * 
-   * @deprecated Use `pipRules` instead for fine-grained control.
-   * 
-   * - false: Singleton. SDK reuses the same instanceId for all tool calls.
-   * - true: Multi-instance. SDK generates new instanceId each time (unless provided in input).
-   * 
-   * Note: multiInstance is only supported on Creature. On ChatGPT, resources always behave as singleton.
-   */
-  multiInstance?: boolean;
-
-  /**
    * Enable WebSocket for real-time communication with the UI.
    * When true, SDK automatically manages WebSocket lifecycle and provides
    * `context.send()` and `context.onMessage()` in tool handlers.

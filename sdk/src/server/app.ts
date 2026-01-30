@@ -54,12 +54,6 @@ export class App {
   /** Callbacks to invoke when an instance is destroyed. */
   private instanceDestroyCallbacks: Array<(ctx: InstanceDestroyContext) => void> = [];
 
-  /** Singleton instanceIds per resourceUri (for non-multiInstance resources). */
-  private singletonInstances = new Map<string, string>();
-
-  /** Whether the connected host supports multiInstance. ChatGPT doesn't, Creature does. */
-  private hostSupportsMultiInstance = false;
-
   /** The connected client type for format-specific responses. */
   private clientType: "creature" | "claude" | "chatgpt" | "unknown" = "unknown";
 
@@ -480,9 +474,6 @@ export class App {
         if (config.experimental?.pipRules) {
           experimental.pipRules = config.experimental.pipRules;
         }
-        if (config.experimental?.multiInstance) {
-          experimental.multiInstance = config.experimental.multiInstance;
-        }
         
         resources.push({
           uri,
@@ -636,36 +627,19 @@ export class App {
   }
 
   /**
-   * Resolve instanceId for a tool call based on resource configuration.
+   * Resolve instanceId for a tool call.
    * 
-   * - Singleton resources (default): Reuse same instanceId per resourceUri
-   * - Multi-instance resources: Generate new instanceId (unless provided in input)
+   * The host (control plane) owns routing decisions and passes instanceId.
+   * SDK uses the provided instanceId for state management, or generates
+   * a new one if not provided (fallback for hosts that don't manage routing).
    * 
-   * @param resourceUri The resource URI from tool config
-   * @param inputInstanceId instanceId from tool call input args (if any)
+   * @param inputInstanceId - instanceId from tool call input args (provided by host)
    */
-  private resolveInstanceId(resourceUri: string, inputInstanceId: unknown): string {
-    // If instanceId provided in input, always use it (for both singleton and multi-instance)
+  private resolveInstanceId(inputInstanceId: unknown): string {
     if (typeof inputInstanceId === "string") {
       return inputInstanceId;
     }
-
-    const resource = this.resources.get(resourceUri);
-    const isMultiInstance = resource?.config.experimental?.multiInstance && this.hostSupportsMultiInstance;
-
-    if (isMultiInstance) {
-      // Multi-instance: always generate new
-      return this.generateInstanceId();
-    }
-
-    // Singleton: reuse existing or create once
-    let instanceId = this.singletonInstances.get(resourceUri);
-    if (!instanceId) {
-      instanceId = this.generateInstanceId();
-      this.singletonInstances.set(resourceUri, instanceId);
-      console.log(`[MCP] Singleton instance created for ${resourceUri}: ${instanceId}`);
-    }
-    return instanceId;
+    return this.generateInstanceId();
   }
 
   // ==========================================================================
@@ -750,18 +724,14 @@ export class App {
         const clientName = req.body?.params?.clientInfo?.name?.toLowerCase() || "";
         if (clientName === "creature") {
           this.clientType = "creature";
-          this.hostSupportsMultiInstance = true;
         } else if (clientName.includes("claude")) {
           this.clientType = "claude";
-          this.hostSupportsMultiInstance = false;
         } else if (clientName.includes("chatgpt") || clientName.includes("openai")) {
           this.clientType = "chatgpt";
-          this.hostSupportsMultiInstance = false;
         } else {
           this.clientType = "unknown";
-          this.hostSupportsMultiInstance = false;
         }
-        console.log(`[MCP] Client: ${clientName}, type: ${this.clientType}, multiInstance: ${this.hostSupportsMultiInstance}`);
+        console.log(`[MCP] Client: ${clientName}, type: ${this.clientType}`);
 
         transport = this.createTransport();
         const server = this.createMcpServer();
@@ -878,9 +848,6 @@ export class App {
       if (config.experimental?.pipRules) {
         experimental.pipRules = config.experimental.pipRules;
       }
-      if (config.experimental?.multiInstance) {
-        experimental.multiInstance = config.experimental.multiInstance;
-      }
       
       server.registerResource(
         config.name,
@@ -996,9 +963,10 @@ export class App {
             const input = config.input ? config.input.parse(args) : args;
 
             // Determine instanceId for tools with UI
+            // Host (control plane) passes instanceId for routing; SDK uses it for state
             let instanceId: string | undefined;
             if (hasUi && config.ui) {
-              instanceId = this.resolveInstanceId(config.ui, args.instanceId);
+              instanceId = this.resolveInstanceId(args.instanceId);
             }
 
             // Get resource config for WebSocket setup

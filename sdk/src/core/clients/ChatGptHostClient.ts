@@ -245,6 +245,11 @@ export class ChatGptHostClient extends Subscribable implements UnifiedHostClient
         return false;
       },
 
+      getInitialToolResult: () => {
+        // ChatGPT uses toolOutput which is already processed on connect
+        return null;
+      },
+
       // ChatGPT-specific APIs
       sendFollowUpMessage: async (prompt: string) => {
         if (window.openai?.sendFollowUpMessage) {

@@ -134,6 +134,7 @@ export type {
   ToolResult,
   // Host Context
   HostContext,
+  OpenContext,
   // Content Blocks
   ContentBlock,
   TextContentBlock,

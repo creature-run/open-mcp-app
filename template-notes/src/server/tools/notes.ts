@@ -4,17 +4,15 @@
  * Separate tools for each note operation:
  * - notes_list: Show searchable list of all notes
  * - notes_create: Create new note (always new pip)
- * - notes_open: Open existing note in editor (one pip per noteId)
- * - notes_save: Update existing note (no UI change)
- * - notes_delete: Remove a note (no UI change)
+ * - notes_open: Open existing note in editor
+ * - notes_save: Update existing note
+ * - notes_delete: Remove a note
  *
  * Pip Routing (via pipRules on resource):
- * - notes_list: defaults to "single" - one list pip, reused
- * - notes_open/:noteId: "single" - one pip per noteId value
- * - notes_create: "new" - always creates a new pip
- * 
- * All tools reference the same NOTES_UI_URI. The pip routing is handled
- * by the pipRules configuration on the resource, not by separate URIs.
+ * - notes_open/:noteId → find pip where widgetState.modelContent.noteId matches
+ * - notes_save/:noteId → find pip where widgetState.modelContent.noteId matches
+ * - notes_create → always creates a new pip
+ * - notes_list → defaults to "single" (reuse any pip for this resource)
  */
 
 import { z } from "zod";
@@ -150,7 +148,7 @@ const handleOpen = async (
 
 /**
  * Save changes to a note.
- * Does NOT open or change windows.
+ * Routes result to existing editor pip for that noteId.
  */
 const handleSave = async (
   { noteId, title, content }: z.infer<typeof NotesSaveSchema>,
@@ -171,7 +169,8 @@ const handleSave = async (
   await store.set(noteId, note);
 
   return {
-    data: { success: true, note },
+    data: { note, view: "editor" },
+    title: note.title,
     text: `Saved note: ${note.title}`,
   };
 };
@@ -209,12 +208,8 @@ const handleDelete = async (
 /**
  * Register all notes tools.
  *
- * Multi-instance behavior:
- * - notes_list: Uses NOTES_LIST_URI (singleton) - only one list view
- * - notes_create: Uses NOTE_EDITOR_URI (multiInstance) - always new window
- * - notes_open: Uses NOTE_EDITOR_URI (multiInstance) - opens in new window
- * - notes_save: No UI - doesn't change windows
- * - notes_delete: No UI - doesn't change windows
+ * Pip routing is handled by pipRules on the resource. The control plane
+ * finds the correct pip by matching widgetState.modelContent.noteId.
  */
 export const registerNotesTools = (app: App) => {
   /**
@@ -282,13 +277,14 @@ export const registerNotesTools = (app: App) => {
 
   /**
    * Save changes to a note.
-   * No UI - doesn't open or change windows.
+   * Routes result to existing editor pip for that noteId.
    */
   app.tool(
     "notes_save",
     {
       description: "Save changes to an existing note",
       input: NotesSaveSchema,
+      ui: NOTES_UI_URI,
       visibility: ["model", "app"],
     },
     async (input: z.infer<typeof NotesSaveSchema>, context: ToolContext) => {

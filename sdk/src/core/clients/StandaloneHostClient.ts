@@ -189,6 +189,11 @@ export class StandaloneHostClient extends Subscribable implements UnifiedHostCli
         return false;
       },
 
+      getInitialToolResult: () => {
+        // No tool results in standalone mode
+        return null;
+      },
+
       // ChatGPT-only APIs - no-ops
       sendFollowUpMessage: async (_prompt: string) => {
         // No-op

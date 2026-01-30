@@ -63,9 +63,13 @@ export default function App() {
  *
  * Thin rendering layer that delegates all state management to useNotes hook.
  * Simply decides which view to render based on the current state.
+ *
+ * Shows a loading spinner until the host connection is ready.
+ * This prevents flickering between views during initialization.
  */
 function NotesApp() {
   const {
+    isReady,
     view,
     note,
     notes,
@@ -77,6 +81,15 @@ function NotesApp() {
     createNote,
     refreshList,
   } = useNotes();
+
+  // Show loading spinner until host is ready
+  if (!isReady) {
+    return (
+      <div className="loading-container">
+        <div className="loading-spinner" />
+      </div>
+    );
+  }
 
   // Render editor view if editing a note
   if (view === "editor" && note) {
