@@ -243,30 +243,6 @@ export interface ToolContext {
    */
   instanceId: string;
   /**
-   * Creature token for identity retrieval.
-   * Present when either:
-   * 1. Tool call originated from Creature host (injected via `_creatureToken` arg)
-   * 2. Tool call includes OAuth bearer token in Authorization header (ChatGPT/other hosts)
-   *
-   * Use `getIdentity(context.creatureToken)` to retrieve user identity
-   * for multi-tenant data access.
-   *
-   * @example
-   * ```typescript
-   * app.tool("save_note", { ... }, async ({ content }, context) => {
-   *   if (!context.creatureToken) {
-   *     return { error: "Authentication required" };
-   *   }
-   *   const identity = await getIdentity(context.creatureToken);
-   *   await db.notes.insert({
-   *     user_id: identity.user.id,
-   *     content,
-   *   });
-   * });
-   * ```
-   */
-  creatureToken?: string;
-  /**
    * Get server-side state for this instance.
    * State is NOT sent to UI — use for PIDs, connections, handles.
    */
@@ -347,30 +323,6 @@ export interface TransportSessionInfo {
 }
 
 // ============================================================================
-// Auth Configuration
-// ============================================================================
-
-/**
- * Creature-managed authentication configuration.
- * When enabled, Creature provides user identity and tokens to your app.
- */
-export interface CreatureAuthConfig {
-  /**
-   * Enable Creature-managed authentication.
-   * When true, your app receives user identity (id, email, name) and
-   * organization/project context via hostContext.creature.
-   *
-   * Apps can use this for:
-   * - Auto-registering users without login screens
-   * - Scoping data to users/orgs/projects
-   * - Backend API calls with verified identity
-   *
-   * @default false
-   */
-  creatureManaged?: boolean;
-}
-
-// ============================================================================
 // App Configuration
 // ============================================================================
 
@@ -382,14 +334,6 @@ export interface AppConfig {
   name: string;
   /** App version */
   version: string;
-  /**
-   * Authentication configuration.
-   * Enable Creature-managed auth to receive user identity automatically.
-   *
-   * @example
-   * auth: { creatureManaged: true }
-   */
-  auth?: CreatureAuthConfig;
   /**
    * High-level instructions for using this MCP.
    * Sent to the model during initialization to provide context about

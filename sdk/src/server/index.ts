@@ -24,13 +24,3 @@ export type {
 export { MIME_TYPES } from "./types.js";
 
 export { wrapServer } from "./middleware.js";
-
-// Auth utilities for retrieving identity from Creature-issued tokens
-export { getIdentity, CreatureIdentityError } from "./auth.js";
-export type {
-  CreatureIdentity,
-  CreatureUser,
-  CreatureOrganization,
-  CreatureProject,
-  CreatureSession,
-} from "./auth.js";

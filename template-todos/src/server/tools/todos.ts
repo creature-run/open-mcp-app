@@ -9,7 +9,7 @@
  * - todos_toggle: Toggle a todo's completed status
  * - todos_remove: Delete a todo item
  *
- * Todos are scoped by orgId and projectId from Creature identity.
+ * Todos are scoped by instanceId.
  */
 
 import { z } from "zod";

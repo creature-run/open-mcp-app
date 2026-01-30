@@ -28,7 +28,6 @@ const app = createApp({
   name: MCP_NAME,
   version: "0.1.0",
   port: PORT,
-  auth: { creatureManaged: true },
   instructions: `This MCP manages a todo list with separate tools:
 
 - todos_list - Display all todos in the interactive list
@@ -57,21 +56,6 @@ app.resource({
 // =============================================================================
 
 registerTodosTools(app);
-
-// =============================================================================
-// OAuth Discovery (for ChatGPT and other OAuth clients)
-// =============================================================================
-
-app.serveOAuthDiscovery({
-  path: "/.well-known/oauth-authorization-server",
-  issuer: "https://creature.run",
-  authorization_endpoint: "https://creature.run/oauth/authorize",
-  token_endpoint: "https://api.creature.run/apps/v1/oauth/token",
-  response_types_supported: ["code"],
-  grant_types_supported: ["authorization_code", "refresh_token"],
-  code_challenge_methods_supported: ["S256"],
-  token_endpoint_auth_methods_supported: ["client_secret_basic", "client_secret_post"],
-});
 
 // =============================================================================
 // Start Server

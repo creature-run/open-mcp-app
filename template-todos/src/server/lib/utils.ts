@@ -2,16 +2,12 @@
  * Tool Utilities
  *
  * Shared helper functions used by todo tools.
- * Handles ID generation, authentication, and store creation.
+ * Handles ID generation and store creation.
  *
- * Cross-Platform Support:
- * - Creature (MCP Apps): Uses creatureToken for user identity and cloud storage
- * - ChatGPT Apps: Uses OAuth token (via creatureToken) for identity
- * - Generic MCP Apps: Falls back to local/anonymous storage (instanceId-scoped)
+ * Data is scoped by instanceId for local storage.
  */
 
-import { getIdentity } from "open-mcp-app/server";
-import { createDataStore, type DataScope, type DataStore } from "./data.js";
+import { createDataStore, type DataStore } from "./data.js";
 import type { Todo, ToolContext, ToolResult } from "./types.js";
 
 // =============================================================================
@@ -49,71 +45,27 @@ export const getTodoCounts = (todos: Todo[]) => ({
 });
 
 // =============================================================================
-// Authentication & Scope
+// Store Creation
 // =============================================================================
 
 /**
- * Extract scope from authentication context.
- *
- * Supports multiple authentication modes:
- * 1. Creature with project: Returns { orgId, projectId } for cloud storage
- * 2. ChatGPT/OAuth: Returns { orgId } for org-level cloud storage
- * 3. Anonymous/Local: Returns { localId } for local/session storage
- *
- * @param creatureToken - Token from Creature or OAuth bearer token
- * @param instanceId - Instance ID for fallback local scope
- * @returns DataScope for store creation
+ * Create a todo store scoped by localId.
  */
-export const extractScope = async (
-  creatureToken?: string,
-  instanceId?: string
-): Promise<DataScope> => {
-  // If we have a token, try to get identity for cloud storage
-  if (creatureToken) {
-    try {
-      const identity = await getIdentity(creatureToken);
-
-      if (identity.organization) {
-        return {
-          orgId: identity.organization.id,
-          projectId: identity.project?.id,
-        };
-      }
-    } catch (err) {
-      // Token invalid or API unavailable - fall through to local mode
-      console.warn("[Todos] Failed to get identity, using local storage:", err);
-    }
-  }
-
-  // Fall back to local/anonymous mode using a stable local ID
-  // This allows the app to work in generic MCP Apps hosts without auth
-  return {
-    localId: instanceId || "anonymous",
-  };
-};
-
-/**
- * Create a scoped todo store based on scope.
- */
-export const createTodoStore = (scope: DataScope): DataStore<Todo> => {
+export const createTodoStore = (localId: string): DataStore<Todo> => {
   return createDataStore<Todo>({
     collection: "mcps_todos_todos",
-    scope,
+    localId,
   });
 };
 
 /**
- * Handle authentication and return store.
- * Wraps tool handlers with auth logic to reduce boilerplate.
- *
- * Unlike previous versions, this no longer fails if auth is unavailable.
- * Instead, it falls back to local storage mode for generic MCP Apps hosts.
+ * Wrap tool handlers with store creation.
+ * Creates a store scoped by instanceId.
  */
 export const withAuth = async (
   context: ToolContext,
   handler: (store: DataStore<Todo>) => Promise<ToolResult>
 ): Promise<ToolResult> => {
-  const scope = await extractScope(context.creatureToken, context.instanceId);
-  const store = createTodoStore(scope);
+  const store = createTodoStore(context.instanceId || "anonymous");
   return handler(store);
 };
