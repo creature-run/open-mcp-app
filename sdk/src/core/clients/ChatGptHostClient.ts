@@ -1,13 +1,25 @@
-import { Subscribable } from "./Subscribable.js";
+/**
+ * ChatGPT Host Client
+ *
+ * Unified host client for ChatGPT Apps environment.
+ * Bridges the ChatGPT Apps SDK (`window.openai`) to the unified interface.
+ */
+
+import { Subscribable } from "../subscribable.js";
 import type {
+  ContentBlock,
   DisplayMode,
-  BaseHostClient,
+  ExpHostApi,
   HostClientConfig,
+  HostClientEvents,
   HostClientState,
+  HostContext,
   LogLevel,
+  StateListener,
   ToolResult,
+  UnifiedHostClient,
   WidgetState,
-} from "./types.js";
+} from "../types.js";
 
 /**
  * OpenAI bridge interface exposed by ChatGPT Apps SDK.
@@ -25,6 +37,9 @@ interface OpenAIBridge {
     content?: Array<{ type: string; text?: string }>;
   }>;
   requestDisplayMode?: (args: { mode: string }) => Promise<{ mode: string }>;
+  sendFollowUpMessage?: (prompt: string) => Promise<void>;
+  requestModal?: (options: { title?: string; params?: Record<string, unknown> }) => Promise<unknown>;
+  requestClose?: () => Promise<void>;
 }
 
 declare global {
@@ -34,31 +49,25 @@ declare global {
 }
 
 /**
- * ChatGPT Apps base host client implementation.
+ * ChatGPT host client implementation.
  *
- * Bridges the ChatGPT Apps SDK (`window.openai`) to provide a spec-compliant interface.
- * Handles initial data processing, globals updates, and widget state synchronization.
+ * Bridges the ChatGPT Apps SDK to provide a unified interface.
+ * MCP-specific features are no-ops.
  */
-export class ChatGptBaseHostClient extends Subscribable implements BaseHostClient {
-  // ============================================================================
-  // Private Properties
-  // ============================================================================
+export class ChatGptHostClient extends Subscribable implements UnifiedHostClient {
+  readonly environment = "chatgpt" as const;
 
   private state: HostClientState = {
     isReady: false,
     environment: "chatgpt",
     widgetState: null,
   };
-  protected config: HostClientConfig;
+  private config: HostClientConfig;
   private connected = false;
   private hasProcessedInitialData = false;
   private globalsHandler: ((event: Event) => void) | null = null;
   private lastToolOutputJson: string | null = null;
   private lastWidgetStateJson: string | null = null;
-
-  // ============================================================================
-  // Constructor
-  // ============================================================================
 
   constructor(config: HostClientConfig) {
     super();
@@ -66,14 +75,41 @@ export class ChatGptBaseHostClient extends Subscribable implements BaseHostClien
   }
 
   // ============================================================================
-  // Public API
+  // Static Factory
   // ============================================================================
 
   /**
-   * Get the current client state.
+   * Create a ChatGPT host client instance.
    */
+  static create(config: HostClientConfig): ChatGptHostClient {
+    return new ChatGptHostClient(config);
+  }
+
+  /**
+   * Check if the current environment is ChatGPT.
+   */
+  static detect(): boolean {
+    if (typeof window === "undefined") return false;
+    return "openai" in window && !!window.openai;
+  }
+
+  // ============================================================================
+  // UnifiedHostClient Implementation
+  // ============================================================================
+
   getState(): HostClientState {
     return this.state;
+  }
+
+  /**
+   * Get host context - returns null for ChatGPT as it doesn't use MCP Apps protocol.
+   */
+  getHostContext(): HostContext | null {
+    return null;
+  }
+
+  subscribe(listener: StateListener): () => void {
+    return this.subscribeToState(listener);
   }
 
   /**
@@ -92,8 +128,6 @@ export class ChatGptBaseHostClient extends Subscribable implements BaseHostClien
 
   /**
    * Disconnect from the host.
-   *
-   * Removes the globals event listener and cleanup.
    */
   disconnect(): void {
     if (!this.connected) return;
@@ -134,30 +168,6 @@ export class ChatGptBaseHostClient extends Subscribable implements BaseHostClien
   }
 
   /**
-   * Set widget state and sync with the ChatGPT host.
-   */
-  setWidgetState(state: WidgetState | null): void {
-    this.setState({ widgetState: state });
-
-    if (window.openai?.setWidgetState) {
-      // Pass empty object when clearing state (ChatGPT may not support null)
-      window.openai.setWidgetState(state ?? {});
-    }
-
-    this.emit("widget-state-change", state);
-  }
-
-  /**
-   * Log a message to the console.
-   *
-   * ChatGPT doesn't have a DevConsole, so logs go to browser console only.
-   */
-  log(level: LogLevel, message: string, data?: Record<string, unknown>): void {
-    const consoleMethod = level === "error" ? "error" : level === "warning" ? "warn" : "log";
-    console[consoleMethod](`[${this.config.name}]`, message, data ?? "");
-  }
-
-  /**
    * Request a display mode change from the ChatGPT host.
    */
   async requestDisplayMode(params: { mode: DisplayMode }): Promise<{ mode: DisplayMode }> {
@@ -171,6 +181,92 @@ export class ChatGptBaseHostClient extends Subscribable implements BaseHostClien
     return { mode: params.mode };
   }
 
+  /**
+   * Log a message to the console.
+   * ChatGPT doesn't have a DevConsole, so logs go to browser console only.
+   */
+  log(level: LogLevel, message: string, data?: Record<string, unknown>): void {
+    const consoleMethod = level === "error" ? "error" : level === "warning" ? "warn" : "log";
+    console[consoleMethod](`[${this.config.name}]`, message, data ?? "");
+  }
+
+  on<K extends keyof HostClientEvents>(
+    event: K,
+    handler: HostClientEvents[K]
+  ): () => void {
+    // theme-change and teardown are no-ops on ChatGPT
+    if (event === "theme-change" || event === "teardown") {
+      return () => {};
+    }
+    return this.onEvent(
+      event as "tool-input" | "tool-result" | "widget-state-change",
+      handler as HostClientEvents["tool-input" | "tool-result" | "widget-state-change"]
+    );
+  }
+
+  // ============================================================================
+  // Experimental API
+  // ============================================================================
+
+  /**
+   * Experimental APIs for non-standard features.
+   */
+  get exp(): ExpHostApi {
+    return {
+      setWidgetState: (state: WidgetState | null) => {
+        this.setState({ widgetState: state });
+
+        if (window.openai?.setWidgetState) {
+          // Pass empty object when clearing state (ChatGPT may not support null)
+          window.openai.setWidgetState(state ?? {});
+        }
+
+        this.emit("widget-state-change", state);
+      },
+
+      setTitle: (_title: string) => {
+        // No-op on ChatGPT
+      },
+
+      updateModelContext: async (_content: ContentBlock[]) => {
+        // No-op on ChatGPT
+      },
+
+      sendNotification: (_method: string, _params: unknown) => {
+        // No-op on ChatGPT
+      },
+
+      getInstanceId: () => {
+        // ChatGPT may have widgetSessionId, but we don't expose it
+        return null;
+      },
+
+      supportsMultiInstance: () => {
+        return false;
+      },
+
+      // ChatGPT-specific APIs
+      sendFollowUpMessage: async (prompt: string) => {
+        if (window.openai?.sendFollowUpMessage) {
+          await window.openai.sendFollowUpMessage(prompt);
+        }
+      },
+
+      requestModal: async (options: { title?: string; params?: Record<string, unknown> }) => {
+        if (window.openai?.requestModal) {
+          return await window.openai.requestModal(options);
+        }
+        return null;
+      },
+
+      requestClose: async () => {
+        if (window.openai?.requestClose) {
+          await window.openai.requestClose();
+        }
+      },
+    };
+  }
+
   // ============================================================================
   // Private Methods
   // ============================================================================
@@ -178,7 +274,7 @@ export class ChatGptBaseHostClient extends Subscribable implements BaseHostClien
   /**
    * Update internal state and notify listeners.
    */
-  protected setState(partial: Partial<HostClientState>): void {
+  private setState(partial: Partial<HostClientState>): void {
     const prev = this.state;
     this.state = { ...this.state, ...partial };
     this.notifyStateChange(this.state, prev);
@@ -186,9 +282,6 @@ export class ChatGptBaseHostClient extends Subscribable implements BaseHostClien
 
   /**
    * Process initial data from `window.openai`.
-   *
-   * Called once on connect to handle any tool output or widget state
-   * that was set before the client connected.
    */
   private processInitialData(): void {
     if (this.hasProcessedInitialData) return;
@@ -215,10 +308,6 @@ export class ChatGptBaseHostClient extends Subscribable implements BaseHostClien
 
   /**
    * Set up listener for `openai:set_globals` events.
-   *
-   * ChatGPT dispatches this event when tool output or widget state
-   * changes after initial load. Uses JSON comparison to prevent
-   * infinite loops from unchanged data.
    */
   private setupGlobalsListener(): void {
     this.globalsHandler = (event: Event) => {

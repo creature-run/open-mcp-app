@@ -1,65 +1,66 @@
 /**
- * Notes Tool
+ * Notes Tools
  *
- * Single tool for all note operations. All actions route to the same UI.
+ * Separate tools for each note operation:
+ * - notes_list: Show searchable list of all notes (singleton instance)
+ * - notes_create: Create new note (always new instance)
+ * - notes_open: Open existing note in editor
+ * - notes_save: Update existing note (no UI change)
+ * - notes_delete: Remove a note (no UI change)
  *
- * Actions:
- * - list: Show searchable list of all notes
- * - open: Open existing note in editor
- * - create: Create new note in editor
- * - read: Get note content (for AI processing)
- * - save: Update existing note
- * - delete: Remove a note
- *
- * Notes are scoped by orgId and projectId from Creature identity.
+ * Multi-Instance Behavior:
+ * - notes_list: Singleton - only one list view at a time
+ * - notes_create: Multi-instance - always creates a new editor window
+ * - notes_open: Multi-instance - opens note in a new editor window
+ * - notes_save, notes_delete: No UI - don't open/create/change windows
  */
 
 import { z } from "zod";
 import type { App } from "open-mcp-app/server";
 import type { DataStore } from "../lib/data.js";
 import {
-  NOTE_UI_URI,
+  NOTE_EDITOR_URI,
+  NOTES_LIST_URI,
   type Note,
+  type NoteSummary,
   type NoteInstanceState,
   type ToolContext,
   type ToolResult,
 } from "../lib/types.js";
-import { generateNoteId, getAllNotes, withAuth } from "../lib/utils.js";
+import { generateNoteId, getAllNotes, withStore } from "../lib/utils.js";
 
 // =============================================================================
-// Input Schema
+// Input Schemas
 // =============================================================================
 
-const NotesSchema = z.object({
-  action: z
-    .enum(["list", "open", "create", "read", "save", "delete"])
-    .describe("Action to perform on notes"),
-  noteId: z
-    .string()
-    .optional()
-    .describe("Note ID - required for open, read, save, delete"),
-  title: z
-    .string()
-    .optional()
-    .describe("Note title - optional for create, required for save"),
-  content: z
-    .string()
-    .optional()
-    .describe("Note content (markdown) - optional for create, required for save"),
-  instanceId: z
-    .string()
-    .optional()
-    .describe("PIP Tab instance ID. NEVER pass for 'create'. IF you already have a PIP tab open for one or mulitple noteIds,ALWAYS pass the instanceId of the PIP tab for that noteId into the 'read', 'save', 'open', 'delete' actions to target existing tab showing that note."),
+const NotesListSchema = z.object({});
+
+const NotesCreateSchema = z.object({
+  title: z.string().optional().describe("Initial title for the note"),
+  content: z.string().optional().describe("Initial content (markdown)"),
 });
 
-type NotesInput = z.infer<typeof NotesSchema>;
+const NotesOpenSchema = z.object({
+  noteId: z.string().describe("The ID of the note to open"),
+});
+
+const NotesSaveSchema = z.object({
+  noteId: z.string().describe("The ID of the note to save"),
+  title: z.string().describe("The note title"),
+  content: z.string().describe("The note content (markdown)"),
+});
+
+const NotesDeleteSchema = z.object({
+  noteId: z.string().describe("The ID of the note to delete"),
+});
 
 // =============================================================================
-// Action Handlers
+// Tool Handlers
 // =============================================================================
 
 /**
- * Handle 'list' action - show all notes.
+ * List all notes.
+ * Returns summary data for the list view.
  */
 const handleList = async (
   store: DataStore<Note>,
@@ -67,12 +68,18 @@ const handleList = async (
 ): Promise<ToolResult> => {
   const allNotes = await getAllNotes(store);
 
-  setState<NoteInstanceState & { view: string }>({ noteId: "", view: "list" });
+  setState<NoteInstanceState>({ view: "list" });
+
+  const summaries: NoteSummary[] = allNotes.map((n) => ({
+    id: n.id,
+    title: n.title,
+    updatedAt: n.updatedAt,
+  }));
 
   if (allNotes.length === 0) {
     return {
       data: { notes: [], view: "list" },
-      text: "No notes yet. Use action 'create' to make one.",
+      text: "No notes yet. Use notes_create to make one.",
       title: "All Notes",
     };
   }
@@ -80,58 +87,18 @@ const handleList = async (
   const summary = allNotes.map((n) => `- ${n.title} (${n.id})`).join("\n");
 
   return {
-    data: {
-      notes: allNotes.map((n) => ({
-        id: n.id,
-        title: n.title,
-        updatedAt: n.updatedAt,
-      })),
-      view: "list",
-    },
+    data: { notes: summaries, view: "list" },
     text: `${allNotes.length} note(s):\n${summary}`,
     title: "All Notes",
   };
 };
 
 /**
- * Handle 'open' action - open existing note in editor.
- */
-const handleOpen = async (
-  { noteId }: NotesInput,
-  store: DataStore<Note>,
-  setState: ToolContext["setState"]
-): Promise<ToolResult> => {
-  if (!noteId) {
-    return {
-      data: { error: "noteId is required for 'open' action" },
-      text: "noteId is required for 'open' action",
-      isError: true,
-    };
-  }
-
-  const note = await store.get(noteId);
-  if (!note) {
-    return {
-      data: { error: "Note not found" },
-      text: "Note not found",
-      isError: true,
-    };
-  }
-
-  setState<NoteInstanceState & { view: string }>({ noteId: note.id, view: "editor" });
-
-  return {
-    data: { note, view: "editor" },
-    title: note.title,
-    text: `Opened note: ${note.title}`,
-  };
-};
-
-/**
- * Handle 'create' action - create new note and open in editor.
+ * Create a new note.
+ * Always creates a new instance.
  */
 const handleCreate = async (
-  { title, content }: NotesInput,
+  { title, content }: z.infer<typeof NotesCreateSchema>,
   store: DataStore<Note>,
   setState: ToolContext["setState"]
 ): Promise<ToolResult> => {
@@ -144,7 +111,7 @@ const handleCreate = async (
   };
 
   await store.set(note.id, note);
-  setState<NoteInstanceState & { view: string }>({ noteId: note.id, view: "editor" });
+  setState<NoteInstanceState>({ noteId: note.id, view: "editor" });
 
   return {
     data: { note, view: "editor" },
@@ -154,20 +121,14 @@ const handleCreate = async (
 };
 
 /**
- * Handle 'read' action - get note content for AI.
+ * Open an existing note.
+ * Creates a new window only if the note isn't already open.
  */
-const handleRead = async (
-  { noteId }: NotesInput,
-  store: DataStore<Note>
+const handleOpen = async (
+  { noteId }: z.infer<typeof NotesOpenSchema>,
+  store: DataStore<Note>,
+  setState: ToolContext["setState"]
 ): Promise<ToolResult> => {
-  if (!noteId) {
-    return {
-      data: { error: "noteId is required for 'read' action" },
-      text: "noteId is required for 'read' action",
-      isError: true,
-    };
-  }
-
   const note = await store.get(noteId);
   if (!note) {
     return {
@@ -177,42 +138,23 @@ const handleRead = async (
     };
   }
 
+  setState<NoteInstanceState>({ noteId: note.id, view: "editor" });
+
   return {
     data: { note, view: "editor" },
     title: note.title,
-    text: `Note "${note.title}":\n\n${note.content}`,
+    text: `Opened note: ${note.title}`,
   };
 };
 
 /**
- * Handle 'save' action - update existing note.
+ * Save changes to a note.
+ * Does NOT open or change windows.
  */
 const handleSave = async (
-  { noteId, title, content }: NotesInput,
+  { noteId, title, content }: z.infer<typeof NotesSaveSchema>,
   store: DataStore<Note>
 ): Promise<ToolResult> => {
-  if (!noteId) {
-    return {
-      data: { error: "noteId is required for 'save' action" },
-      text: "noteId is required for 'save' action",
-      isError: true,
-    };
-  }
-  if (!title) {
-    return {
-      data: { error: "title is required for 'save' action" },
-      text: "title is required for 'save' action",
-      isError: true,
-    };
-  }
-  if (content === undefined) {
-    return {
-      data: { error: "content is required for 'save' action" },
-      text: "content is required for 'save' action",
-      isError: true,
-    };
-  }
-
   const note = await store.get(noteId);
   if (!note) {
     return {
@@ -228,27 +170,19 @@ const handleSave = async (
   await store.set(noteId, note);
 
   return {
-    data: { success: true, note, view: "editor" },
-    title: note.title,
+    data: { success: true, note },
     text: `Saved note: ${note.title}`,
   };
 };
 
 /**
- * Handle 'delete' action - remove note.
+ * Delete a note.
+ * Does NOT open or change windows.
  */
 const handleDelete = async (
-  { noteId }: NotesInput,
+  { noteId }: z.infer<typeof NotesDeleteSchema>,
   store: DataStore<Note>
 ): Promise<ToolResult> => {
-  if (!noteId) {
-    return {
-      data: { error: "noteId is required for 'delete' action" },
-      text: "noteId is required for 'delete' action",
-      isError: true,
-    };
-  }
-
   const note = await store.get(noteId);
   if (!note) {
     return {
@@ -261,12 +195,8 @@ const handleDelete = async (
   const title = note.title;
   await store.delete(noteId);
 
-  // After delete, show list view
-  const allNotes = await getAllNotes(store);
-
   return {
-    data: { success: true, deletedId: noteId, notes: allNotes, view: "list" },
-    title: "All Notes",
+    data: { success: true, deletedId: noteId },
     text: `Deleted note: ${title}`,
   };
 };
@@ -276,52 +206,108 @@ const handleDelete = async (
 // =============================================================================
 
 /**
- * Register the notes tool.
+ * Register all notes tools.
  *
- * Single tool for all note operations. Results are routed to the pip
- * for UI updates.
+ * Multi-instance behavior:
+ * - notes_list: Uses NOTES_LIST_URI (singleton) - only one list view
+ * - notes_create: Uses NOTE_EDITOR_URI (multiInstance) - always new window
+ * - notes_open: Uses NOTE_EDITOR_URI (multiInstance) - opens in new window
+ * - notes_save: No UI - doesn't change windows
+ * - notes_delete: No UI - doesn't change windows
  */
-export const registerNotesTool = (app: App) => {
+export const registerNotesTools = (app: App) => {
+  /**
+   * List all notes in a searchable view.
+   * Uses singleton instance - only one list view at a time.
+   */
   app.tool(
-    "notes",
+    "notes_list",
     {
-      description: `Manage notes. Actions:
-- list: Show all notes
-- open: Open note in editor (requires noteId)
-- create: Create new note (optional title/content)
-    - NEVER pass instanceId for 'create' action
-- read: Get note content for processing (requires noteId)
-- save: Update note (requires noteId, title, content)
-- delete: Remove note (requires noteId)`,
-      input: NotesSchema,
-      ui: NOTE_UI_URI,
+      description: "Show all notes in a searchable list view",
+      input: NotesListSchema,
+      ui: NOTES_LIST_URI,
       visibility: ["model", "app"],
       displayModes: ["pip"],
-      defaultDisplayMode: "pip",
+      experimental: {
+        defaultDisplayMode: "pip",
+      },
     },
-    async (input: NotesInput, context: ToolContext) => {
-      return withAuth(context, async (store) => {
-        switch (input.action) {
-          case "list":
-            return handleList(store, context.setState);
-          case "open":
-            return handleOpen(input, store, context.setState);
-          case "create":
-            return handleCreate(input, store, context.setState);
-          case "read":
-            return handleRead(input, store);
-          case "save":
-            return handleSave(input, store);
-          case "delete":
-            return handleDelete(input, store);
-          default:
-            return {
-              data: { error: `Unknown action: ${input.action}` },
-              text: `Unknown action: ${input.action}`,
-              isError: true,
-            };
-        }
-      });
+    async (_input: z.infer<typeof NotesListSchema>, context: ToolContext) => {
+      return withStore(context, async (store) => handleList(store, context.setState));
+    }
+  );
+
+  /**
+   * Create a new note.
+   * Always creates a new editor instance.
+   */
+  app.tool(
+    "notes_create",
+    {
+      description: "Create a new note and open it in an editor",
+      input: NotesCreateSchema,
+      ui: NOTE_EDITOR_URI,
+      visibility: ["model", "app"],
+      displayModes: ["pip"],
+      experimental: {
+        defaultDisplayMode: "pip",
+      },
+    },
+    async (input: z.infer<typeof NotesCreateSchema>, context: ToolContext) => {
+      return withStore(context, async (store) => handleCreate(input, store, context.setState));
+    }
+  );
+
+  /**
+   * Open an existing note.
+   * Opens in a new editor window.
+   */
+  app.tool(
+    "notes_open",
+    {
+      description: "Open an existing note in an editor",
+      input: NotesOpenSchema,
+      ui: NOTE_EDITOR_URI,
+      visibility: ["model", "app"],
+      displayModes: ["pip"],
+      experimental: {
+        defaultDisplayMode: "pip",
+      },
+    },
+    async (input: z.infer<typeof NotesOpenSchema>, context: ToolContext) => {
+      return withStore(context, async (store) => handleOpen(input, store, context.setState));
+    }
+  );
+
+  /**
+   * Save changes to a note.
+   * No UI - doesn't open or change windows.
+   */
+  app.tool(
+    "notes_save",
+    {
+      description: "Save changes to an existing note",
+      input: NotesSaveSchema,
+      visibility: ["model", "app"],
+    },
+    async (input: z.infer<typeof NotesSaveSchema>, context: ToolContext) => {
+      return withStore(context, async (store) => handleSave(input, store));
+    }
+  );
+
+  /**
+   * Delete a note.
+   * No UI - doesn't open or change windows.
+   */
+  app.tool(
+    "notes_delete",
+    {
+      description: "Delete a note",
+      input: NotesDeleteSchema,
+      visibility: ["model", "app"],
+    },
+    async (input: z.infer<typeof NotesDeleteSchema>, context: ToolContext) => {
+      return withStore(context, async (store) => handleDelete(input, store));
     }
   );
 };

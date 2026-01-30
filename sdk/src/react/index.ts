@@ -23,6 +23,7 @@ export type {
   WidgetState,
   StructuredWidgetState,
   WebSocketStatus,
+  ExpHostApi,
   // Tool calling types
   ToolCallStatus,
   ToolCallState,
@@ -30,21 +31,14 @@ export type {
   ToolCallTuple,
 } from "./types.js";
 
-// Adapter-based exports
+// Core exports
 export {
   createHost,
   createHostAsync,
-  // Adapters
-  CreatureAdapter,
-  ChatGptAdapter,
-  McpAppsAdapter,
-  UpgradingMcpAppsClient,
-  StandaloneAdapter,
-  // Host identity utilities
-  parseHostUserAgent,
-  getHostIdentity,
-  isHost,
-  KNOWN_HOSTS,
+  // Host clients (for advanced usage)
+  McpAppsHostClient,
+  ChatGptHostClient,
+  StandaloneHostClient,
   // Style utilities
   applyDocumentTheme,
   applyHostStyleVariables,
@@ -56,16 +50,13 @@ export {
 export type {
   // Unified types
   UnifiedHostClient,
-  UnifiedHostClientEvents,
-  ExperimentalHostApi,
-  AdapterKind,
-  HostAdapter,
-  HostIdentity,
-  // Base types
+  HostClientEvents,
+  // Configuration types
   HostClientConfig,
   HostClientState,
-  BaseHostClient,
-  BaseHostClientEvents,
   WebSocketClient,
   WebSocketClientConfig,
+  ContentBlock,
+  TextContentBlock,
+  ImageContentBlock,
 } from "../core/index.js";

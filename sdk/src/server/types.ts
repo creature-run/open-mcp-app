@@ -43,6 +43,33 @@ export interface IconConfig {
 }
 
 /**
+ * Experimental resource options.
+ * 
+ * These are non-standard extensions that may not be supported by all hosts.
+ * Per MCP Apps spec, experimental features are namespaced under `experimental`.
+ */
+export interface ResourceExperimentalConfig {
+  /**
+   * Allow multiple instances of this resource.
+   * Default: false (singleton - all tools share one instance per resourceUri)
+   * 
+   * - false: Singleton. SDK reuses the same instanceId for all tool calls.
+   * - true: Multi-instance. SDK generates new instanceId each time (unless provided in input).
+   * 
+   * Note: multiInstance is only supported on Creature. On ChatGPT, resources always behave as singleton.
+   */
+  multiInstance?: boolean;
+  /**
+   * Enable WebSocket for real-time communication with the UI.
+   * When true, SDK automatically manages WebSocket lifecycle and provides
+   * `context.send()` and `context.onMessage()` in tool handlers.
+   * 
+   * Note: WebSocket is only supported on Creature. Not part of MCP Apps spec.
+   */
+  websocket?: boolean;
+}
+
+/**
  * Resource configuration.
  */
 export interface ResourceConfig {
@@ -87,21 +114,12 @@ export interface ResourceConfig {
     resourceDomains?: string[];
   };
   /**
-   * Allow multiple instances of this resource.
-   * Default: false (singleton - all tools share one instance per resourceUri)
+   * Experimental (non-standard) resource options.
    * 
-   * - false: Singleton. SDK reuses the same instanceId for all tool calls.
-   * - true: Multi-instance. SDK generates new instanceId each time (unless provided in input).
-   * 
-   * Note: multiInstance is only supported on Creature. On ChatGPT, resources always behave as singleton.
+   * These features are host-specific extensions that may not be supported everywhere.
+   * Per MCP Apps spec, they are namespaced under `experimental`.
    */
-  multiInstance?: boolean;
-  /**
-   * Enable WebSocket for real-time communication with the UI.
-   * When true, SDK automatically manages WebSocket lifecycle and provides
-   * `context.send()` and `context.onMessage()` in tool handlers.
-   */
-  websocket?: boolean;
+  experimental?: ResourceExperimentalConfig;
 }
 
 /**
@@ -114,6 +132,21 @@ export interface ResourceDefinition {
 // ============================================================================
 // Tools
 // ============================================================================
+
+/**
+ * Experimental tool options.
+ * 
+ * These are non-standard extensions that may not be supported by all hosts.
+ * Per MCP Apps spec, experimental features are namespaced under `experimental`.
+ */
+export interface ToolExperimentalConfig {
+  /**
+   * Preferred display mode when the agent doesn't specify one.
+   * 
+   * Note: defaultDisplayMode is a Creature extension. Not part of MCP Apps spec.
+   */
+  defaultDisplayMode?: DisplayMode;
+}
 
 /**
  * Tool configuration.
@@ -129,12 +162,17 @@ export interface ToolConfig<TInput extends z.ZodType = z.ZodType> {
   visibility?: ToolVisibility[];
   /** Supported display modes for this tool */
   displayModes?: DisplayMode[];
-  /** Preferred display mode */
-  defaultDisplayMode?: DisplayMode;
   /** Loading message shown while tool is running (used by ChatGPT) */
   loadingMessage?: string;
   /** Completion message shown when tool finishes (used by ChatGPT) */
   completedMessage?: string;
+  /**
+   * Experimental (non-standard) tool options.
+   * 
+   * These features are host-specific extensions that may not be supported everywhere.
+   * Per MCP Apps spec, they are namespaced under `experimental`.
+   */
+  experimental?: ToolExperimentalConfig;
 }
 
 /**

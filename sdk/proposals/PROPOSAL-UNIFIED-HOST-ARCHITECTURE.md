@@ -178,6 +178,37 @@ interface ExpHostApi {
    * - Generic MCP Apps hosts: false (unless they implement it)
    */
   supportsMultiInstance(): boolean;
+  
+  // ============================================================================
+  // ChatGPT-specific APIs (no-op on MCP Apps hosts)
+  // ============================================================================
+  
+  /**
+   * Send a follow-up message to the conversation.
+   * 
+   * **ChatGPT only.** Triggers a new model turn with the given prompt.
+   * - ChatGPT: Calls `window.openai.sendFollowUpMessage()`
+   * - MCP Apps / Creature: No-op
+   */
+  sendFollowUpMessage(prompt: string): Promise<void>;
+  
+  /**
+   * Open a modal dialog from the host.
+   * 
+   * **ChatGPT only.**
+   * - ChatGPT: Calls `window.openai.requestModal()`
+   * - MCP Apps / Creature: No-op, returns null
+   */
+  requestModal(options: { title?: string; params?: Record<string, unknown> }): Promise<unknown | null>;
+  
+  /**
+   * Request the host to close this widget.
+   * 
+   * **ChatGPT only.**
+   * - ChatGPT: Calls `window.openai.requestClose()`
+   * - MCP Apps / Creature: No-op
+   */
+  requestClose(): Promise<void>;
 }
 ```
 
@@ -943,11 +974,16 @@ After reviewing the MCP Apps specification (`SEP-1865`) and official SDK:
 
 **Host Extensions (must be in `exp`):**
 
-*Client-side:*
+*Client-side (cross-platform):*
 - `setWidgetState` - ChatGPT native, Creature extension, not in MCP Apps spec
 - `setTitle` - Creature only, not in MCP Apps spec
 - `getCreatureStyles` - Creature only, not in MCP Apps spec
 - `getInstanceId` / `supportsMultiInstance` - Creature multi-instance, not in spec
+
+*Client-side (ChatGPT only, no-op on MCP Apps):*
+- `sendFollowUpMessage` - ChatGPT only, triggers new model turn
+- `requestModal` - ChatGPT only, opens modal dialog
+- `requestClose` - ChatGPT only, closes widget
 
 *Server-side:*
 - `multiInstance` resource option - Creature only, not in MCP Apps spec

@@ -1,6 +1,6 @@
 import { useSyncExternalStore, useEffect, useRef, useMemo, useState, useCallback } from "react";
 import { createHost, detectEnvironment } from "../core/index.js";
-import type { UnifiedHostClient, Environment, HostContext, AdapterKind, ToolResult, WidgetState } from "../core/index.js";
+import type { UnifiedHostClient, Environment, ToolResult, WidgetState } from "../core/index.js";
 import type { UseHostConfig, UseHostReturn, Logger, ToolCallState, ToolCallTuple, ToolCallFunction } from "./types.js";
 import { useHostClientOptional } from "./HostContext.js";
 
@@ -24,12 +24,12 @@ const INITIAL_TOOL_STATE: ToolCallState = {
 /**
  * Extract metadata from a tool result's structuredContent.
  */
-function extractResultMetadata<T>(result: ToolResult<T>): {
+const extractResultMetadata = <T>(result: ToolResult<T>): {
   data: T | null;
   title: string | null;
   instanceId: string | null;
   text: string | null;
-} {
+} => {
   const structured = result.structuredContent as (T & { title?: string; instanceId?: string }) | undefined;
   let data: T | null = null;
   let title: string | null = null;
@@ -45,7 +45,7 @@ function extractResultMetadata<T>(result: ToolResult<T>): {
   const text = result.content?.[0]?.text ?? null;
 
   return { data, title, instanceId, text };
-}
+};
 
 /**
  * React hook for connecting to an MCP Apps host.
@@ -75,8 +75,8 @@ function extractResultMetadata<T>(result: ToolResult<T>): {
  *
  * // MyWidget.tsx
  * function MyWidget() {
- *   const { callTool, isReady, log, experimental_widgetState } = useHost();
- *   const [widgetState, setWidgetState] = experimental_widgetState();
+ *   const { callTool, isReady, log, exp_widgetState } = useHost();
+ *   const [widgetState, setWidgetState] = exp_widgetState();
  *   const [listTodos, listTodosData] = callTool("todos_list");
  *
  *   useEffect(() => {
@@ -262,14 +262,19 @@ export function useHost(config?: UseHostConfig): UseHostReturn {
   );
 
   /**
-   * Wrap experimental APIs for stable references.
+   * Wrap exp APIs for stable references.
    */
-  const experimental = useMemo(
+  const exp = useMemo(
     () => ({
-      sendNotification: client.experimental.sendNotification.bind(client.experimental),
-      setWidgetState: client.experimental.setWidgetState.bind(client.experimental),
-      setTitle: client.experimental.setTitle.bind(client.experimental),
-      getCreatureStyles: client.experimental.getCreatureStyles.bind(client.experimental),
+      setWidgetState: client.exp.setWidgetState.bind(client.exp),
+      setTitle: client.exp.setTitle.bind(client.exp),
+      updateModelContext: client.exp.updateModelContext.bind(client.exp),
+      sendNotification: client.exp.sendNotification.bind(client.exp),
+      getInstanceId: client.exp.getInstanceId.bind(client.exp),
+      supportsMultiInstance: client.exp.supportsMultiInstance.bind(client.exp),
+      sendFollowUpMessage: client.exp.sendFollowUpMessage.bind(client.exp),
+      requestModal: client.exp.requestModal.bind(client.exp),
+      requestClose: client.exp.requestClose.bind(client.exp),
     }),
     [client]
   );
@@ -290,7 +295,7 @@ export function useHost(config?: UseHostConfig): UseHostReturn {
    */
   const setWidgetState = useCallback(
     <T extends WidgetState = WidgetState>(newState: T | null) => {
-      client.experimental.setWidgetState(newState);
+      client.exp.setWidgetState(newState);
     },
     [client]
   );
@@ -299,7 +304,7 @@ export function useHost(config?: UseHostConfig): UseHostReturn {
    * Returns a useState-like tuple for widget state.
    * The setter is stable and won't cause infinite render loops.
    */
-  const experimental_widgetState = useCallback(
+  const exp_widgetState = useCallback(
     <T extends WidgetState = WidgetState>(): [T | null, (s: T | null) => void] => {
       const currentState = state.widgetState as T | null;
       return [currentState, setWidgetState as (s: T | null) => void];
@@ -391,14 +396,11 @@ export function useHost(config?: UseHostConfig): UseHostReturn {
     callTool,
     requestDisplayMode,
     log,
-    // Host detection properties (may change after connection for MCP Apps)
-    adapterKind: client.adapterKind,
-    isCreature: client.isCreature,
     hostContext: client.getHostContext(),
     // Experimental APIs (non-spec extensions)
-    experimental,
-    experimental_widgetState,
+    exp,
+    exp_widgetState,
     // Tool result subscription
     onToolResult,
   };
-}
+};

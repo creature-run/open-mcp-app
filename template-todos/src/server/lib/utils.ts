@@ -4,7 +4,7 @@
  * Shared helper functions used by todo tools.
  * Handles ID generation and store creation.
  *
- * Data is scoped by instanceId for local storage.
+ * Data is scoped by instanceId for isolation.
  */
 
 import { createDataStore, type DataStore } from "./data.js";
@@ -53,19 +53,19 @@ export const getTodoCounts = (todos: Todo[]) => ({
  */
 export const createTodoStore = (localId: string): DataStore<Todo> => {
   return createDataStore<Todo>({
-    collection: "mcps_todos_todos",
+    collection: "todos",
     localId,
   });
 };
 
 /**
  * Wrap tool handlers with store creation.
- * Creates a store scoped by instanceId.
+ * Creates a store scoped by instanceId for data isolation.
  */
-export const withAuth = async (
+export const withStore = async (
   context: ToolContext,
   handler: (store: DataStore<Todo>) => Promise<ToolResult>
 ): Promise<ToolResult> => {
-  const store = createTodoStore(context.instanceId || "anonymous");
+  const store = createTodoStore(context.instanceId || "default");
   return handler(store);
 };

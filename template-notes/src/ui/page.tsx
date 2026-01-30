@@ -9,7 +9,7 @@
  * - Works in any generic MCP Apps host
  *
  * Views:
- * - List view: Searchable list of all notes
+ * - List view: Searchable list of all notes (polls for updates)
  * - Editor view: WYSIWYG markdown editor for a single note
  *
  * Features:
@@ -17,21 +17,18 @@
  * - Saves via tool calls (compatible with all hosts)
  * - Auto-save on edit with debouncing
  * - Full markdown support via Milkdown
+ * - List view polls every 5 seconds for new notes
  *
  * SDK hooks used:
  * - HostProvider: Provides host client to child components via context
- * - useHost: Access callTool, isReady, log, experimental_widgetState from context
- * - initStyles: Inject environment-specific CSS variable defaults
- *
- * The SDK automatically detects the host environment and provides a unified
- * API that works across all platforms. Environment-specific features like
- * logging to DevConsole (Creature) gracefully degrade on other hosts.
+ * - useHost: Access callTool, isReady, log, exp_widgetState from context
+ * - initDefaultStyles: Inject environment-specific CSS variable defaults
  */
 
 // MUST be first - injects environment-specific CSS variable defaults before CSS loads
-import { detectEnvironment, initStyles } from "open-mcp-app/core";
+import { detectEnvironment, initDefaultStyles } from "open-mcp-app/core";
 const environment = detectEnvironment();
-initStyles({ environment });
+initDefaultStyles({ environment });
 
 import { useEffect, useCallback, useState, useRef, useMemo } from "react";
 import { HostProvider, useHost, type Environment } from "open-mcp-app/react";
@@ -92,13 +89,26 @@ interface ListViewProps {
   notes: NoteSummary[];
   onOpenNote: (noteId: string) => void;
   onCreateNote: () => void;
+  onRefresh: () => void;
 }
 
 /**
  * List view showing all notes with search/filter.
+ * Polls for updates every 5 seconds.
  */
-function ListView({ notes, onOpenNote, onCreateNote }: ListViewProps) {
+function ListView({ notes, onOpenNote, onCreateNote, onRefresh }: ListViewProps) {
   const [search, setSearch] = useState("");
+
+  /**
+   * Poll for new notes every 5 seconds.
+   * No logging to keep it silent.
+   */
+  useEffect(() => {
+    const interval = setInterval(() => {
+      onRefresh();
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [onRefresh]);
 
   const filteredNotes = useMemo(() => {
     if (!search.trim()) return notes;
@@ -181,7 +191,6 @@ function ListView({ notes, onOpenNote, onCreateNote }: ListViewProps) {
 interface EditorViewProps {
   note: Note;
   onSave: (noteId: string, title: string, content: string) => void;
-  onBack: () => void;
   isSaving: boolean;
   lastSaved: Date | null;
   editorRef: React.RefObject<MilkdownEditorRef | null>;
@@ -189,11 +198,11 @@ interface EditorViewProps {
 
 /**
  * Editor view for editing a single note.
+ * No back button - list is a separate window.
  */
 function EditorView({
   note,
   onSave,
-  onBack,
   isSaving,
   lastSaved,
   editorRef,
@@ -260,9 +269,6 @@ function EditorView({
   return (
     <div className="note-container">
       <header className="note-header">
-        <button className="back-button" onClick={onBack}>
-          ←
-        </button>
         <input
           type="text"
           className="note-title"
@@ -319,12 +325,7 @@ function getEnvironmentLabel(env: Environment): string {
  *
  * Uses the MCP Apps SDK with HostProvider pattern:
  * - HostProvider: Wraps the app to provide host client via context
- * - useHost: Access callTool, isReady, log, experimental_widgetState from context
- *
- * The component works identically across all supported hosts:
- * - Creature (MCP Apps): Full feature support including DevConsole logging
- * - ChatGPT Apps: Core features work, logging falls back to console
- * - Standalone: For development/testing outside a host
+ * - useHost: Access callTool, isReady, log, exp_widgetState from context
  */
 export default function Page() {
   return (
@@ -338,7 +339,7 @@ export default function Page() {
  * Inner notes app component that uses useHost() with HostProvider.
  */
 function NotesApp() {
-  const [view, setView] = useState<ViewType>("editor");
+  const [view, setView] = useState<ViewType | null>(null);
   const [note, setNote] = useState<Note | null>(null);
   const [notes, setNotes] = useState<NoteSummary[]>([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -359,13 +360,16 @@ function NotesApp() {
   const editorRef = useRef<MilkdownEditorRef>(null);
 
   // Get host from context (HostProvider)
-  const { callTool, isReady, log, experimental_widgetState, environment: hostEnvironment } = useHost();
+  const { callTool, isReady, log, exp_widgetState, environment: hostEnvironment } = useHost();
 
   // Get widget state tuple for reading and updating
-  const [widgetState, setWidgetState] = experimental_widgetState<NoteWidgetState>();
+  const [widgetState, setWidgetState] = exp_widgetState<NoteWidgetState>();
 
-  // Get the notes tool caller
-  const [notesTool, notesState] = callTool<NoteData>("notes");
+  // Get tool callers for different operations
+  const [listTool, listState] = callTool<NoteData>("notes_list");
+  const [createTool] = callTool<NoteData>("notes_create");
+  const [openTool, openState] = callTool<NoteData>("notes_open");
+  const [saveTool] = callTool<NoteData>("notes_save");
 
   /**
    * Save note via tool call.
@@ -375,12 +379,10 @@ function NotesApp() {
       setIsSaving(true);
       lastSavedContentRef.current = newContent;
       try {
-        await notesTool({
-          action: "save",
+        await saveTool({
           noteId,
           title: newTitle,
           content: newContent,
-          instanceId: instanceIdRef.current ?? undefined,
         });
         setLastSaved(new Date());
         log.debug("Note saved", { noteId, title: newTitle });
@@ -390,7 +392,7 @@ function NotesApp() {
         setIsSaving(false);
       }
     },
-    [notesTool, log]
+    [saveTool, log]
   );
 
   /**
@@ -399,17 +401,13 @@ function NotesApp() {
   const openNote = useCallback(
     async (noteId: string) => {
       try {
-        await notesTool({
-          action: "open",
-          noteId,
-          instanceId: instanceIdRef.current ?? undefined,
-        });
+        await openTool({ noteId });
         log.debug("Opening note", { noteId });
       } catch (err) {
         log.error("Failed to open note", { error: String(err) });
       }
     },
-    [notesTool, log]
+    [openTool, log]
   );
 
   /**
@@ -417,34 +415,27 @@ function NotesApp() {
    */
   const createNote = useCallback(async () => {
     try {
-      await notesTool({
-        action: "create",
-        instanceId: instanceIdRef.current ?? undefined,
-      });
+      await createTool({});
       log.debug("Creating new note");
     } catch (err) {
       log.error("Failed to create note", { error: String(err) });
     }
-  }, [notesTool, log]);
+  }, [createTool, log]);
 
   /**
-   * Go back to list view.
+   * Refresh the notes list (for polling).
+   * Silent - no logging.
    */
-  const goToList = useCallback(async () => {
+  const refreshList = useCallback(async () => {
     try {
-      await notesTool({
-        action: "list",
-        instanceId: instanceIdRef.current ?? undefined,
-      });
-      log.debug("Navigating to list");
-    } catch (err) {
-      log.error("Failed to load list", { error: String(err) });
+      await listTool({});
+    } catch {
+      // Silent failure for polling
     }
-  }, [notesTool, log]);
+  }, [listTool]);
 
   /**
    * Log when connection is ready.
-   * On Creature, this appears in DevConsole. On ChatGPT, it goes to browser console.
    */
   useEffect(() => {
     if (isReady && !hasLoggedReady.current) {
@@ -454,24 +445,34 @@ function NotesApp() {
   }, [isReady, log, hostEnvironment]);
 
   /**
-   * Handle data from tool results.
+   * Handle data from list tool results.
    */
   useEffect(() => {
-    const data = notesState.data;
+    const data = listState.data;
     if (!data) return;
 
-    // Extract instanceId from data
     if (data.instanceId) {
       instanceIdRef.current = data.instanceId;
     }
 
-    // Determine view from data
     if (data.view === "list" && data.notes) {
       setView("list");
       setNotes(data.notes);
-      setNote(null);
-      log.debug("List view loaded", { count: data.notes.length });
-    } else if (data.note) {
+    }
+  }, [listState.data]);
+
+  /**
+   * Handle data from open tool results.
+   */
+  useEffect(() => {
+    const data = openState.data;
+    if (!data) return;
+
+    if (data.instanceId) {
+      instanceIdRef.current = data.instanceId;
+    }
+
+    if (data.note) {
       setView("editor");
       const noteData = data.note;
       const isNewNote = note?.id !== noteData.id;
@@ -494,13 +495,13 @@ function NotesApp() {
         }
       }
     }
-  }, [notesState.data, log, note?.id]);
+  }, [openState.data, log, note?.id]);
 
   /**
    * Restore from widget state if no data.
    */
   useEffect(() => {
-    if (!notesState.data && widgetState?.privateContent) {
+    if (view === null && widgetState?.privateContent) {
       const { lastView, lastNote, lastNotes } = widgetState.privateContent;
 
       if (lastView === "list" && lastNotes) {
@@ -513,7 +514,7 @@ function NotesApp() {
         log.debug("Note restored from widget state", { id: lastNote.id });
       }
     }
-  }, [widgetState, notesState.data, log]);
+  }, [widgetState, view, log]);
 
   /**
    * Persist state to widget state.
@@ -531,7 +532,7 @@ function NotesApp() {
           lastView: "list",
         },
       });
-    } else if (note) {
+    } else if (view === "editor" && note) {
       const wordCount = note.content.trim().split(/\s+/).filter(Boolean).length;
       setWidgetState({
         modelContent: {
@@ -556,16 +557,16 @@ function NotesApp() {
         notes={notes}
         onOpenNote={openNote}
         onCreateNote={createNote}
+        onRefresh={refreshList}
       />
     );
   }
 
-  if (note) {
+  if (view === "editor" && note) {
     return (
       <EditorView
         note={note}
         onSave={saveNote}
-        onBack={goToList}
         isSaving={isSaving}
         lastSaved={lastSaved}
         editorRef={editorRef}

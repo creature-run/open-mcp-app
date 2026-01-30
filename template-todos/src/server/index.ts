@@ -28,14 +28,15 @@ const app = createApp({
   name: MCP_NAME,
   version: "0.1.0",
   port: PORT,
-  instructions: `This MCP manages a todo list with separate tools:
+  instructions: `Todo list manager with batch operations. All tools support multiple items per call.
 
-- todos_list - Display all todos in the interactive list
-- todos_add { text } - Create a new todo item
-- todos_toggle { id } - Mark todo as complete/incomplete
-- todos_remove { id } - Delete a todo item
+Tools:
+- todos_list: Display all todos in the interactive list UI
+- todos_add { items: ["task 1", "task 2", ...] }: Create one or more todos
+- todos_toggle { ids: ["id1", "id2", ...] }: Toggle completed status for one or more todos
+- todos_remove { ids: ["id1", "id2", ...] }: Delete one or more todos
 
-Use todos_list to open the interactive pip when the user wants to see their todos.`,
+Use todos_list to open the interactive pip when the user wants to see or manage their todos.`,
 });
 
 // =============================================================================

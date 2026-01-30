@@ -9,7 +9,16 @@
 // =============================================================================
 
 export const MCP_NAME = "mcp-template-notes";
-export const NOTE_UI_URI = `ui://${MCP_NAME}/note`;
+
+/**
+ * URI for the note editor view (single note editing).
+ */
+export const NOTE_EDITOR_URI = `ui://${MCP_NAME}/editor`;
+
+/**
+ * URI for the notes list view (all notes).
+ */
+export const NOTES_LIST_URI = `ui://${MCP_NAME}/list`;
 
 // =============================================================================
 // Data Types
@@ -26,16 +35,26 @@ export interface Note {
   updatedAt: string;
 }
 
+/**
+ * Summary of a note for list views.
+ */
+export interface NoteSummary {
+  id: string;
+  title: string;
+  updatedAt: string;
+}
+
 // =============================================================================
 // Instance State
 // =============================================================================
 
 /**
  * Per-instance state stored by the SDK.
- * Associates a UI widget instance with its note.
+ * Associates a UI widget instance with its note or view type.
  */
 export interface NoteInstanceState {
-  noteId: string;
+  noteId?: string;
+  view: "editor" | "list";
 }
 
 // =============================================================================

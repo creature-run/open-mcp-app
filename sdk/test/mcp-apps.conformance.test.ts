@@ -50,6 +50,7 @@ const FIXTURE_HTML = `<!DOCTYPE html>
 
 const RESOURCE_URI = "ui://test-app/panel";
 const RESOURCE_URI_WITH_CSP = "ui://test-app/panel-csp";
+const RESOURCE_URI_MULTI_INSTANCE = "ui://test-app/multi-instance";
 
 /**
  * Create a test app with resources and tools configured for conformance testing.
@@ -79,6 +80,18 @@ function createTestApp() {
     csp: {
       connectDomains: ["https://api.example.com"],
       resourceDomains: ["https://cdn.example.com"],
+    },
+  });
+
+  // Resource with experimental multiInstance
+  app.resource({
+    name: "Multi-Instance Panel",
+    uri: RESOURCE_URI_MULTI_INSTANCE,
+    description: "A test UI panel with multi-instance support",
+    displayModes: ["pip"],
+    html: FIXTURE_HTML,
+    experimental: {
+      multiInstance: true,
     },
   });
 
@@ -139,6 +152,24 @@ function createTestApp() {
     },
     async () => ({
       text: "Status: OK",
+    })
+  );
+
+  // Tool with experimental defaultDisplayMode
+  app.tool(
+    "show_multi_instance",
+    {
+      description: "Show multi-instance panel",
+      ui: RESOURCE_URI_MULTI_INSTANCE,
+      displayModes: ["pip", "inline"],
+      experimental: {
+        defaultDisplayMode: "pip",
+      },
+      input: z.object({}),
+    },
+    async () => ({
+      data: { created: true },
+      text: "Multi-instance panel created",
     })
   );
 
@@ -457,6 +488,97 @@ describe("MCP Apps Tool Conformance (SEP-1865)", () => {
       // SDK provides instanceId for widget instance tracking
       expect(result.structuredContent?.instanceId).toBeDefined();
       expect(typeof result.structuredContent?.instanceId).toBe("string");
+    });
+  });
+});
+
+// ============================================================================
+// Experimental Namespace Tests (Non-Standard Extensions)
+// ============================================================================
+
+describe("Experimental Namespace (Non-Standard Extensions)", () => {
+  let app: App;
+
+  beforeAll(async () => {
+    app = createTestApp();
+    await jsonRpcRequest(app, "initialize", {
+      protocolVersion: "2024-11-05",
+      clientInfo: { name: "conformance-test", version: "1.0.0" },
+      capabilities: {},
+    });
+  });
+
+  describe("resources/list - experimental.multiInstance", () => {
+    it("includes experimental.multiInstance in _meta.ui for multi-instance resources", async () => {
+      const response = await jsonRpcRequest(app, "resources/list");
+      const result = response.result as {
+        resources: Array<{
+          uri: string;
+          _meta?: { ui?: { experimental?: { multiInstance?: boolean } } };
+        }>;
+      };
+
+      const multiInstanceResource = result.resources.find(
+        (r) => r.uri === RESOURCE_URI_MULTI_INSTANCE
+      );
+      expect(multiInstanceResource).toBeDefined();
+
+      // Non-standard: multiInstance is under experimental namespace
+      expect(multiInstanceResource?._meta?.ui?.experimental?.multiInstance).toBe(true);
+    });
+
+    it("does not include experimental for resources without experimental config", async () => {
+      const response = await jsonRpcRequest(app, "resources/list");
+      const result = response.result as {
+        resources: Array<{
+          uri: string;
+          _meta?: { ui?: { experimental?: { multiInstance?: boolean } } };
+        }>;
+      };
+
+      const basicResource = result.resources.find(
+        (r) => r.uri === RESOURCE_URI
+      );
+      expect(basicResource).toBeDefined();
+
+      // Resources without experimental config should not have experimental field
+      expect(basicResource?._meta?.ui?.experimental).toBeUndefined();
+    });
+  });
+
+  describe("tools/list - experimental.defaultDisplayMode", () => {
+    it("includes experimental.defaultDisplayMode in _meta.ui for tools with defaultDisplayMode", async () => {
+      const response = await jsonRpcRequest(app, "tools/list");
+      const result = response.result as {
+        tools: Array<{
+          name: string;
+          _meta?: { ui?: { experimental?: { defaultDisplayMode?: string } } };
+        }>;
+      };
+
+      const multiInstanceTool = result.tools.find(
+        (t) => t.name === "show_multi_instance"
+      );
+      expect(multiInstanceTool).toBeDefined();
+
+      // Non-standard: defaultDisplayMode is under experimental namespace
+      expect(multiInstanceTool?._meta?.ui?.experimental?.defaultDisplayMode).toBe("pip");
+    });
+
+    it("does not include experimental for tools without experimental config", async () => {
+      const response = await jsonRpcRequest(app, "tools/list");
+      const result = response.result as {
+        tools: Array<{
+          name: string;
+          _meta?: { ui?: { experimental?: { defaultDisplayMode?: string } } };
+        }>;
+      };
+
+      const showPanelTool = result.tools.find((t) => t.name === "show_panel");
+      expect(showPanelTool).toBeDefined();
+
+      // Tools without experimental config should not have experimental field
+      expect(showPanelTool?._meta?.ui?.experimental).toBeUndefined();
     });
   });
 });

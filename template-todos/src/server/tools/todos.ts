@@ -2,12 +2,13 @@
  * Todos Tools
  *
  * Separate tools for each todo operation. All tools route to the same UI.
+ * Each tool supports batch operations (multiple items per call).
  *
  * Tools:
  * - todos_list: Show all todos in interactive list
- * - todos_add: Create a new todo item
- * - todos_toggle: Toggle a todo's completed status
- * - todos_remove: Delete a todo item
+ * - todos_add: Create one or more todo items
+ * - todos_toggle: Toggle one or more todos' completed status
+ * - todos_remove: Delete one or more todo items
  *
  * Todos are scoped by instanceId.
  */
@@ -25,7 +26,7 @@ import {
   generateTodoId,
   getAllTodos,
   getTodoCounts,
-  withAuth,
+  withStore,
 } from "../lib/utils.js";
 
 // =============================================================================
@@ -35,15 +36,15 @@ import {
 const TodosListSchema = z.object({});
 
 const TodosAddSchema = z.object({
-  text: z.string().describe("The todo text to add"),
+  items: z.array(z.string()).describe("Array of todo texts to add"),
 });
 
 const TodosToggleSchema = z.object({
-  id: z.string().describe("The ID of the todo to toggle"),
+  ids: z.array(z.string()).describe("Array of todo IDs to toggle"),
 });
 
 const TodosRemoveSchema = z.object({
-  id: z.string().describe("The ID of the todo to remove"),
+  ids: z.array(z.string()).describe("Array of todo IDs to remove"),
 });
 
 // =============================================================================
@@ -73,89 +74,142 @@ const handleList = async (store: DataStore<Todo>): Promise<ToolResult> => {
 };
 
 /**
- * Add a new todo item.
+ * Add one or more todo items.
  */
 const handleAdd = async (
-  text: string,
+  items: string[],
   store: DataStore<Todo>
 ): Promise<ToolResult> => {
   const now = new Date().toISOString();
-  const todo: Todo = {
-    id: generateTodoId(),
-    text,
-    completed: false,
-    createdAt: now,
-    updatedAt: now,
-  };
+  const addedTodos: Todo[] = [];
 
-  await store.set(todo.id, todo);
+  for (const text of items) {
+    const todo: Todo = {
+      id: generateTodoId(),
+      text,
+      completed: false,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await store.set(todo.id, todo);
+    addedTodos.push(todo);
+  }
 
   const todos = await getAllTodos(store);
   const { open } = getTodoCounts(todos);
 
+  const itemCount = addedTodos.length;
+  const textSummary = itemCount === 1
+    ? `Added todo: ${addedTodos[0].text}`
+    : `Added ${itemCount} todos`;
+
   return {
-    data: { success: true, todo, todos },
-    text: `Added todo: ${text}`,
+    data: { success: true, added: addedTodos, todos },
+    text: textSummary,
     title: `Todos (${open})`,
   };
 };
 
 /**
- * Toggle a todo's completed status.
+ * Toggle one or more todos' completed status.
  */
 const handleToggle = async (
-  id: string,
+  ids: string[],
   store: DataStore<Todo>
 ): Promise<ToolResult> => {
-  const todo = await store.get(id);
-  if (!todo) {
+  const now = new Date().toISOString();
+  const toggled: Todo[] = [];
+  const notFound: string[] = [];
+
+  for (const id of ids) {
+    const todo = await store.get(id);
+    if (!todo) {
+      notFound.push(id);
+      continue;
+    }
+
+    todo.completed = !todo.completed;
+    todo.updatedAt = now;
+    await store.set(id, todo);
+    toggled.push(todo);
+  }
+
+  if (toggled.length === 0 && notFound.length > 0) {
     return {
-      data: { error: "Todo not found" },
-      text: "Todo not found",
+      data: { error: "No todos found", notFound },
+      text: `No todos found for IDs: ${notFound.join(", ")}`,
       isError: true,
     };
   }
 
-  todo.completed = !todo.completed;
-  todo.updatedAt = new Date().toISOString();
-  await store.set(id, todo);
-
-  const status = todo.completed ? "completed" : "uncompleted";
   const todos = await getAllTodos(store);
   const { open } = getTodoCounts(todos);
 
+  let textSummary: string;
+  if (toggled.length === 1) {
+    const status = toggled[0].completed ? "completed" : "uncompleted";
+    textSummary = `Marked "${toggled[0].text}" as ${status}`;
+  } else {
+    textSummary = `Toggled ${toggled.length} todos`;
+  }
+
+  if (notFound.length > 0) {
+    textSummary += ` (${notFound.length} not found)`;
+  }
+
   return {
-    data: { success: true, todo, todos },
-    text: `Marked "${todo.text}" as ${status}`,
+    data: { success: true, toggled, notFound, todos },
+    text: textSummary,
     title: `Todos (${open})`,
   };
 };
 
 /**
- * Remove a todo item.
+ * Remove one or more todo items.
  */
 const handleRemove = async (
-  id: string,
+  ids: string[],
   store: DataStore<Todo>
 ): Promise<ToolResult> => {
-  const todo = await store.get(id);
-  if (!todo) {
+  const deleted: { id: string; text: string }[] = [];
+  const notFound: string[] = [];
+
+  for (const id of ids) {
+    const todo = await store.get(id);
+    if (!todo) {
+      notFound.push(id);
+      continue;
+    }
+
+    deleted.push({ id, text: todo.text });
+    await store.delete(id);
+  }
+
+  if (deleted.length === 0 && notFound.length > 0) {
     return {
-      data: { error: "Todo not found" },
-      text: "Todo not found",
+      data: { error: "No todos found", notFound },
+      text: `No todos found for IDs: ${notFound.join(", ")}`,
       isError: true,
     };
   }
 
-  const todoText = todo.text;
-  await store.delete(id);
-
   const todos = await getAllTodos(store);
   const { open } = getTodoCounts(todos);
 
+  let textSummary: string;
+  if (deleted.length === 1) {
+    textSummary = `Removed todo: ${deleted[0].text}`;
+  } else {
+    textSummary = `Removed ${deleted.length} todos`;
+  }
+
+  if (notFound.length > 0) {
+    textSummary += ` (${notFound.length} not found)`;
+  }
+
   return {
-    data: { success: true, deletedId: id, todos },
-    text: `Removed todo: ${todoText}`,
+    data: { success: true, deleted, notFound, todos },
+    text: textSummary,
     title: `Todos (${open})`,
   };
 };
@@ -180,58 +234,66 @@ export const registerTodosTools = (app: App) => {
       ui: TODOS_UI_URI,
       visibility: ["model", "app"],
       displayModes: ["pip", "inline"],
-      defaultDisplayMode: "pip",
+      experimental: {
+        defaultDisplayMode: "pip",
+      },
     },
     async (_input: z.infer<typeof TodosListSchema>, context: ToolContext) => {
-      return withAuth(context, async (store) => handleList(store));
+      return withStore(context, async (store) => handleList(store));
     }
   );
 
-  // Add todo
+  // Add todos
   app.tool(
     "todos_add",
     {
-      description: "Add a new todo item to the list",
+      description: "Add one or more todo items to the list",
       input: TodosAddSchema,
       ui: TODOS_UI_URI,
       visibility: ["model", "app"],
       displayModes: ["pip", "inline"],
-      defaultDisplayMode: "pip",
+      experimental: {
+        defaultDisplayMode: "pip",
+      },
     },
     async (input: z.infer<typeof TodosAddSchema>, context: ToolContext) => {
-      return withAuth(context, async (store) => handleAdd(input.text, store));
+      return withStore(context, async (store) => handleAdd(input.items, store));
     }
   );
 
-  // Toggle todo
+  // Toggle todos
   app.tool(
     "todos_toggle",
     {
-      description: "Toggle a todo's completed status",
+      description: "Toggle one or more todos' completed status",
       input: TodosToggleSchema,
       ui: TODOS_UI_URI,
       visibility: ["model", "app"],
       displayModes: ["pip", "inline"],
-      defaultDisplayMode: "pip",
+      experimental: {
+        defaultDisplayMode: "pip",
+      },
     },
     async (input: z.infer<typeof TodosToggleSchema>, context: ToolContext) => {
-      return withAuth(context, async (store) => handleToggle(input.id, store));
+      return withStore(context, async (store) => handleToggle(input.ids, store));
     }
   );
 
-  // Remove todo
+  // Remove todos
   app.tool(
     "todos_remove",
     {
-      description: "Remove a todo item from the list",
+      description: "Remove one or more todo items from the list",
       input: TodosRemoveSchema,
       ui: TODOS_UI_URI,
       visibility: ["model", "app"],
       displayModes: ["pip", "inline"],
-      defaultDisplayMode: "pip",
+      experimental: {
+        defaultDisplayMode: "pip",
+      },
     },
     async (input: z.infer<typeof TodosRemoveSchema>, context: ToolContext) => {
-      return withAuth(context, async (store) => handleRemove(input.id, store));
+      return withStore(context, async (store) => handleRemove(input.ids, store));
     }
   );
 };

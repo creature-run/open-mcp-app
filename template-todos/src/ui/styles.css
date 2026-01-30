@@ -24,13 +24,13 @@ select {
 }
 
 /**
- * Form controls styling using MCP Apps spec input variables.
- * Ensures proper visibility in both light and dark modes.
+ * Form controls styling using MCP Apps spec variables.
+ * Uses spec-compliant variables for cross-host compatibility.
  */
 select {
-  background: var(--color-input-background);
-  color: var(--color-input-text);
-  border: var(--border-width-regular) solid var(--color-input-border);
+  background: var(--color-background-secondary);
+  color: var(--color-text-primary);
+  border: var(--border-width-regular) solid var(--color-border-primary);
   border-radius: var(--border-radius-sm);
   padding: 4px 8px;
 }

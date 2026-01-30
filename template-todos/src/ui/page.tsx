@@ -22,8 +22,8 @@
  * SDK hooks used:
  * - HostProvider: Provides host client to child components via context
  * - useHost: Access callTool, isReady, log, etc. from context
- * - experimental_widgetState: Persist UI state across sessions
- * - initStyles: Inject environment-specific CSS variable defaults
+ * - exp_widgetState: Persist UI state across sessions
+ * - initDefaultStyles: Inject environment-specific CSS variable defaults
  *
  * The SDK automatically detects the host environment and provides a unified
  * API that works across all platforms. Environment-specific features like
@@ -31,9 +31,9 @@
  */
 
 // MUST be first - injects environment-specific CSS variable defaults before CSS loads
-import { detectEnvironment, initStyles } from "open-mcp-app/core";
+import { detectEnvironment, initDefaultStyles } from "open-mcp-app/core";
 const environment = detectEnvironment();
-initStyles({ environment });
+initDefaultStyles({ environment });
 
 import { useEffect, useCallback, useState, useRef, type FormEvent } from "react";
 import { HostProvider, useHost, type Environment } from "open-mcp-app/react";
@@ -54,12 +54,16 @@ interface Todo {
 /**
  * Tool result data structure.
  * Tools return this shape with the current todos list.
+ * All batch operations include the full todos array for UI sync.
  */
 interface TodoData {
   todos: Todo[];
   success?: boolean;
-  todo?: Todo;
   error?: string;
+  added?: Todo[];
+  toggled?: Todo[];
+  deleted?: { id: string; text: string }[];
+  notFound?: string[];
 }
 
 /**
@@ -254,10 +258,10 @@ function TodoApp() {
   const hasLoggedReady = useRef(false);
 
   // Get host from context (HostProvider)
-  const { callTool, isReady, log, experimental_widgetState, onToolResult, environment: hostEnvironment } = useHost();
+  const { callTool, isReady, log, exp_widgetState, onToolResult, environment: hostEnvironment } = useHost();
 
   // Get widget state tuple for reading and updating
-  const [widgetState, setWidgetState] = experimental_widgetState<TodoWidgetState>();
+  const [widgetState, setWidgetState] = exp_widgetState<TodoWidgetState>();
 
   // Separate tool callers for each action
   const [listTodos, listState] = callTool<TodoData>("todos_list");
@@ -331,7 +335,7 @@ function TodoApp() {
   useEffect(() => {
     return onToolResult((result) => {
       if (result.source === "agent") {
-        updateTodosFromData(result.structuredContent as TodoData);
+        updateTodosFromData(result.structuredContent as unknown as TodoData);
       }
     });
   }, [onToolResult, updateTodosFromData]);
@@ -353,7 +357,7 @@ function TodoApp() {
     async ({ text }: { text: string }) => {
       log.info("Adding todo", { text });
       try {
-        await addTodo({ text });
+        await addTodo({ items: [text] });
       } catch (err) {
         log.error("Failed to add todo", { error: String(err) });
       }
@@ -367,7 +371,7 @@ function TodoApp() {
   const handleToggle = useCallback(
     async ({ id }: { id: string }) => {
       try {
-        await toggleTodo({ id });
+        await toggleTodo({ ids: [id] });
       } catch (err) {
         log.error("Failed to toggle todo", { id, error: String(err) });
       }
@@ -382,7 +386,7 @@ function TodoApp() {
     async ({ id }: { id: string }) => {
       log.info("Deleting todo", { id });
       try {
-        await removeTodo({ id });
+        await removeTodo({ ids: [id] });
       } catch (err) {
         log.error("Failed to delete todo", { id, error: String(err) });
       }

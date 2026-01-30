@@ -6,10 +6,10 @@ import type {
   WidgetState,
   HostContext,
   WebSocketStatus,
+  ExpHostApi,
 } from "../core/types.js";
-import type { AdapterKind, ExperimentalHostApi } from "../core/providers/types.js";
 
-export type { DisplayMode, Environment, LogLevel, ToolResult, WidgetState, HostContext, WebSocketStatus, AdapterKind, ExperimentalHostApi };
+export type { DisplayMode, Environment, LogLevel, ToolResult, WidgetState, HostContext, WebSocketStatus, ExpHostApi };
 
 export { type StructuredWidgetState } from "../core/types.js";
 
@@ -149,22 +149,9 @@ export interface UseHostReturn {
   callTool: <T = Record<string, unknown>>(toolName: string) => ToolCallTuple<T>;
 
   environment: Environment;
-  /** Current widget state (read-only). Use experimental_widgetState() for read/write access. */
+  /** Current widget state (read-only). Use exp_widgetState() for read/write access. */
   widgetState: WidgetState | null;
   requestDisplayMode: (params: { mode: DisplayMode }) => Promise<{ mode: DisplayMode }>;
-
-  /**
-   * The adapter kind currently in use.
-   * For MCP Apps, this is determined after connection based on hostContext.userAgent.
-   * Values: "mcp-apps" | "creature" | "chatgpt" | "standalone"
-   */
-  adapterKind: AdapterKind;
-
-  /**
-   * Whether this host is Creature (supports Creature-specific extensions).
-   * Determined via hostContext.userAgent after connection.
-   */
-  isCreature: boolean;
 
   /**
    * Get the host context received from the host.
@@ -197,28 +184,23 @@ export interface UseHostReturn {
   log: Logger;
 
   /**
-   * Experimental APIs that are not part of the MCP Apps spec.
+   * Experimental APIs for non-standard features.
    *
-   * These APIs provide access to Creature-specific features and other
-   * non-standard extensions. They may change or be removed in future versions.
+   * These APIs provide access to host-specific features that may not be
+   * supported by all hosts. Methods gracefully degrade on unsupported hosts.
    *
    * @example
    * ```tsx
-   * const { experimental, isCreature } = useHost({ name: "my-app", version: "1.0.0" });
+   * const { exp } = useHost({ name: "my-app", version: "1.0.0" });
    *
    * // Set widget state (non-spec extension)
-   * experimental.setWidgetState({ count: 42 });
+   * exp.setWidgetState({ count: 42 });
    *
-   * // Set title (Creature-only)
-   * if (isCreature) {
-   *   experimental.setTitle("My Widget");
-   * }
-   *
-   * // Get Creature-specific styles
-   * const styles = experimental.getCreatureStyles();
+   * // Set title (Creature-only, no-op on others)
+   * exp.setTitle("My Widget");
    * ```
    */
-  experimental: ExperimentalHostApi;
+  exp: ExpHostApi;
 
   /**
    * Get widget state as a useState-like tuple.
@@ -229,8 +211,8 @@ export interface UseHostReturn {
    *
    * @example
    * ```tsx
-   * const { experimental_widgetState } = useHost({ name: "my-app", version: "1.0.0" });
-   * const [widgetState, setWidgetState] = experimental_widgetState<MyState>();
+   * const { exp_widgetState } = useHost({ name: "my-app", version: "1.0.0" });
+   * const [widgetState, setWidgetState] = exp_widgetState<MyState>();
    *
    * return (
    *   <button onClick={() => setWidgetState({ count: (widgetState?.count ?? 0) + 1 })}>
@@ -239,7 +221,7 @@ export interface UseHostReturn {
    * );
    * ```
    */
-  experimental_widgetState: <T extends WidgetState = WidgetState>() => [
+  exp_widgetState: <T extends WidgetState = WidgetState>() => [
     T | null,
     (state: T | null) => void
   ];

@@ -475,6 +475,12 @@ export class App {
     if (method === "resources/list") {
       const resources = [];
       for (const [uri, { config }] of this.resources) {
+        // Build experimental metadata (non-standard extensions)
+        const experimental: Record<string, unknown> = {};
+        if (config.experimental?.multiInstance) {
+          experimental.multiInstance = config.experimental.multiInstance;
+        }
+        
         resources.push({
           uri,
           name: config.name,
@@ -482,7 +488,7 @@ export class App {
           mimeType: MIME_TYPES.MCP_APPS,
           _meta: {
             ui: {
-              multiInstance: config.multiInstance,
+              ...(Object.keys(experimental).length > 0 && { experimental }),
               ...(config.icon && {
                 icon: {
                   data: svgToDataUri(config.icon.svg),
@@ -642,7 +648,7 @@ export class App {
     }
 
     const resource = this.resources.get(resourceUri);
-    const isMultiInstance = resource?.config.multiInstance && this.hostSupportsMultiInstance;
+    const isMultiInstance = resource?.config.experimental?.multiInstance && this.hostSupportsMultiInstance;
 
     if (isMultiInstance) {
       // Multi-instance: always generate new
@@ -864,6 +870,12 @@ export class App {
 
   private registerResources(server: McpServer): void {
     for (const [uri, { config }] of this.resources) {
+      // Build experimental metadata (non-standard extensions)
+      const experimental: Record<string, unknown> = {};
+      if (config.experimental?.multiInstance) {
+        experimental.multiInstance = config.experimental.multiInstance;
+      }
+      
       server.registerResource(
         config.name,
         uri,
@@ -872,7 +884,7 @@ export class App {
           description: config.description,
           _meta: {
             ui: {
-              multiInstance: config.multiInstance,
+              ...(Object.keys(experimental).length > 0 && { experimental }),
               ...(config.icon && {
                 icon: {
                   data: svgToDataUri(config.icon.svg),
@@ -985,7 +997,7 @@ export class App {
 
             // Get resource config for WebSocket setup
             const resource = config.ui ? this.resources.get(config.ui) : undefined;
-            const hasWebSocket = resource?.config.websocket === true;
+            const hasWebSocket = resource?.config.experimental?.websocket === true;
 
             // Get or create WebSocket if resource has websocket: true
             let ws: WebSocketConnection<unknown, unknown> | undefined;
@@ -1062,11 +1074,18 @@ export class App {
     
     if (config.ui) {
       const visibility = config.visibility || ["model", "app"];
+      
+      // Build experimental metadata (non-standard extensions)
+      const experimental: Record<string, unknown> = {};
+      if (config.experimental?.defaultDisplayMode) {
+        experimental.defaultDisplayMode = config.experimental.defaultDisplayMode;
+      }
+      
       toolMeta.ui = {
         resourceUri: config.ui,
         visibility,
         ...(config.displayModes && { displayModes: config.displayModes }),
-        ...(config.defaultDisplayMode && { defaultDisplayMode: config.defaultDisplayMode }),
+        ...(Object.keys(experimental).length > 0 && { experimental }),
       };
       toolMeta["openai/outputTemplate"] = config.ui;
       // ChatGPT requires this to allow widget/UI to call the tool

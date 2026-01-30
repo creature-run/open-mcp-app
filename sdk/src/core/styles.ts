@@ -2,7 +2,7 @@
  * Environment-Aware Default Styles
  *
  * This module provides default CSS variable values for MCP Apps and ChatGPT Apps.
- * Import `initStyles` early in your app entry point to prevent flash of unstyled content.
+ * Import `initDefaultStyles` early in your app entry point to prevent flash of unstyled content.
  *
  * The MCP Apps spec defines CSS variable names (e.g., --color-background-primary).
  * This module provides environment-specific VALUES for those variables as sensible
@@ -435,7 +435,7 @@ export const applyStyles = ({ styles }: { styles: Record<string, string> }): voi
  * @param environment - The detected environment (from detectEnvironment)
  * @param options - Configuration options
  */
-export const initStyles = ({
+export const initDefaultStyles = ({
   environment,
   options = {},
 }: {
