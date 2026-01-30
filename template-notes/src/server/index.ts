@@ -11,7 +11,7 @@
 
 import { createApp } from "open-mcp-app/server";
 import { registerNotesTools } from "./tools/notes.js";
-import { MCP_NAME, NOTE_EDITOR_URI, NOTES_LIST_URI } from "./lib/types.js";
+import { MCP_NAME, NOTES_UI_URI } from "./lib/types.js";
 import { ICON_SVG, ICON_ALT } from "./lib/icon.js";
 
 // =============================================================================
@@ -44,30 +44,38 @@ Each note opens in its own editor window. The list view shows all notes.`,
 // =============================================================================
 
 /**
- * Note editor view - multi-instance, one per note.
+ * Notes UI resource.
+ * 
+ * Uses pipRules to control pip routing:
+ * - notes_list: single pip (default), reused for all list calls
+ * - notes_open/:noteId: one pip per noteId value
+ * - notes_create: always creates a new pip
  */
 app.resource({
-  name: "Note Editor",
-  uri: NOTE_EDITOR_URI,
-  description: "Markdown note editor with live preview",
+  name: "Notes",
+  uri: NOTES_UI_URI,
+  description: "Markdown notes app with list and editor views",
   displayModes: ["pip"],
   html: "../../dist/ui/main.html",
   icon: { svg: ICON_SVG, alt: ICON_ALT },
   experimental: {
-    multiInstance: true,
+    /**
+     * Pip routing rules.
+     * 
+     * Routes are matched in order of specificity:
+     * - "notes_open/:noteId": One pip per noteId value (reused when same noteId)
+     * - "notes_create": Always creates a new pip for new notes
+     * - "notes_list": Single list pip, reused (default behavior)
+     * 
+     * The :noteId syntax extracts the value from tool input args.noteId
+     * and uses it as a routing key (e.g., "notes_open:abc123").
+     */
+    pipRules: {
+      "notes_open/:noteId": "single",  // One pip per noteId, reuse when same note
+      "notes_create": "new",           // Always new pip for create
+      // notes_list: defaults to "single" - one list pip, reused
+    },
   },
-});
-
-/**
- * Notes list view - singleton, shows all notes.
- */
-app.resource({
-  name: "Notes List",
-  uri: NOTES_LIST_URI,
-  description: "Searchable list of all notes",
-  displayModes: ["pip"],
-  html: "../../dist/ui/main.html",
-  icon: { svg: ICON_SVG, alt: ICON_ALT },
 });
 
 // =============================================================================

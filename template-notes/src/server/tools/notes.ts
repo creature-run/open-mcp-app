@@ -2,25 +2,26 @@
  * Notes Tools
  *
  * Separate tools for each note operation:
- * - notes_list: Show searchable list of all notes (singleton instance)
- * - notes_create: Create new note (always new instance)
- * - notes_open: Open existing note in editor
+ * - notes_list: Show searchable list of all notes
+ * - notes_create: Create new note (always new pip)
+ * - notes_open: Open existing note in editor (one pip per noteId)
  * - notes_save: Update existing note (no UI change)
  * - notes_delete: Remove a note (no UI change)
  *
- * Multi-Instance Behavior:
- * - notes_list: Singleton - only one list view at a time
- * - notes_create: Multi-instance - always creates a new editor window
- * - notes_open: Multi-instance - opens note in a new editor window
- * - notes_save, notes_delete: No UI - don't open/create/change windows
+ * Pip Routing (via pipRules on resource):
+ * - notes_list: defaults to "single" - one list pip, reused
+ * - notes_open/:noteId: "single" - one pip per noteId value
+ * - notes_create: "new" - always creates a new pip
+ * 
+ * All tools reference the same NOTES_UI_URI. The pip routing is handled
+ * by the pipRules configuration on the resource, not by separate URIs.
  */
 
 import { z } from "zod";
 import type { App } from "open-mcp-app/server";
 import type { DataStore } from "../lib/data.js";
 import {
-  NOTE_EDITOR_URI,
-  NOTES_LIST_URI,
+  NOTES_UI_URI,
   type Note,
   type NoteSummary,
   type NoteInstanceState,
@@ -225,7 +226,7 @@ export const registerNotesTools = (app: App) => {
     {
       description: "Show all notes in a searchable list view",
       input: NotesListSchema,
-      ui: NOTES_LIST_URI,
+      ui: NOTES_UI_URI,
       visibility: ["model", "app"],
       displayModes: ["pip"],
       experimental: {
@@ -246,7 +247,7 @@ export const registerNotesTools = (app: App) => {
     {
       description: "Create a new note and open it in an editor",
       input: NotesCreateSchema,
-      ui: NOTE_EDITOR_URI,
+      ui: NOTES_UI_URI,
       visibility: ["model", "app"],
       displayModes: ["pip"],
       experimental: {
@@ -267,7 +268,7 @@ export const registerNotesTools = (app: App) => {
     {
       description: "Open an existing note in an editor",
       input: NotesOpenSchema,
-      ui: NOTE_EDITOR_URI,
+      ui: NOTES_UI_URI,
       visibility: ["model", "app"],
       displayModes: ["pip"],
       experimental: {

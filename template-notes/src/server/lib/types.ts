@@ -11,14 +11,23 @@
 export const MCP_NAME = "mcp-template-notes";
 
 /**
- * URI for the note editor view (single note editing).
+ * URI for the notes UI resource.
+ * 
+ * With pipRules, a single resource handles all views (list and editor).
+ * The pip routing is controlled by pipRules based on tool name and args,
+ * not by separate resource URIs.
  */
-export const NOTE_EDITOR_URI = `ui://${MCP_NAME}/editor`;
+export const NOTES_UI_URI = `ui://${MCP_NAME}/notes`;
 
 /**
- * URI for the notes list view (all notes).
+ * @deprecated Use NOTES_UI_URI instead. Kept for reference.
  */
-export const NOTES_LIST_URI = `ui://${MCP_NAME}/list`;
+export const NOTE_EDITOR_URI = NOTES_UI_URI;
+
+/**
+ * @deprecated Use NOTES_UI_URI instead. Kept for reference.
+ */
+export const NOTES_LIST_URI = NOTES_UI_URI;
 
 // =============================================================================
 // Data Types

@@ -48,6 +48,19 @@ export class McpAppsHostClient extends Subscribable implements UnifiedHostClient
   private hostContext: HostContext | null = null;
   private instanceId: string | null = null;
 
+  /**
+   * Timer for the ready buffer period.
+   * 
+   * After ui/initialize completes, we wait briefly for tool-input/tool-result
+   * messages that may arrive immediately after. This prevents flickering when
+   * pips are opened via tool calls - the app sees the correct initial data
+   * rather than rendering a default view and then switching.
+   */
+  private readyBufferTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** Duration to wait after initialization before setting isReady */
+  private static readonly READY_BUFFER_MS = 500;
+
   constructor(config: HostClientConfig) {
     super();
     this.config = config;
@@ -115,6 +128,12 @@ export class McpAppsHostClient extends Subscribable implements UnifiedHostClient
   disconnect(): void {
     if (!this.connected) return;
     this.connected = false;
+
+    // Clear any pending ready buffer timer
+    if (this.readyBufferTimer) {
+      clearTimeout(this.readyBufferTimer);
+      this.readyBufferTimer = null;
+    }
 
     if (this.app) {
       this.app.close();
@@ -301,6 +320,22 @@ export class McpAppsHostClient extends Subscribable implements UnifiedHostClient
   }
 
   /**
+   * Complete the ready state immediately.
+   * 
+   * Called when tool-input or tool-result arrives during the buffer period.
+   * Since we now have the data, there's no need to wait for the buffer timeout.
+   */
+  private completeReadyState(): void {
+    if (this.readyBufferTimer) {
+      clearTimeout(this.readyBufferTimer);
+      this.readyBufferTimer = null;
+    }
+    if (!this.state.isReady) {
+      this.setState({ isReady: true });
+    }
+  }
+
+  /**
    * Set up notification handlers on the App instance.
    */
   private setupHandlers(): void {
@@ -308,6 +343,11 @@ export class McpAppsHostClient extends Subscribable implements UnifiedHostClient
 
     this.app.ontoolinput = (params) => {
       console.debug(`[${this.config.name}] Received tool-input`, { args: params.arguments });
+      
+      // If we receive tool-input during the buffer period, we have the data
+      // we were waiting for - complete ready state immediately
+      this.completeReadyState();
+      
       this.emit("tool-input", params.arguments || {});
     };
 
@@ -327,6 +367,10 @@ export class McpAppsHostClient extends Subscribable implements UnifiedHostClient
         }
       }
 
+      // If we receive tool-result during the buffer period, we have the data
+      // we were waiting for - complete ready state immediately
+      this.completeReadyState();
+
       this.emit("tool-result", result);
     };
 
@@ -344,6 +388,10 @@ export class McpAppsHostClient extends Subscribable implements UnifiedHostClient
 
   /**
    * Initiate connection using PostMessageTransport.
+   * 
+   * After ui/initialize completes, we start a buffer period before setting
+   * isReady. This allows tool-input/tool-result messages to arrive first,
+   * preventing flickering when pips are opened via tool calls.
    */
   private async initiateConnection(): Promise<void> {
     if (!this.app) return;
@@ -366,7 +414,14 @@ export class McpAppsHostClient extends Subscribable implements UnifiedHostClient
         }
       }
 
-      this.setState({ isReady: true });
+      // Start buffer period before setting isReady.
+      // If tool-input/tool-result arrives during this period, isReady will be
+      // set immediately (see completeReadyState). Otherwise, it fires after the timeout.
+      // This prevents flickering when pips are opened via tool calls.
+      this.readyBufferTimer = setTimeout(() => {
+        this.readyBufferTimer = null;
+        this.setState({ isReady: true });
+      }, McpAppsHostClient.READY_BUFFER_MS);
     } catch (error) {
       console.error(`[${this.config.name}] Connection failed`, { error });
     }

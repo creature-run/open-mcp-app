@@ -42,6 +42,50 @@ export interface IconConfig {
   alt: string;
 }
 
+// ============================================================================
+// Pip Rules
+// ============================================================================
+
+/**
+ * Pip rule behavior values.
+ * 
+ * - "single": One pip per route match. If route has `:param`, one pip per param value.
+ * - "new": Always create a new pip for this route.
+ */
+export type PipRuleBehavior = "single" | "new";
+
+/**
+ * Pip routing rules configuration.
+ * 
+ * Routes tool calls to pips based on tool name and input parameters.
+ * Uses Express-style `:param` syntax to extract routing keys from tool inputs.
+ * 
+ * @example
+ * ```typescript
+ * pipRules: {
+ *   "notes_list": "single",           // one list pip, reuse
+ *   "notes_open/:noteId": "single",   // one pip per noteId
+ *   "notes_create": "new",            // always new pip
+ * }
+ * ```
+ * 
+ * Routing logic:
+ * - Routes are matched in order of specificity (routes with params first)
+ * - "single" means one pip per unique route match
+ * - "new" means always create a new pip
+ * - Tools not listed default to "single" behavior
+ * 
+ * The `:param` syntax extracts the value from tool input args:
+ * - `notes_open/:noteId` matches tool "notes_open" and uses `args.noteId` as key
+ * - If args.noteId is "abc", routes to pip keyed by "notes_open:abc"
+ * - If args.noteId is missing, falls back to next matching rule or default
+ */
+export type PipRules = Record<string, PipRuleBehavior>;
+
+// ============================================================================
+// Resource Experimental Config
+// ============================================================================
+
 /**
  * Experimental resource options.
  * 
@@ -50,8 +94,30 @@ export interface IconConfig {
  */
 export interface ResourceExperimentalConfig {
   /**
+   * Pip routing rules for this resource.
+   * 
+   * Controls how tool calls are routed to pip instances:
+   * - Use `:param` syntax to route by tool input values
+   * - "single" = one pip per route match (default)
+   * - "new" = always create new pip
+   * 
+   * @example
+   * ```typescript
+   * pipRules: {
+   *   "notes_open/:noteId": "single",  // one pip per noteId
+   *   "notes_create": "new",           // always new pip
+   *   // notes_list: defaults to "single"
+   * }
+   * ```
+   * 
+   * Note: pipRules is only supported on Creature. Other hosts use default behavior.
+   */
+  pipRules?: PipRules;
+
+  /**
    * Allow multiple instances of this resource.
-   * Default: false (singleton - all tools share one instance per resourceUri)
+   * 
+   * @deprecated Use `pipRules` instead for fine-grained control.
    * 
    * - false: Singleton. SDK reuses the same instanceId for all tool calls.
    * - true: Multi-instance. SDK generates new instanceId each time (unless provided in input).
@@ -59,6 +125,7 @@ export interface ResourceExperimentalConfig {
    * Note: multiInstance is only supported on Creature. On ChatGPT, resources always behave as singleton.
    */
   multiInstance?: boolean;
+
   /**
    * Enable WebSocket for real-time communication with the UI.
    * When true, SDK automatically manages WebSocket lifecycle and provides

@@ -60,11 +60,11 @@ function findPages(dir: string, baseDir: string): EntryPoint[] {
 
   const items = readdirSync(dir);
 
-  if (items.includes("page.tsx")) {
+  if (items.includes("app.tsx")) {
     const relativePath = dir.slice(baseDir.length + 1);
     entries.push({
       name: relativePath || "main",
-      pagePath: join(dir, "page.tsx"),
+      pagePath: join(dir, "app.tsx"),
     });
   }
 
@@ -195,13 +195,13 @@ function notifyHmrClients(): void {
 /**
  * Vite plugin for Creature MCP Apps.
  * 
- * Just write page.tsx files - no HTML or entry files needed.
+ * Just write app.tsx files - no HTML or entry files needed.
  * 
  * ```
  * src/ui/
- * ├── page.tsx         → dist/ui/main.html
- * ├── inline/page.tsx  → dist/ui/inline.html
- * └── _components/     → ignored
+ * ├── app.tsx         → dist/ui/main.html
+ * ├── inline/app.tsx  → dist/ui/inline.html
+ * └── _components/    → ignored
  * ```
  * 
  * When using vite-plugin-singlefile, multiple pages are built automatically

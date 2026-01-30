@@ -477,6 +477,9 @@ export class App {
       for (const [uri, { config }] of this.resources) {
         // Build experimental metadata (non-standard extensions)
         const experimental: Record<string, unknown> = {};
+        if (config.experimental?.pipRules) {
+          experimental.pipRules = config.experimental.pipRules;
+        }
         if (config.experimental?.multiInstance) {
           experimental.multiInstance = config.experimental.multiInstance;
         }
@@ -872,6 +875,9 @@ export class App {
     for (const [uri, { config }] of this.resources) {
       // Build experimental metadata (non-standard extensions)
       const experimental: Record<string, unknown> = {};
+      if (config.experimental?.pipRules) {
+        experimental.pipRules = config.experimental.pipRules;
+      }
       if (config.experimental?.multiInstance) {
         experimental.multiInstance = config.experimental.multiInstance;
       }

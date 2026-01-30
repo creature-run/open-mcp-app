@@ -36,7 +36,9 @@ Tools:
 - todos_toggle { ids: ["id1", "id2", ...] }: Toggle completed status for one or more todos
 - todos_remove { ids: ["id1", "id2", ...] }: Delete one or more todos
 
-Use todos_list to open the interactive pip when the user wants to see or manage their todos.`,
+Use todos_list to open the interactive pip when the user wants to see or manage their todos.
+
+Response style: The user can see the todo list UI, so don't repeat todo contents in your responses. Keep it brief with simple status updates like "Added 5 todos" or "Marked 3 as complete".`,
 });
 
 // =============================================================================

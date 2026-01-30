@@ -231,7 +231,7 @@ function getEnvironmentLabel(env: Environment): string {
 }
 
 /**
- * Main todo list page component.
+ * Main todo list app entry point.
  *
  * Uses the MCP Apps SDK with HostProvider pattern:
  * - HostProvider: Wraps the app to provide host client via context
@@ -242,7 +242,7 @@ function getEnvironmentLabel(env: Environment): string {
  * - ChatGPT Apps: Core features work, logging falls back to console
  * - Standalone: For development/testing outside a host
  */
-export default function Page() {
+export default function App() {
   return (
     <HostProvider name="mcp-template-todos" version="0.1.0">
       <TodoApp />
@@ -341,14 +341,19 @@ function TodoApp() {
   }, [onToolResult, updateTodosFromData]);
 
   /**
-   * Fetch initial todos when host connection is ready.
+   * Fetch initial data when ready.
+   * 
+   * The UI shows the todo list by default, so we fetch todos on mount.
+   * Agent tool results will update the data via onToolResult.
    */
+  const hasInitiallyFetched = useRef(false);
+  
   useEffect(() => {
-    if (isReady) {
-      log.debug("Fetching initial todos");
+    if (isReady && !hasInitiallyFetched.current) {
+      hasInitiallyFetched.current = true;
       listTodos();
     }
-  }, [isReady, listTodos, log]);
+  }, [isReady, listTodos]);
 
   /**
    * Add a new todo item.
