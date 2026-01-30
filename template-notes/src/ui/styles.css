@@ -2,7 +2,7 @@
  * MCP Notes Styles
  *
  * Uses MCP Apps CSS variables for theming consistency with the host.
- * Variables are injected by initStyles() from @creature-ai/sdk/core
+ * Variables are injected by initStyles() from open-mcp-app/core
  * and overridden by host at runtime via hostContext.styles.variables.
  *
  * @see https://github.com/modelcontextprotocol/ext-apps specification
@@ -699,4 +699,21 @@ body,
   justify-content: center;
   height: 100%;
   color: var(--color-text-secondary);
+  position: relative;
+}
+
+/* =============================================================================
+   Environment Badge (Development)
+============================================================================= */
+
+.environment-badge {
+  position: fixed;
+  bottom: 8px;
+  right: 8px;
+  padding: 4px 8px;
+  background: var(--color-background-tertiary);
+  color: var(--color-text-secondary);
+  font-size: var(--font-text-xs-size);
+  border-radius: var(--border-radius-sm);
+  opacity: 0.7;
 }

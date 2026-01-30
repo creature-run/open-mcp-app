@@ -1,6 +1,6 @@
 # Building MCP Apps
 
-Build interactive AI apps with `@creature-ai/sdk` that work on both **Creature** and **ChatGPT**. This guide covers everything from quick start to designing for cross-platform compatibility.
+Build interactive AI apps with `open-mcp-app` that work on both **Creature** and **ChatGPT**. This guide covers everything from quick start to designing for cross-platform compatibility.
 
 ## Prerequisites
 
@@ -160,18 +160,18 @@ app.tool("add_item", {
 
 ### Rule 5: Gracefully Handle Platform-Specific Features
 
-Some features only work on Creature. Check the environment and degrade gracefully:
+Some features only work on Creature. Check `isCreature` (and `environment`) and degrade gracefully:
 
 ```tsx
-const { environment } = useHost({ ... });
+const { environment, isCreature } = useHost({ ... });
 
 // WebSocket - Creature only
 const { status, send } = useWebSocket(
-  environment === "mcp-apps" ? websocketUrl : undefined,
+  isCreature ? websocketUrl : undefined,
   { onMessage: handleMessage }
 );
 
-// Teardown handlers - Creature only
+// Teardown handlers - MCP Apps only (no-op on ChatGPT)
 useHost({
   onTeardown: environment === "mcp-apps" 
     ? () => saveState() 
@@ -179,11 +179,12 @@ useHost({
 });
 ```
 
-**Creature-only features:**
+**Creature-only extensions:**
 - WebSocket communication (`useWebSocket`)
-- Teardown notifications (`onTeardown`)
 - PIP tabs and multi-instance
-- DevConsole logging (`log()`)
+
+**MCP Apps-only features (Creature + any MCP Apps host):**
+- Teardown notifications (`onTeardown`)
 - Theme change events (`onThemeChange`)
 
 ---
@@ -194,7 +195,7 @@ useHost({
 
 ```typescript
 // src/server/app.ts
-import { createApp } from "@creature-ai/sdk/server";
+import { createApp } from "open-mcp-app/server";
 import { ICON_SVG, ICON_ALT } from "./icon.js";
 
 const app = createApp({
@@ -229,7 +230,7 @@ The recommended pattern is a consolidated tool with an `action` parameter:
 ```typescript
 // src/server/tools/todo.ts
 import { z } from "zod";
-import type { App } from "@creature-ai/sdk/server";
+import type { App } from "open-mcp-app/server";
 
 const TodoSchema = z.object({
   action: z.enum(["list", "add", "toggle", "remove"])
@@ -307,7 +308,7 @@ Run with `npm run dev` which typically uses:
 ```tsx
 // src/ui/page.tsx
 import { useEffect, useState } from "react";
-import { useHost, useToolResult } from "@creature-ai/sdk/react";
+import { useHost, useToolResult } from "open-mcp-app/react";
 import "./styles.css";
 
 interface Todo {
@@ -466,14 +467,14 @@ app.tool("terminal_run", {
 ### UI
 
 ```tsx
-import { useHost, useToolResult, useWebSocket } from "@creature-ai/sdk/react";
+import { useHost, useToolResult, useWebSocket } from "open-mcp-app/react";
 
 function Terminal() {
   const { data, onToolResult } = useToolResult<{ websocketUrl?: string }>();
-  const { environment } = useHost({ name: "my-app", version: "1.0.0", onToolResult });
+  const { isCreature } = useHost({ name: "my-app", version: "1.0.0", onToolResult });
 
   // Only connect on Creature (WebSocket not available on ChatGPT)
-  const wsUrl = environment === "mcp-apps" ? data?.websocketUrl : undefined;
+  const wsUrl = isCreature ? data?.websocketUrl : undefined;
 
   const { status, send } = useWebSocket<ClientMsg, ServerMsg>(wsUrl, {
     onMessage: (msg) => {
@@ -613,7 +614,7 @@ Provide fallbacks for standalone testing:
 Enable Creature-managed authentication for verified user identity:
 
 ```typescript
-import { getIdentity } from "@creature-ai/sdk/server";
+import { getIdentity } from "open-mcp-app/server";
 
 const app = createApp({
   name: "my-app",
@@ -741,12 +742,15 @@ await db.notes.insert({
 The SDK's `environment` detection tells you where you're running:
 
 ```tsx
-const { environment } = useHost({ ... });
+const { environment, isCreature } = useHost({ ... });
 
 console.log(environment);
-// "mcp-apps"   - Running in Creature
+// "mcp-apps"   - Running in an MCP Apps host (Creature or other)
 // "chatgpt"    - Running in ChatGPT
 // "standalone" - Running in browser directly (dev/test)
+
+console.log(isCreature);
+// true when `hostContext.userAgent` indicates Creature
 ```
 
 Use this to:
@@ -824,7 +828,7 @@ Enable `generateBundle: true` in Vite config to create the embedded HTML:
 
 ```typescript
 // vite.config.ts
-import { creature } from "@creature-ai/sdk/vite";
+import { creature } from "open-mcp-app/vite";
 
 export default {
   plugins: [creature({ generateBundle: true })],

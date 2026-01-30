@@ -3,6 +3,10 @@ export { useToolResult } from "./useToolResult.js";
 export { useWebSocket } from "./useWebSocket.js";
 export { CreatureIcon } from "./CreatureIcon.js";
 
+// Host Provider for context-based hooks
+export { HostProvider } from "./HostContext.js";
+export type { HostProviderProps } from "./HostContext.js";
+
 export type {
   DisplayMode,
   UseHostConfig,
@@ -19,12 +23,29 @@ export type {
   WidgetState,
   StructuredWidgetState,
   WebSocketStatus,
+  // Tool calling types
+  ToolCallStatus,
+  ToolCallState,
+  ToolCallFunction,
+  ToolCallTuple,
 } from "./types.js";
 
+// Adapter-based exports
 export {
   createHost,
-  McpAppHostClient,
-  ChatGptAppHostClient,
+  createHostAsync,
+  // Adapters
+  CreatureAdapter,
+  ChatGptAdapter,
+  McpAppsAdapter,
+  UpgradingMcpAppsClient,
+  StandaloneAdapter,
+  // Host identity utilities
+  parseHostUserAgent,
+  getHostIdentity,
+  isHost,
+  KNOWN_HOSTS,
+  // Style utilities
   applyDocumentTheme,
   applyHostStyleVariables,
   applyHostFonts,
@@ -33,10 +54,18 @@ export {
 } from "../core/index.js";
 
 export type {
-  HostClient,
+  // Unified types
+  UnifiedHostClient,
+  UnifiedHostClientEvents,
+  ExperimentalHostApi,
+  AdapterKind,
+  HostAdapter,
+  HostIdentity,
+  // Base types
   HostClientConfig,
   HostClientState,
-  HostClientEvents,
+  BaseHostClient,
+  BaseHostClientEvents,
   WebSocketClient,
   WebSocketClientConfig,
 } from "../core/index.js";

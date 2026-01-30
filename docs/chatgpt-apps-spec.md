@@ -17,7 +17,7 @@ Creature aims to be compatible with **OpenAI's ChatGPT Apps SDK**, allowing deve
 
 ## Overview
 
-The ChatGPT Apps SDK is built on MCP (Model Context Protocol) and uses a JavaScript bridge (`window.openai`) for host communication. Our SDK (`@creature-ai/sdk`) provides a unified API that works in both environments.
+The ChatGPT Apps SDK is built on MCP (Model Context Protocol) and uses a JavaScript bridge (`window.openai`) for host communication. Our SDK (`open-mcp-app`) provides a unified API that works in both environments.
 
 **ChatGPT Apps SDK requirements:**
 - MCP server implementing tools and resources
@@ -161,12 +161,12 @@ These ChatGPT features are **not yet available** in Creature:
 
 ## SDK Cross-Platform API
 
-The `@creature-ai/sdk` provides a unified API for both platforms:
+The `open-mcp-app` provides a unified API for both platforms:
 
 ### Server Side
 
 ```typescript
-import { createApp } from "@creature-ai/sdk/server";
+import { createApp } from "open-mcp-app/server";
 
 const app = createApp({ name: "my-app", version: "1.0.0" });
 
@@ -193,7 +193,7 @@ app.tool("my_tool", {
 ### Client Side (React)
 
 ```tsx
-import { useHost, useToolResult } from "@creature-ai/sdk/react";
+import { useHost, useToolResult } from "open-mcp-app/react";
 
 function App() {
   const { data, instanceId, onToolResult } = useToolResult();
@@ -219,7 +219,7 @@ function App() {
 ### Client Side (Vanilla JS)
 
 ```typescript
-import { createHost } from "@creature-ai/sdk/core";
+import { createHost } from "open-mcp-app/core";
 
 // Auto-detects ChatGPT vs MCP Apps environment
 const host = createHost({ name: "my-app", version: "1.0.0" });
@@ -259,7 +259,7 @@ host.setWidgetState({ modelContent: { selected: "item" } });
 
 ### For Maximum Compatibility
 
-1. **Use the SDK** - The `@creature-ai/sdk` handles platform differences automatically
+1. **Use the SDK** - The `open-mcp-app` handles platform differences automatically
 2. **Support both display modes** - Always include `["inline", "pip"]` in `displayModes`
 3. **Use structured widget state** - `modelContent`/`privateContent` format works best
 4. **Provide fallbacks** - Check `environment` and degrade gracefully for Creature-only features

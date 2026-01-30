@@ -1,16 +1,35 @@
 /**
  * HMR Client Script
- * 
+ *
  * This script is injected into MCP App HTML during development mode.
  * It connects to Vite's HMR WebSocket and notifies the parent frame
  * when a full reload is needed.
- * 
+ *
  * The parent frame (Creature host) will then:
  * 1. Save current widget state
  * 2. Re-fetch fresh HTML from the MCP server
  * 3. Reload the iframe with new content
  * 4. Restore widget state
+ *
+ * ## Internal Protocol Extension
+ *
+ * This module uses the `ui/notifications/hmr-reload` notification method,
+ * which is an **internal, dev-only Creature extension** not part of the
+ * MCP Apps specification. It is NOT exposed via the public SDK client API.
+ *
+ * The host (Creature desktop) listens for this notification and triggers
+ * a graceful iframe reload while preserving widget state.
  */
+
+/**
+ * Internal notification method for HMR reload.
+ *
+ * This is a Creature-specific, dev-only extension NOT part of the MCP Apps spec.
+ * It is used internally by the Vite HMR integration and should not be used directly.
+ *
+ * @internal
+ */
+export const HMR_RELOAD_NOTIFICATION = "ui/notifications/hmr-reload" as const;
 
 /**
  * Generate the HMR client script as a string.
@@ -80,11 +99,12 @@ export function generateHmrClientScript(port: number): string {
     };
   }
 
+  // Note: Method name must match HMR_RELOAD_NOTIFICATION constant
   function notifyParent() {
     console.log('[Creature HMR] Sending hmr-reload to parent frame');
     window.parent.postMessage({
       jsonrpc: '2.0',
-      method: 'ui/notifications/hmr-reload',
+      method: '${HMR_RELOAD_NOTIFICATION}',
       params: {}
     }, '*');
   }

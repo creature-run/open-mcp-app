@@ -7,7 +7,7 @@
  * @example
  * ```ts
  * import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
- * import { wrapServer } from "@creature-ai/sdk/server";
+ * import { wrapServer } from "open-mcp-app/server";
  *
  * const server = wrapServer(new McpServer({ name: "my-app", version: "1.0.0" }));
  *
@@ -32,7 +32,7 @@ import { MIME_TYPES } from "./types.js";
  * @example
  * ```ts
  * import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
- * import { wrapServer } from "@creature-ai/sdk/server";
+ * import { wrapServer } from "open-mcp-app/server";
  *
  * const server = wrapServer(new McpServer({ name: "my-app", version: "1.0.0" }));
  *

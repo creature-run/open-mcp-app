@@ -1,7 +1,12 @@
 /**
  * MCP Notes UI
  *
- * A notes app demonstrating multi-instance MCP Apps.
+ * A notes app demonstrating cross-platform multi-instance MCP Apps.
+ *
+ * Cross-Platform Compatibility:
+ * - Works in Creature (MCP Apps host)
+ * - Works in ChatGPT Apps
+ * - Works in any generic MCP Apps host
  *
  * Views:
  * - List view: Searchable list of all notes
@@ -9,22 +14,27 @@
  *
  * Features:
  * - Unified editor: edit markdown and see formatted preview in one view
- * - Saves via tool calls (compatible with ChatGPT Apps)
+ * - Saves via tool calls (compatible with all hosts)
  * - Auto-save on edit with debouncing
  * - Full markdown support via Milkdown
  *
  * SDK hooks used:
- * - useToolResult: Receive note data from tool calls
- * - useHost: Connect to host, call tools, and persist widget state
+ * - HostProvider: Provides host client to child components via context
+ * - useHost: Access callTool, isReady, log, experimental_widgetState from context
  * - initStyles: Inject environment-specific CSS variable defaults
+ *
+ * The SDK automatically detects the host environment and provides a unified
+ * API that works across all platforms. Environment-specific features like
+ * logging to DevConsole (Creature) gracefully degrade on other hosts.
  */
 
 // MUST be first - injects environment-specific CSS variable defaults before CSS loads
-import { detectEnvironment, initStyles } from "@creature-ai/sdk/core";
-initStyles({ environment: detectEnvironment() });
+import { detectEnvironment, initStyles } from "open-mcp-app/core";
+const environment = detectEnvironment();
+initStyles({ environment });
 
 import { useEffect, useCallback, useState, useRef, useMemo } from "react";
-import { useHost, useToolResult } from "@creature-ai/sdk/react";
+import { HostProvider, useHost, type Environment } from "open-mcp-app/react";
 import MilkdownEditor, { type MilkdownEditorRef } from "./MilkdownEditor";
 import "./styles.css";
 
@@ -283,10 +293,51 @@ function EditorView({
 }
 
 // =============================================================================
+// Utilities
+// =============================================================================
+
+/**
+ * Get a human-readable label for the environment.
+ */
+function getEnvironmentLabel(env: Environment): string {
+  switch (env) {
+    case "chatgpt":
+      return "ChatGPT";
+    case "mcp-apps":
+      return "MCP Apps";
+    case "standalone":
+      return "Standalone";
+  }
+}
+
+// =============================================================================
 // Main Component
 // =============================================================================
 
+/**
+ * Main notes page component.
+ *
+ * Uses the MCP Apps SDK with HostProvider pattern:
+ * - HostProvider: Wraps the app to provide host client via context
+ * - useHost: Access callTool, isReady, log, experimental_widgetState from context
+ *
+ * The component works identically across all supported hosts:
+ * - Creature (MCP Apps): Full feature support including DevConsole logging
+ * - ChatGPT Apps: Core features work, logging falls back to console
+ * - Standalone: For development/testing outside a host
+ */
 export default function Page() {
+  return (
+    <HostProvider name="mcp-template-notes" version="0.1.0">
+      <NotesApp />
+    </HostProvider>
+  );
+}
+
+/**
+ * Inner notes app component that uses useHost() with HostProvider.
+ */
+function NotesApp() {
   const [view, setView] = useState<ViewType>("editor");
   const [note, setNote] = useState<Note | null>(null);
   const [notes, setNotes] = useState<NoteSummary[]>([]);
@@ -307,18 +358,14 @@ export default function Page() {
   /** Ref to the Milkdown editor for imperative content updates */
   const editorRef = useRef<MilkdownEditorRef>(null);
 
-  const { data, onToolResult } = useToolResult<NoteData>();
+  // Get host from context (HostProvider)
+  const { callTool, isReady, log, experimental_widgetState, environment: hostEnvironment } = useHost();
 
-  /**
-   * Connect to host and get widget state for persistence.
-   */
-  const { callTool, isReady, log, widgetState, setWidgetState } = useHost({
-    name: "mcp-template-notes",
-    version: "0.1.0",
-    onToolResult,
-  });
+  // Get widget state tuple for reading and updating
+  const [widgetState, setWidgetState] = experimental_widgetState<NoteWidgetState>();
 
-  const typedWidgetState = widgetState as NoteWidgetState | null;
+  // Get the notes tool caller
+  const [notesTool, notesState] = callTool<NoteData>("notes");
 
   /**
    * Save note via tool call.
@@ -328,7 +375,7 @@ export default function Page() {
       setIsSaving(true);
       lastSavedContentRef.current = newContent;
       try {
-        await callTool("notes", {
+        await notesTool({
           action: "save",
           noteId,
           title: newTitle,
@@ -343,7 +390,7 @@ export default function Page() {
         setIsSaving(false);
       }
     },
-    [callTool, log]
+    [notesTool, log]
   );
 
   /**
@@ -352,7 +399,7 @@ export default function Page() {
   const openNote = useCallback(
     async (noteId: string) => {
       try {
-        await callTool("notes", {
+        await notesTool({
           action: "open",
           noteId,
           instanceId: instanceIdRef.current ?? undefined,
@@ -362,7 +409,7 @@ export default function Page() {
         log.error("Failed to open note", { error: String(err) });
       }
     },
-    [callTool, log]
+    [notesTool, log]
   );
 
   /**
@@ -370,7 +417,7 @@ export default function Page() {
    */
   const createNote = useCallback(async () => {
     try {
-      await callTool("notes", {
+      await notesTool({
         action: "create",
         instanceId: instanceIdRef.current ?? undefined,
       });
@@ -378,14 +425,14 @@ export default function Page() {
     } catch (err) {
       log.error("Failed to create note", { error: String(err) });
     }
-  }, [callTool, log]);
+  }, [notesTool, log]);
 
   /**
    * Go back to list view.
    */
   const goToList = useCallback(async () => {
     try {
-      await callTool("notes", {
+      await notesTool({
         action: "list",
         instanceId: instanceIdRef.current ?? undefined,
       });
@@ -393,22 +440,24 @@ export default function Page() {
     } catch (err) {
       log.error("Failed to load list", { error: String(err) });
     }
-  }, [callTool, log]);
+  }, [notesTool, log]);
 
   /**
    * Log when connection is ready.
+   * On Creature, this appears in DevConsole. On ChatGPT, it goes to browser console.
    */
   useEffect(() => {
     if (isReady && !hasLoggedReady.current) {
       hasLoggedReady.current = true;
-      log.info("Notes app connected");
+      log.info("Notes app connected", { environment: hostEnvironment });
     }
-  }, [isReady, log]);
+  }, [isReady, log, hostEnvironment]);
 
   /**
    * Handle data from tool results.
    */
   useEffect(() => {
+    const data = notesState.data;
     if (!data) return;
 
     // Extract instanceId from data
@@ -445,14 +494,14 @@ export default function Page() {
         }
       }
     }
-  }, [data, log, note?.id]);
+  }, [notesState.data, log, note?.id]);
 
   /**
    * Restore from widget state if no data.
    */
   useEffect(() => {
-    if (!data && typedWidgetState?.privateContent) {
-      const { lastView, lastNote, lastNotes } = typedWidgetState.privateContent;
+    if (!notesState.data && widgetState?.privateContent) {
+      const { lastView, lastNote, lastNotes } = widgetState.privateContent;
 
       if (lastView === "list" && lastNotes) {
         setView("list");
@@ -464,7 +513,7 @@ export default function Page() {
         log.debug("Note restored from widget state", { id: lastNote.id });
       }
     }
-  }, [typedWidgetState, data, log]);
+  }, [widgetState, notesState.data, log]);
 
   /**
    * Persist state to widget state.
@@ -511,7 +560,7 @@ export default function Page() {
     );
   }
 
-      if (note) {
+  if (note) {
     return (
       <EditorView
         note={note}
@@ -528,6 +577,12 @@ export default function Page() {
   return (
     <div className="loading-container">
       <p>Loading...</p>
+      {/* Environment indicator - useful for development/debugging */}
+      {hostEnvironment === "standalone" && (
+        <div className="environment-badge" title="Running outside a host environment">
+          {getEnvironmentLabel(hostEnvironment)}
+        </div>
+      )}
     </div>
   );
 }

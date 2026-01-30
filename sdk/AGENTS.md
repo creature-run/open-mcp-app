@@ -1,4 +1,4 @@
-# @creature-ai/sdk Knowledge Base
+# open-mcp-app Knowledge Base
 
 ## OVERVIEW
 Multi-entry SDK for building Model Context Protocol (MCP) Apps compatible with Creature and ChatGPT. Provides cross-platform abstraction for tools, resources, and UI widgets.
@@ -12,10 +12,10 @@ Multi-entry SDK for building Model Context Protocol (MCP) Apps compatible with C
 ## WHERE TO LOOK
 | Entry Point | Core File | Responsibility |
 |-------------|-----------|----------------|
-| `@creature-ai/sdk/server` | `src/server/app.ts` | `createApp` builder, tool/resource registry. |
-| `@creature-ai/sdk/core` | `src/core/index.ts` | `createHost` factory, protocol detection. |
-| `@creature-ai/sdk/react` | `src/react/index.ts` | `useHost`, `useToolResult`, `useWebSocket`. |
-| `@creature-ai/sdk/vite` | `src/vite/index.ts` | HMR proxy and dev server injection. |
+| `open-mcp-app/server` | `src/server/app.ts` | `createApp` builder, tool/resource registry. |
+| `open-mcp-app/core` | `src/core/index.ts` | `createHost` factory, protocol detection. |
+| `open-mcp-app/react` | `src/react/index.ts` | `useHost`, `useToolResult`, `useWebSocket`. |
+| `open-mcp-app/vite` | `src/vite/index.ts` | HMR proxy and dev server injection. |
 
 ## CONVENTIONS
 - Entry-point Imports: Import from specific subpaths (e.g., `/server`), never root.
@@ -40,7 +40,7 @@ The SDK automatically injects protocol-specific metadata into tool results and r
 Core uses `detectEnvironment()` to check for `window.__CREATURE_HOST__` or ChatGPT-specific globals to instantiate the correct `HostClient`.
 
 ### HMR Integration
-`@creature-ai/sdk/vite` injects a dev-only client script into resources, enabling live UI updates without restarting the MCP server or refreshing the host.
+`open-mcp-app/vite` injects a dev-only client script into resources, enabling live UI updates without restarting the MCP server or refreshing the host.
 
 ## TECHNICAL NOTES
 - Protocol Translation: Maps MCP `structuredContent` to host-specific UI requirements.

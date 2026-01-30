@@ -108,46 +108,63 @@ function sendWebSocketFrame(socket: Duplex, data: string): void {
   socket.write(frame);
 }
 
-function startHmrServer(port: number): void {
-  if (hmrServer) return;
-  
-  hmrServer = createHttpServer((_req: IncomingMessage, res: ServerResponse) => {
-    res.writeHead(200);
-    res.end("Creature HMR Server");
-  });
-  
-  hmrServer.on("upgrade", (req: IncomingMessage, socket: Duplex, head: Buffer) => {
-    const key = req.headers["sec-websocket-key"];
-    if (!key) {
-      socket.destroy();
+function startHmrServer(port: number): Promise<void> {
+  return new Promise((resolve) => {
+    if (hmrServer) {
+      resolve();
       return;
     }
     
-    const acceptKey = createHash("sha1")
-      .update(key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11")
-      .digest("base64");
-    
-    socket.write(
-      "HTTP/1.1 101 Switching Protocols\r\n" +
-      "Upgrade: websocket\r\n" +
-      "Connection: Upgrade\r\n" +
-      `Sec-WebSocket-Accept: ${acceptKey}\r\n` +
-      "\r\n"
-    );
-    
-    hmrClients.add(socket);
-    sendWebSocketFrame(socket, JSON.stringify({ type: "connected" }));
-    
-    socket.on("close", () => {
-      hmrClients.delete(socket);
+    hmrServer = createHttpServer((_req: IncomingMessage, res: ServerResponse) => {
+      res.writeHead(200);
+      res.end("Creature HMR Server");
     });
     
-    socket.on("error", () => {
-      hmrClients.delete(socket);
+    hmrServer.on("upgrade", (req: IncomingMessage, socket: Duplex, head: Buffer) => {
+      const key = req.headers["sec-websocket-key"];
+      if (!key) {
+        socket.destroy();
+        return;
+      }
+      
+      const acceptKey = createHash("sha1")
+        .update(key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11")
+        .digest("base64");
+      
+      socket.write(
+        "HTTP/1.1 101 Switching Protocols\r\n" +
+        "Upgrade: websocket\r\n" +
+        "Connection: Upgrade\r\n" +
+        `Sec-WebSocket-Accept: ${acceptKey}\r\n` +
+        "\r\n"
+      );
+      
+      hmrClients.add(socket);
+      sendWebSocketFrame(socket, JSON.stringify({ type: "connected" }));
+      
+      socket.on("close", () => {
+        hmrClients.delete(socket);
+      });
+      
+      socket.on("error", () => {
+        hmrClients.delete(socket);
+      });
+    });
+    
+    hmrServer.on("error", (err: NodeJS.ErrnoException) => {
+      if (err.code === "EADDRINUSE") {
+        console.warn(`[Creature HMR] Port ${port} in use, HMR disabled. Kill other dev servers or restart.`);
+        hmrServer = null;
+      } else {
+        console.error(`[Creature HMR] Server error:`, err);
+      }
+      resolve();
+    });
+    
+    hmrServer.listen(port, () => {
+      resolve();
     });
   });
-  
-  hmrServer.listen(port);
 }
 
 function notifyHmrClients(): void {
@@ -299,15 +316,18 @@ createRoot(document.getElementById("root")!).render(createElement(Page));
         // waiting for hmr.json to be written, eliminating the race condition.
         const mcpPort = process.env.MCP_PORT ? parseInt(process.env.MCP_PORT, 10) : null;
         hmrPort = mcpPort ? mcpPort + HMR_PORT_OFFSET : await findAvailablePort(preferredHmrPort);
-        startHmrServer(hmrPort);
+        await startHmrServer(hmrPort);
         
         // Still write hmr.json for non-Creature environments (manual npm run dev)
-        mkdirSync(tempDir, { recursive: true });
-        const hmrConfig: HmrConfig = { port: hmrPort };
-        writeFileSync(
-          join(tempDir, "hmr.json"),
-          JSON.stringify(hmrConfig, null, 2)
-        );
+        // Only write if HMR server started successfully
+        if (hmrServer) {
+          mkdirSync(tempDir, { recursive: true });
+          const hmrConfig: HmrConfig = { port: hmrPort };
+          writeFileSync(
+            join(tempDir, "hmr.json"),
+            JSON.stringify(hmrConfig, null, 2)
+          );
+        }
       }
     },
 

@@ -24,7 +24,7 @@ The Agent receives your messages, decides which Tools to call, and can route upd
 
 An **MCP Server** is an external process that provides Tools and optionally UI Resources to the Host. MCP Servers extend what the AI can do.
 
-MCP Servers communicate with the Host via the Model Context Protocol. With `@creature-ai/sdk`, you can build MCP Servers that work in both Creature and ChatGPT.
+MCP Servers communicate with the Host via the Model Context Protocol. With `open-mcp-app`, you can build MCP Servers that work in both Creature and ChatGPT.
 
 → See [Quick Start](./building-mcp-apps.md) to create your first MCP Server.
 
@@ -117,6 +117,7 @@ Inline Widgets are:
 | `styles.variables` | CSS custom properties for theming |
 | `platform` | `"desktop"`, `"web"`, or `"mobile"` |
 | `displayMode` | Current display mode |
+| `userAgent` | Host identifier in format `"<host>/<version>"` (e.g. `"creature/1.0.0"`). Use this for spec-compliant host detection. |
 
 The SDK automatically applies theme and styles.
 

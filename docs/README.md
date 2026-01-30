@@ -12,7 +12,7 @@ New to Creature? Start here:
 
 ## Reference
 
-- [**SDK Reference**](./sdk-reference.md) — Complete API documentation for `@creature-ai/sdk`
+- [**SDK Reference**](./sdk-reference.md) — Complete API documentation for `open-mcp-app`
 
 ## Specifications
 
@@ -24,5 +24,5 @@ Creature supports multiple app specifications for cross-platform compatibility:
 ## Resources
 
 - [Creature Desktop](https://creature.run) — Download the app
-- [@creature-ai/sdk on npm](https://www.npmjs.com/package/@creature-ai/sdk) — Install the SDK
+- [open-mcp-app on npm](https://www.npmjs.com/package/open-mcp-app) — Install the SDK
 - [GitHub](https://github.com/creature-run/creature) — Source code and templates

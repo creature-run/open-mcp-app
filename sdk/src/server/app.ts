@@ -35,6 +35,8 @@ import type { WebSocketConnection } from "./types.js";
  */
 interface RequestContext {
   authorizationHeader?: string;
+  /** Creature token extracted from raw request before MCP SDK validation */
+  creatureToken?: string;
 }
 
 /**
@@ -89,6 +91,9 @@ export class App {
 
   /** Whether the connected host supports multiInstance. ChatGPT doesn't, Creature does. */
   private hostSupportsMultiInstance = false;
+
+  /** The connected client type for format-specific responses. */
+  private clientType: "creature" | "claude" | "chatgpt" | "unknown" = "unknown";
 
   /** OAuth discovery endpoint configuration. */
   private oauthDiscoveryConfig: { path: string; body: Record<string, unknown> } | null = null;
@@ -835,10 +840,11 @@ export class App {
           type: "object",
           properties,
           ...(required.length > 0 && { required }),
+          additionalProperties: true, // Allow _creatureToken and other injected args
         };
       }
     }
-    return { type: "object" };
+    return { type: "object", additionalProperties: true };
   }
 
   /**
@@ -1045,8 +1051,15 @@ export class App {
     const transportSessionId = req.headers["mcp-session-id"] as string | undefined;
     const authorizationHeader = req.headers["authorization"] as string | undefined;
 
+    // Extract Creature token from raw request body BEFORE MCP SDK validation strips it
+    // This handles tools/call requests where _creatureToken is in params.arguments
+    let creatureToken: string | undefined;
+    if (req.body?.method === "tools/call" && req.body?.params?.arguments?._creatureToken) {
+      creatureToken = req.body.params.arguments._creatureToken;
+    }
+
     // Run MCP handling within request context so tool handlers can access auth
-    const context: RequestContext = { authorizationHeader };
+    const context: RequestContext = { authorizationHeader, creatureToken };
 
     await requestContextStorage.run(context, async () => {
       try {
@@ -1055,11 +1068,22 @@ export class App {
         if (transportSessionId && this.transports.has(transportSessionId)) {
           transport = this.transports.get(transportSessionId)!;
         } else if (!transportSessionId && isInitializeRequest(req.body)) {
-          // Detect if host supports multiInstance based on client name
-          // Creature clients support multiInstance, ChatGPT clients don't
-          const clientName = req.body?.params?.clientInfo?.name;
-          this.hostSupportsMultiInstance = clientName === "creature";
-          console.log(`[MCP] Client: ${clientName}, multiInstance support: ${this.hostSupportsMultiInstance}`);
+          // Detect client type for format-specific responses
+          const clientName = req.body?.params?.clientInfo?.name?.toLowerCase() || "";
+          if (clientName === "creature") {
+            this.clientType = "creature";
+            this.hostSupportsMultiInstance = true;
+          } else if (clientName.includes("claude")) {
+            this.clientType = "claude";
+            this.hostSupportsMultiInstance = false;
+          } else if (clientName.includes("chatgpt") || clientName.includes("openai")) {
+            this.clientType = "chatgpt";
+            this.hostSupportsMultiInstance = false;
+          } else {
+            this.clientType = "unknown";
+            this.hostSupportsMultiInstance = false;
+          }
+          console.log(`[MCP] Client: ${clientName}, type: ${this.clientType}, multiInstance: ${this.hostSupportsMultiInstance}`);
 
           transport = this.createTransport();
           const server = this.createMcpServer();
@@ -1216,6 +1240,35 @@ export class App {
             "openai/widgetPrefersBorder": true,
           };
 
+          // Claude Desktop/Claude.ai only supports 1 content item in resource responses
+          // Return format-specific content based on detected client type
+          if (this.clientType === "claude" || this.clientType === "creature") {
+            return {
+              contents: [
+                {
+                  uri,
+                  mimeType: MIME_TYPES.MCP_APPS,
+                  text: html,
+                  _meta: mcpAppsMeta,
+                },
+              ],
+            };
+          }
+
+          if (this.clientType === "chatgpt") {
+            return {
+              contents: [
+                {
+                  uri,
+                  mimeType: MIME_TYPES.CHATGPT,
+                  text: html,
+                  _meta: chatgptMeta,
+                },
+              ],
+            };
+          }
+
+          // Unknown clients: return both formats for compatibility
           return {
             contents: [
               {
@@ -1259,11 +1312,12 @@ export class App {
         },
         async (args: Record<string, unknown>) => {
           try {
-            // Extract Creature token from args (injected by Creature host)
-            // or from Authorization header (OAuth bearer token from ChatGPT/other hosts)
-            let creatureToken = args._creatureToken as string | undefined;
+            // Get request context which stores the raw creatureToken extracted before MCP SDK validation
+            const reqContext = requestContextStorage.getStore();
+            
+            // Try to get token from: 1) Context (extracted before validation), 2) Args (if passthrough worked), 3) Auth header
+            let creatureToken = reqContext?.creatureToken || (args._creatureToken as string | undefined);
             if (!creatureToken) {
-              const reqContext = requestContextStorage.getStore();
               creatureToken = extractBearerToken(reqContext?.authorizationHeader);
             }
             const { _creatureToken: _, ...cleanArgs } = args;
@@ -1365,6 +1419,9 @@ export class App {
       toolMeta["openai/outputTemplate"] = config.ui;
       // ChatGPT requires this to allow widget/UI to call the tool
       toolMeta["openai/widgetAccessible"] = visibility.includes("app");
+
+      // TODO: Remove this once Claude.ai follows the spec correctly.
+      toolMeta["ui/resourceUri"] = config.ui;
     }
     
     if (config.loadingMessage) {
@@ -1460,17 +1517,21 @@ export class App {
 // ============================================================================
 
 /**
- * Detect if a file path is within the SDK package.
- */
-/**
  * Checks if a filename belongs to the SDK itself.
+ * Matches various SDK installation patterns:
+ * - Published: node_modules/open-mcp-app/
+ * - Local development: desktop/artifacts/sdk/
+ * - Public SDK: public/sdk/
  */
 function isSDKPath(filename: string): boolean {
   return (
     filename.includes("/public/sdk/") ||
     filename.includes("\\public\\sdk\\") ||
-    filename.includes("/@creature-ai/sdk/") ||
-    filename.includes("\\@creature-ai\\sdk\\")
+    filename.includes("/open-mcp-app/") ||
+    filename.includes("\\open-mcp-app\\") ||
+    // Local SDK development paths
+    filename.includes("/artifacts/sdk/") ||
+    filename.includes("\\artifacts\\sdk\\")
   );
 }
 

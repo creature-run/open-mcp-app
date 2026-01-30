@@ -1,6 +1,6 @@
 {
-  "name": "@creature-ai/sdk",
-  "version": "0.1.24",
+  "name": "open-mcp-app",
+  "version": "0.1.6",
   "description": "SDK for building MCP Apps that work on both Creature and ChatGPT",
   "type": "module",
   "exports": {
@@ -37,11 +37,13 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@modelcontextprotocol/ext-apps": "^0.2.2",
-    "@modelcontextprotocol/sdk": "^1.12.1",
+    "@modelcontextprotocol/sdk": "^1.24.0",
     "express": "^5.1.0",
     "ws": "^8.18.0",
     "zod": "^3.24.4"
@@ -55,7 +57,8 @@
     "react": "^19.1.0",
     "tsup": "^8.5.1",
     "typescript": "^5.8.3",
-    "vite": "^6.3.5"
+    "vite": "^6.3.5",
+    "vitest": "^3.1.0"
   },
   "peerDependencies": {
     "react": ">=18.0.0"

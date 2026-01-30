@@ -1,7 +1,7 @@
 import { Subscribable } from "./Subscribable.js";
 import type {
   DisplayMode,
-  HostClient,
+  BaseHostClient,
   HostClientConfig,
   HostClientState,
   LogLevel,
@@ -34,13 +34,12 @@ declare global {
 }
 
 /**
- * ChatGPT Apps host client implementation.
+ * ChatGPT Apps base host client implementation.
  *
- * Bridges the ChatGPT Apps SDK (`window.openai`) to provide a consistent
- * interface with the MCP Apps host client. Handles initial data processing,
- * globals updates, and widget state synchronization.
+ * Bridges the ChatGPT Apps SDK (`window.openai`) to provide a spec-compliant interface.
+ * Handles initial data processing, globals updates, and widget state synchronization.
  */
-export class ChatGptAppHostClient extends Subscribable implements HostClient {
+export class ChatGptBaseHostClient extends Subscribable implements BaseHostClient {
   // ============================================================================
   // Private Properties
   // ============================================================================
@@ -50,7 +49,7 @@ export class ChatGptAppHostClient extends Subscribable implements HostClient {
     environment: "chatgpt",
     widgetState: null,
   };
-  private config: HostClientConfig;
+  protected config: HostClientConfig;
   private connected = false;
   private hasProcessedInitialData = false;
   private globalsHandler: ((event: Event) => void) | null = null;
@@ -108,10 +107,6 @@ export class ChatGptAppHostClient extends Subscribable implements HostClient {
 
   /**
    * Call a tool on the MCP server via the ChatGPT bridge.
-   *
-   * @param toolName - Name of the tool to call
-   * @param args - Arguments to pass to the tool
-   * @returns Tool result with content and structuredContent
    */
   async callTool<T = Record<string, unknown>>(
     toolName: string,
@@ -139,18 +134,7 @@ export class ChatGptAppHostClient extends Subscribable implements HostClient {
   }
 
   /**
-   * Send a notification to the host.
-   *
-   * No-op on ChatGPT — notifications are not supported.
-   */
-  sendNotification(_method: string, _params: unknown): void {
-    // No-op on ChatGPT
-  }
-
-  /**
    * Set widget state and sync with the ChatGPT host.
-   *
-   * @param state - New widget state (or null to clear)
    */
   setWidgetState(state: WidgetState | null): void {
     this.setState({ widgetState: state });
@@ -164,29 +148,27 @@ export class ChatGptAppHostClient extends Subscribable implements HostClient {
   }
 
   /**
-   * Set the pip/widget title displayed in the host UI.
-   *
-   * No-op on ChatGPT — title updates are not supported.
-   *
-   * @param _title - The new title to display (ignored)
-   */
-  setTitle(_title: string): void {
-    // No-op on ChatGPT
-  }
-
-  /**
    * Log a message to the console.
    *
    * ChatGPT doesn't have a DevConsole, so logs go to browser console only.
-   * This provides API parity with McpAppHostClient.
-   *
-   * @param level - Log severity level
-   * @param message - Log message
-   * @param data - Optional structured data
    */
   log(level: LogLevel, message: string, data?: Record<string, unknown>): void {
     const consoleMethod = level === "error" ? "error" : level === "warning" ? "warn" : "log";
     console[consoleMethod](`[${this.config.name}]`, message, data ?? "");
+  }
+
+  /**
+   * Request a display mode change from the ChatGPT host.
+   */
+  async requestDisplayMode(params: { mode: DisplayMode }): Promise<{ mode: DisplayMode }> {
+    const openai = window.openai;
+
+    if (openai?.requestDisplayMode) {
+      const result = await openai.requestDisplayMode({ mode: params.mode });
+      return { mode: result.mode as DisplayMode };
+    }
+
+    return { mode: params.mode };
   }
 
   // ============================================================================
@@ -196,7 +178,7 @@ export class ChatGptAppHostClient extends Subscribable implements HostClient {
   /**
    * Update internal state and notify listeners.
    */
-  private setState(partial: Partial<HostClientState>): void {
+  protected setState(partial: Partial<HostClientState>): void {
     const prev = this.state;
     this.state = { ...this.state, ...partial };
     this.notifyStateChange(this.state, prev);
@@ -268,22 +250,5 @@ export class ChatGptAppHostClient extends Subscribable implements HostClient {
     };
 
     window.addEventListener("openai:set_globals", this.globalsHandler, { passive: true });
-  }
-
-  /**
-   * Request a display mode change from the ChatGPT host.
-   *
-   * @param params - Display mode to request
-   * @returns The resulting display mode
-   */
-  async requestDisplayMode(params: { mode: DisplayMode }): Promise<{ mode: DisplayMode }> {
-    const openai = window.openai;
-
-    if (openai?.requestDisplayMode) {
-      const result = await openai.requestDisplayMode({ mode: params.mode });
-      return { mode: result.mode as DisplayMode };
-    }
-
-    return { mode: params.mode };
   }
 }

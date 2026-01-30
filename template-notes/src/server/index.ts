@@ -9,7 +9,7 @@
  * The app runs as an Express server at /mcp endpoint.
  */
 
-import { createApp } from "@creature-ai/sdk/server";
+import { createApp } from "open-mcp-app/server";
 import { registerNotesTool } from "./tools/notes.js";
 import { MCP_NAME, NOTE_UI_URI } from "./lib/types.js";
 import { ICON_SVG, ICON_ALT } from "./lib/icon.js";

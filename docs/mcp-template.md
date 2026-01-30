@@ -1,6 +1,6 @@
 # SDK Reference
 
-Complete API documentation for `@creature-ai/sdk`. This reference covers all server and client APIs with detailed options.
+Complete API documentation for `open-mcp-app`. This reference covers all server and client APIs with detailed options.
 
 → New to MCP Apps? Start with the [Quick Start](./building-mcp-apps.md).
 
@@ -8,14 +8,14 @@ Complete API documentation for `@creature-ai/sdk`. This reference covers all ser
 
 ## Server API
 
-Import from `@creature-ai/sdk/server`.
+Import from `open-mcp-app/server`.
 
 ### createApp()
 
 Create an MCP server:
 
 ```typescript
-import { createApp } from "@creature-ai/sdk/server";
+import { createApp } from "open-mcp-app/server";
 
 const app = createApp({
   name: "my-app",
@@ -207,14 +207,14 @@ If no CSP is declared, the Host blocks all external connections.
 
 ## React UI API
 
-Import from `@creature-ai/sdk/react`.
+Import from `open-mcp-app/react`.
 
 ### useHost()
 
 Connect to the host (Creature or ChatGPT):
 
 ```tsx
-import { useHost } from "@creature-ai/sdk/react";
+import { useHost } from "open-mcp-app/react";
 
 const { isReady, callTool, environment, log, setWidgetState } = useHost({
   name: "my-app",
@@ -255,7 +255,7 @@ const { isReady, callTool, environment, log, setWidgetState } = useHost({
 Manage tool result state with type safety:
 
 ```tsx
-import { useToolResult } from "@creature-ai/sdk/react";
+import { useToolResult } from "open-mcp-app/react";
 
 interface MyData {
   items: Array<{ id: string; name: string }>;
@@ -287,7 +287,7 @@ return <div>{data?.count} items</div>;
 Persist UI state across sessions:
 
 ```tsx
-import { useWidgetState } from "@creature-ai/sdk/react";
+import { useWidgetState } from "open-mcp-app/react";
 
 const [state, setState] = useWidgetState({
   filter: "all",
@@ -315,7 +315,7 @@ const [state, setState] = useWidgetState({
 Real-time WebSocket communication:
 
 ```tsx
-import { useChannel } from "@creature-ai/sdk/react";
+import { useChannel } from "open-mcp-app/react";
 
 type ClientMsg = { type: "input"; data: string };
 type ServerMsg = { type: "output"; data: string };
@@ -378,7 +378,7 @@ For real-time streaming (terminals, live logs):
 #### Server
 
 ```typescript
-import { createApp } from "@creature-ai/sdk/server";
+import { createApp } from "open-mcp-app/server";
 
 type ServerMsg = { type: "output"; data: string };
 type ClientMsg = { type: "input"; data: string };
@@ -410,7 +410,7 @@ app.tool("terminal_create", {
 #### React UI
 
 ```tsx
-import { useChannel } from "@creature-ai/sdk/react";
+import { useChannel } from "open-mcp-app/react";
 
 function Terminal({ channelUrl }: { channelUrl: string }) {
   const [output, setOutput] = useState("");
@@ -477,7 +477,7 @@ Use the SDK's Vite plugin for HMR:
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { viteSingleFile } from "vite-plugin-singlefile";
-import { creature } from "@creature-ai/sdk/vite";
+import { creature } from "open-mcp-app/vite";
 
 export default defineConfig({
   plugins: [
@@ -543,7 +543,7 @@ See a full working example: [Todo List App](https://github.com/creature-run/sdk/
 
 ```typescript
 // src/server.ts
-import { createApp } from "@creature-ai/sdk/server";
+import { createApp } from "open-mcp-app/server";
 import { z } from "zod";
 import { ICON_SVG, ICON_ALT } from "./icon.js";
 

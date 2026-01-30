@@ -15,7 +15,7 @@
  */
 
 import { z } from "zod";
-import type { App } from "@creature-ai/sdk/server";
+import type { App } from "open-mcp-app/server";
 import type { DataStore } from "../lib/data.js";
 import {
   NOTE_UI_URI,
