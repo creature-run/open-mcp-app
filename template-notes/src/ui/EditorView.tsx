@@ -3,42 +3,41 @@
  *
  * WYSIWYG markdown editor for a single note.
  * Features auto-save with debouncing and external update detection.
+ *
+ * Uses NotesContext to access state and actions directly,
+ * eliminating the need for prop drilling.
  */
 
 import { useEffect, useCallback, useState, useRef, useMemo } from "react";
-import MilkdownEditor, { type MilkdownEditorRef } from "./MilkdownEditor";
-import type { Note } from "./types";
-
-interface EditorViewProps {
-  note: Note;
-  onSave: (noteId: string, title: string, content: string) => void;
-  isSaving: boolean;
-  lastSaved: Date | null;
-  editorRef: React.RefObject<MilkdownEditorRef | null>;
-}
+import MilkdownEditor from "./MilkdownEditor";
+import { useNotesContext } from "./useNotes";
 
 /**
  * Editor view for editing a single note.
  * Auto-saves changes with 800ms debounce.
+ *
+ * Note: This component expects `note` to be non-null when rendered.
+ * The parent (NotesApp) only renders EditorView when a note is loaded.
  */
-export function EditorView({
-  note,
-  onSave,
-  isSaving,
-  lastSaved,
-  editorRef,
-}: EditorViewProps) {
-  const [title, setTitle] = useState(note.title);
-  const contentRef = useRef(note.content);
+export function EditorView() {
+  const { note, saveNote, isSaving, lastSaved, editorRef } = useNotesContext();
+
+  // Initialize with empty strings - will be synced via effect when note is available
+  const [title, setTitle] = useState(note?.title ?? "");
+  const contentRef = useRef(note?.content ?? "");
+  const titleRef = useRef(note?.title ?? ""); // Ref for stable callback access
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /**
-   * Sync title state when note changes (e.g., switching notes).
+   * Sync title state and refs when note changes (e.g., switching notes).
    */
   useEffect(() => {
-    setTitle(note.title);
-    contentRef.current = note.content;
-  }, [note.id, note.title, note.content]);
+    if (note) {
+      setTitle(note.title);
+      titleRef.current = note.title;
+      contentRef.current = note.content;
+    }
+  }, [note?.id, note?.title, note?.content]);
 
   /**
    * Debounced save function.
@@ -46,15 +45,16 @@ export function EditorView({
    */
   const debouncedSave = useCallback(
     (newTitle: string, newContent: string) => {
+      if (!note) return;
       if (saveTimerRef.current) {
         clearTimeout(saveTimerRef.current);
       }
       saveTimerRef.current = setTimeout(() => {
-        onSave(note.id, newTitle, newContent);
+        saveNote(note.id, newTitle, newContent);
         saveTimerRef.current = null;
       }, 800);
     },
-    [note.id, onSave]
+    [note, saveNote]
   );
 
   /**
@@ -64,6 +64,7 @@ export function EditorView({
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const newTitle = e.target.value;
       setTitle(newTitle);
+      titleRef.current = newTitle; // Keep ref in sync for content changes
       debouncedSave(newTitle, contentRef.current);
     },
     [debouncedSave]
@@ -71,13 +72,15 @@ export function EditorView({
 
   /**
    * Handle content changes from Milkdown editor.
+   * Uses titleRef instead of title state to avoid stale closure issues
+   * with MilkdownEditor's internal callback handling.
    */
   const handleContentChange = useCallback(
     (newContent: string) => {
       contentRef.current = newContent;
-      debouncedSave(title, newContent);
+      debouncedSave(titleRef.current, newContent);
     },
-    [title, debouncedSave]
+    [debouncedSave]
   );
 
   /**
@@ -87,6 +90,11 @@ export function EditorView({
     if (!lastSaved) return null;
     return `Saved ${lastSaved.toLocaleTimeString()}`;
   }, [lastSaved]);
+
+  // Early return if no note (shouldn't happen - parent checks this)
+  if (!note) {
+    return null;
+  }
 
   return (
     <div className="note-container">

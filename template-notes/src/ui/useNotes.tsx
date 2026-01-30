@@ -19,7 +19,7 @@
  * This eliminates race conditions between agent-initiated and user-initiated opens.
  */
 
-import { useEffect, useCallback, useState, useRef } from "react";
+import { useEffect, useCallback, useState, useRef, createContext, useContext, type ReactNode } from "react";
 import { useHost } from "open-mcp-app/react";
 import type { MilkdownEditorRef } from "./MilkdownEditor";
 import type { Note, NoteSummary, NoteData, NoteWidgetState, ViewType } from "./types";
@@ -76,9 +76,15 @@ export const useNotes = (): UseNotesReturn => {
   const hasInitialized = useRef(false);
   const lastSavedContentRef = useRef<string | null>(null);
   const hasRestoredState = useRef(false);
+  const viewRef = useRef<ViewType>(view); // Ref for stable callback access
 
   /** Ref to the Milkdown editor for imperative content updates */
   const editorRef = useRef<MilkdownEditorRef>(null);
+
+  // Keep viewRef in sync with view state (for stable callback access)
+  useEffect(() => {
+    viewRef.current = view;
+  }, [view]);
 
   // Get host APIs from context
   const {
@@ -101,13 +107,21 @@ export const useNotes = (): UseNotesReturn => {
   const [saveTool, saveState] = callTool<NoteData>("notes_save");
 
   /**
-   * Process incoming note data from any source (agent or UI tool calls).
+   * Process incoming note data from agent or UI tool calls.
    *
-   * List results should not override an active editor view, so list updates
-   * only switch views when the app is already in list mode.
+   * @param data - The note data from a tool result
+   * @param source - Whether this came from "agent" or "ui"
+   *
+   * For list view results:
+   * - Agent-initiated: Always switch to list view (user explicitly asked)
+   * - UI-initiated: Only switch if already in list view (prevents polling from interrupting editing)
+   *
+   * IMPORTANT: This callback uses viewRef instead of view state to avoid
+   * being recreated when view changes. Recreating would cause all effects
+   * watching tool state to re-run with stale data, creating view flip-flops.
    */
   const processNoteData = useCallback(
-    (data: NoteData | null) => {
+    (data: NoteData | null, source: "agent" | "ui") => {
       if (!data) return;
 
       // Track instanceId for routing
@@ -115,12 +129,14 @@ export const useNotes = (): UseNotesReturn => {
         instanceIdRef.current = data.instanceId;
       }
 
-      // List view data - update notes, only switch view if already in list
+      // List view data
       if (data.view === "list" && data.notes) {
         setNotes(data.notes);
-        if (view === "list") {
+        // Agent-initiated list calls always switch to list view
+        // UI-initiated (polling) only updates data without switching view
+        if (source === "agent" || viewRef.current === "list") {
           setView("list");
-          log.debug("List view updated", { count: data.notes.length });
+          log.debug("List view updated", { count: data.notes.length, source });
         } else {
           log.debug("List data updated while editing", { count: data.notes.length });
         }
@@ -152,7 +168,7 @@ export const useNotes = (): UseNotesReturn => {
         }
       }
     },
-    [log, note?.id, view]
+    [log, note?.id]
   );
 
   // ===========================================================================
@@ -251,7 +267,7 @@ export const useNotes = (): UseNotesReturn => {
     if (initialResult) {
       // View was opened by agent tool call - use the result data
       log.debug("Initialized from agent tool result");
-      processNoteData(initialResult.structuredContent as unknown as NoteData);
+      processNoteData(initialResult.structuredContent as unknown as NoteData, "agent");
     } else {
       // View was opened by user - fetch initial list
       log.debug("Initialized by user - fetching list");
@@ -266,7 +282,7 @@ export const useNotes = (): UseNotesReturn => {
   useEffect(() => {
     return onToolResult((result) => {
       if (result.source === "agent") {
-        processNoteData(result.structuredContent as unknown as NoteData);
+        processNoteData(result.structuredContent as unknown as NoteData, "agent");
       }
     });
   }, [onToolResult, processNoteData]);
@@ -277,19 +293,19 @@ export const useNotes = (): UseNotesReturn => {
    * This is the simple SPA approach - UI calls tool, processes result, updates view.
    */
   useEffect(() => {
-    processNoteData(listState.data);
+    processNoteData(listState.data, "ui");
   }, [listState.data, processNoteData]);
 
   useEffect(() => {
-    processNoteData(createState.data);
+    processNoteData(createState.data, "ui");
   }, [createState.data, processNoteData]);
 
   useEffect(() => {
-    processNoteData(openState.data);
+    processNoteData(openState.data, "ui");
   }, [openState.data, processNoteData]);
 
   useEffect(() => {
-    processNoteData(saveState.data);
+    processNoteData(saveState.data, "ui");
   }, [saveState.data, processNoteData]);
 
   /**
@@ -365,3 +381,40 @@ export const useNotes = (): UseNotesReturn => {
     refreshList,
   };
 };
+
+// =============================================================================
+// Context
+// =============================================================================
+
+/**
+ * Notes context for sharing state across components without prop drilling.
+ * Provides all the state and actions from useNotes to any descendant component.
+ */
+const NotesContext = createContext<UseNotesReturn | null>(null);
+
+/**
+ * Provider component that wraps the app and provides notes state via context.
+ * Must be used inside a HostProvider since useNotes depends on useHost.
+ */
+export function NotesProvider({ children }: { children: ReactNode }) {
+  const notesState = useNotes();
+  return (
+    <NotesContext.Provider value={notesState}>
+      {children}
+    </NotesContext.Provider>
+  );
+}
+
+/**
+ * Hook to access notes state from context.
+ * Must be used inside a NotesProvider.
+ *
+ * @throws Error if used outside NotesProvider
+ */
+export function useNotesContext(): UseNotesReturn {
+  const context = useContext(NotesContext);
+  if (!context) {
+    throw new Error("useNotesContext must be used within a NotesProvider");
+  }
+  return context;
+}

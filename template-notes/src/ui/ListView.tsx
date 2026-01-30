@@ -3,17 +3,13 @@
  *
  * Displays a searchable list of all notes with polling for updates.
  * Handles empty state with a prompt to create the first note.
+ *
+ * Uses NotesContext to access state and actions directly,
+ * eliminating the need for prop drilling.
  */
 
 import { useEffect, useState, useMemo } from "react";
-import type { NoteSummary } from "./types";
-
-interface ListViewProps {
-  notes: NoteSummary[];
-  onOpenNote: (noteId: string) => void;
-  onCreateNote: () => void;
-  onRefresh: () => void;
-}
+import { useNotesContext } from "./useNotes";
 
 /**
  * Format a date string as relative time (e.g., "5m ago", "2h ago").
@@ -37,7 +33,8 @@ const formatRelativeTime = (dateStr: string): string => {
  * List view showing all notes with search/filter.
  * Polls for updates every 5 seconds.
  */
-export function ListView({ notes, onOpenNote, onCreateNote, onRefresh }: ListViewProps) {
+export function ListView() {
+  const { notes, openNote, createNote, refreshList } = useNotesContext();
   const [search, setSearch] = useState("");
 
   /**
@@ -46,10 +43,10 @@ export function ListView({ notes, onOpenNote, onCreateNote, onRefresh }: ListVie
    */
   useEffect(() => {
     const interval = setInterval(() => {
-      onRefresh();
+      refreshList();
     }, 5000);
     return () => clearInterval(interval);
-  }, [onRefresh]);
+  }, [refreshList]);
 
   /**
    * Filter notes by search query (case-insensitive title match).
@@ -64,7 +61,7 @@ export function ListView({ notes, onOpenNote, onCreateNote, onRefresh }: ListVie
     <div className="list-container">
       <header className="list-header">
         <h1 className="list-title">Notes</h1>
-        <button className="create-button" onClick={onCreateNote}>
+        <button className="create-button" onClick={createNote}>
           + New Note
         </button>
       </header>
@@ -84,7 +81,7 @@ export function ListView({ notes, onOpenNote, onCreateNote, onRefresh }: ListVie
           {notes.length === 0 ? (
             <>
               <p>No notes yet</p>
-              <button className="create-button-large" onClick={onCreateNote}>
+              <button className="create-button-large" onClick={createNote}>
                 Create your first note
               </button>
             </>
@@ -98,7 +95,7 @@ export function ListView({ notes, onOpenNote, onCreateNote, onRefresh }: ListVie
             <li
               key={note.id}
               className="note-item"
-              onClick={() => onOpenNote(note.id)}
+              onClick={() => openNote(note.id)}
             >
               <span className="note-item-title">{note.title || "Untitled"}</span>
               <span className="note-item-time">{formatRelativeTime(note.updatedAt)}</span>
