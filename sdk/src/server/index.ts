@@ -14,12 +14,6 @@ export type {
   TransportType,
   TransportSessionInfo,
   WebSocketConnection,
-  // Adapter types
-  StateAdapter,
-  RealtimeAdapter,
-  AdapterOptions,
-  VercelMcpOptions,
-  AwsLambdaOptions,
 } from "./types.js";
 export { MIME_TYPES } from "./types.js";
 

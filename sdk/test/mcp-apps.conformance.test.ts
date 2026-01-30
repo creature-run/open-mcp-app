@@ -17,34 +17,25 @@ import type { App } from "../src/server/index.js";
 // ============================================================================
 
 /**
- * JSON-RPC request helper that uses the SDK's serverless handler.
- * Avoids port binding by using the Edge (Request -> Response) pattern.
+ * JSON-RPC request helper that uses the SDK's handleMcpRequest directly.
+ * Avoids port binding by calling the method directly on the App instance.
  */
 async function jsonRpcRequest(
-  handler: ReturnType<App["toVercelFunctionHandler"]>,
+  app: App,
   method: string,
   params?: Record<string, unknown>
 ): Promise<{
   jsonrpc: string;
-  id: number;
+  id: number | string | null;
   result?: unknown;
   error?: { code: number; message: string };
 }> {
-  const body = {
+  return app.handleMcpRequest({
     jsonrpc: "2.0",
     id: 1,
     method,
     params,
-  };
-
-  const request = new Request("http://localhost/mcp", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
   });
-
-  const response = await handler(request);
-  return response.json();
 }
 
 // ============================================================================
@@ -159,13 +150,12 @@ function createTestApp() {
 // ============================================================================
 
 describe("MCP Apps Resource Conformance (SEP-1865)", () => {
-  let handler: ReturnType<App["toVercelFunctionHandler"]>;
+  let app: App;
 
   beforeAll(async () => {
-    const app = createTestApp();
-    handler = app.toVercelFunctionHandler();
+    app = createTestApp();
     // Initialize to set up server state
-    await jsonRpcRequest(handler, "initialize", {
+    await jsonRpcRequest(app, "initialize", {
       protocolVersion: "2024-11-05",
       clientInfo: { name: "conformance-test", version: "1.0.0" },
       capabilities: {},
@@ -174,7 +164,7 @@ describe("MCP Apps Resource Conformance (SEP-1865)", () => {
 
   describe("resources/list", () => {
     it("returns resources with ui:// URI scheme", async () => {
-      const response = await jsonRpcRequest(handler, "resources/list");
+      const response = await jsonRpcRequest(app, "resources/list");
 
       expect(response.error).toBeUndefined();
       expect(response.result).toBeDefined();
@@ -190,7 +180,7 @@ describe("MCP Apps Resource Conformance (SEP-1865)", () => {
     });
 
     it("returns resources with correct mimeType", async () => {
-      const response = await jsonRpcRequest(handler, "resources/list");
+      const response = await jsonRpcRequest(app, "resources/list");
       const result = response.result as {
         resources: Array<{ uri: string; mimeType: string }>;
       };
@@ -202,7 +192,7 @@ describe("MCP Apps Resource Conformance (SEP-1865)", () => {
     });
 
     it("returns resources with required name field", async () => {
-      const response = await jsonRpcRequest(handler, "resources/list");
+      const response = await jsonRpcRequest(app, "resources/list");
       const result = response.result as {
         resources: Array<{ uri: string; name: string }>;
       };
@@ -218,7 +208,7 @@ describe("MCP Apps Resource Conformance (SEP-1865)", () => {
 
   describe("resources/read", () => {
     it("returns contents with correct mimeType for ui:// resources", async () => {
-      const response = await jsonRpcRequest(handler, "resources/read", {
+      const response = await jsonRpcRequest(app, "resources/read", {
         uri: RESOURCE_URI,
       });
 
@@ -237,7 +227,7 @@ describe("MCP Apps Resource Conformance (SEP-1865)", () => {
     });
 
     it("returns HTML content via text field", async () => {
-      const response = await jsonRpcRequest(handler, "resources/read", {
+      const response = await jsonRpcRequest(app, "resources/read", {
         uri: RESOURCE_URI,
       });
 
@@ -257,7 +247,7 @@ describe("MCP Apps Resource Conformance (SEP-1865)", () => {
     });
 
     it("includes CSP metadata when configured", async () => {
-      const response = await jsonRpcRequest(handler, "resources/read", {
+      const response = await jsonRpcRequest(app, "resources/read", {
         uri: RESOURCE_URI_WITH_CSP,
       });
 
@@ -286,7 +276,7 @@ describe("MCP Apps Resource Conformance (SEP-1865)", () => {
     });
 
     it("returns matching uri in contents", async () => {
-      const response = await jsonRpcRequest(handler, "resources/read", {
+      const response = await jsonRpcRequest(app, "resources/read", {
         uri: RESOURCE_URI,
       });
 
@@ -305,12 +295,11 @@ describe("MCP Apps Resource Conformance (SEP-1865)", () => {
 // ============================================================================
 
 describe("MCP Apps Tool Conformance (SEP-1865)", () => {
-  let handler: ReturnType<App["toVercelFunctionHandler"]>;
+  let app: App;
 
   beforeAll(async () => {
-    const app = createTestApp();
-    handler = app.toVercelFunctionHandler();
-    await jsonRpcRequest(handler, "initialize", {
+    app = createTestApp();
+    await jsonRpcRequest(app, "initialize", {
       protocolVersion: "2024-11-05",
       clientInfo: { name: "conformance-test", version: "1.0.0" },
       capabilities: {},
@@ -319,7 +308,7 @@ describe("MCP Apps Tool Conformance (SEP-1865)", () => {
 
   describe("tools/list - UI linkage", () => {
     it("includes _meta.ui.resourceUri for tools with UI", async () => {
-      const response = await jsonRpcRequest(handler, "tools/list");
+      const response = await jsonRpcRequest(app, "tools/list");
 
       expect(response.error).toBeUndefined();
       const result = response.result as {
@@ -337,7 +326,7 @@ describe("MCP Apps Tool Conformance (SEP-1865)", () => {
     });
 
     it("resourceUri references a ui:// resource", async () => {
-      const response = await jsonRpcRequest(handler, "tools/list");
+      const response = await jsonRpcRequest(app, "tools/list");
       const result = response.result as {
         tools: Array<{
           name: string;
@@ -354,7 +343,7 @@ describe("MCP Apps Tool Conformance (SEP-1865)", () => {
     });
 
     it("does not include _meta.ui for tools without UI", async () => {
-      const response = await jsonRpcRequest(handler, "tools/list");
+      const response = await jsonRpcRequest(app, "tools/list");
       const result = response.result as {
         tools: Array<{
           name: string;
@@ -372,7 +361,7 @@ describe("MCP Apps Tool Conformance (SEP-1865)", () => {
 
   describe("tools/list - visibility", () => {
     it("defaults visibility to ['model', 'app'] when not specified", async () => {
-      const response = await jsonRpcRequest(handler, "tools/list");
+      const response = await jsonRpcRequest(app, "tools/list");
       const result = response.result as {
         tools: Array<{
           name: string;
@@ -387,7 +376,7 @@ describe("MCP Apps Tool Conformance (SEP-1865)", () => {
     });
 
     it("respects explicit visibility configuration", async () => {
-      const response = await jsonRpcRequest(handler, "tools/list");
+      const response = await jsonRpcRequest(app, "tools/list");
       const result = response.result as {
         tools: Array<{
           name: string;
@@ -403,7 +392,7 @@ describe("MCP Apps Tool Conformance (SEP-1865)", () => {
     });
 
     it("includes required tool fields (name, description, inputSchema)", async () => {
-      const response = await jsonRpcRequest(handler, "tools/list");
+      const response = await jsonRpcRequest(app, "tools/list");
       const result = response.result as {
         tools: Array<{
           name: string;
@@ -424,7 +413,7 @@ describe("MCP Apps Tool Conformance (SEP-1865)", () => {
 
   describe("tools/call - result format", () => {
     it("returns content array with text items", async () => {
-      const response = await jsonRpcRequest(handler, "tools/call", {
+      const response = await jsonRpcRequest(app, "tools/call", {
         name: "show_panel",
         arguments: { title: "Test Title" },
       });
@@ -441,7 +430,7 @@ describe("MCP Apps Tool Conformance (SEP-1865)", () => {
     });
 
     it("returns structuredContent for UI rendering", async () => {
-      const response = await jsonRpcRequest(handler, "tools/call", {
+      const response = await jsonRpcRequest(app, "tools/call", {
         name: "show_panel",
         arguments: { title: "Test Title" },
       });
@@ -456,7 +445,7 @@ describe("MCP Apps Tool Conformance (SEP-1865)", () => {
     });
 
     it("includes instanceId in structuredContent for tools with UI", async () => {
-      const response = await jsonRpcRequest(handler, "tools/call", {
+      const response = await jsonRpcRequest(app, "tools/call", {
         name: "show_panel",
         arguments: {},
       });
@@ -507,15 +496,14 @@ describe("MCP Apps Spec Backlog (SEP-1865)", () => {
 // ============================================================================
 
 describe("MCP Protocol Conformance", () => {
-  let handler: ReturnType<App["toVercelFunctionHandler"]>;
+  let app: App;
 
   beforeAll(() => {
-    const app = createTestApp();
-    handler = app.toVercelFunctionHandler();
+    app = createTestApp();
   });
 
   it("initialize returns protocolVersion and serverInfo", async () => {
-    const response = await jsonRpcRequest(handler, "initialize", {
+    const response = await jsonRpcRequest(app, "initialize", {
       protocolVersion: "2024-11-05",
       clientInfo: { name: "test", version: "1.0.0" },
       capabilities: {},
@@ -536,7 +524,7 @@ describe("MCP Protocol Conformance", () => {
   });
 
   it("returns JSON-RPC 2.0 responses", async () => {
-    const response = await jsonRpcRequest(handler, "initialize", {
+    const response = await jsonRpcRequest(app, "initialize", {
       protocolVersion: "2024-11-05",
       clientInfo: { name: "test", version: "1.0.0" },
       capabilities: {},
@@ -547,7 +535,7 @@ describe("MCP Protocol Conformance", () => {
   });
 
   it("returns error for unknown methods", async () => {
-    const response = await jsonRpcRequest(handler, "unknown/method");
+    const response = await jsonRpcRequest(app, "unknown/method");
 
     expect(response.error).toBeDefined();
     expect(response.error?.code).toBe(-32601); // Method not found

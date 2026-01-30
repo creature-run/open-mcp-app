@@ -363,30 +363,6 @@ export class App {
   }
 
   /**
-   * Create a Vercel serverless function handler.
-   * Works with plain Vercel Serverless Functions - no Next.js or mcp-handler needed.
-   * 
-   * Usage in api/mcp.ts:
-   * ```ts
-   * import { app } from "../src/app";
-   * export default app.toVercelFunctionHandler();
-   * ```
-   */
-  toVercelFunctionHandler(options?: import("./types.js").VercelMcpOptions) {
-    return this.createVercelHandler(options);
-  }
-
-  /**
-   * Create an AWS Lambda handler.
-   * 
-   * Note: This returns a Lambda handler function. The implementation
-   * is inline to avoid circular dependencies.
-   */
-  toAwsLambda(options?: import("./types.js").AwsLambdaOptions) {
-    return this.createLambdaHandler(options);
-  }
-
-  /**
    * Close a specific transport session.
    */
   closeTransportSession(sessionId: string): boolean {
@@ -414,194 +390,31 @@ export class App {
   }
 
   // ==========================================================================
-  // Private: Serverless Adapter Helpers
+  // Public API: MCP Request Handling (for testing)
   // ==========================================================================
 
   /**
-   * Create a ToolContext for serverless environments.
-   * Shared between Vercel and Lambda adapters to avoid duplication.
+   * Handle an MCP JSON-RPC request directly.
+   * Used for testing without starting a server.
    */
-  /**
-   * In-memory state for serverless when no external adapter provided.
-   * Only useful for local development - won't persist across invocations in production.
-   */
-  private serverlessMemoryState = new Map<string, unknown>();
-  private serverlessStateWarningLogged = false;
-  private serverlessRealtimeWarningLogged = false;
-
-  private createServerlessContext({
-    instanceId,
-    stateAdapter,
-    realtimeAdapter,
-  }: {
-    instanceId: string;
-    stateAdapter?: import("./types.js").StateAdapter;
-    realtimeAdapter?: import("./types.js").RealtimeAdapter;
-  }): ToolContext {
-    const websocketUrl = realtimeAdapter?.getWebSocketUrl?.(instanceId);
-    const app = this;
-
-    return {
-      instanceId,
-      getState: <T>() => {
-        if (stateAdapter) {
-          return undefined as T | undefined; // Async adapter would need different pattern
-        }
-        // Use in-memory fallback with warning
-        if (!app.serverlessStateWarningLogged) {
-          console.warn("[MCP] Using in-memory state - won't persist in production serverless");
-          app.serverlessStateWarningLogged = true;
-        }
-        return app.serverlessMemoryState.get(instanceId) as T | undefined;
-      },
-      setState: <T>(state: T) => {
-        if (stateAdapter) {
-          stateAdapter.set(instanceId, state);
-          return;
-        }
-        // Use in-memory fallback with warning
-        if (!app.serverlessStateWarningLogged) {
-          console.warn("[MCP] Using in-memory state - won't persist in production serverless");
-          app.serverlessStateWarningLogged = true;
-        }
-        app.serverlessMemoryState.set(instanceId, state);
-      },
-      send: <T>(message: T) => {
-        if (realtimeAdapter) {
-          realtimeAdapter.send(instanceId, message);
-          return;
-        }
-        // No-op with warning
-        if (!app.serverlessRealtimeWarningLogged) {
-          console.warn("[MCP] Realtime disabled - provide realtimeAdapter for production");
-          app.serverlessRealtimeWarningLogged = true;
-        }
-      },
-      onMessage: <T>(_handler: (msg: T) => void) => {
-        if (realtimeAdapter) {
-          realtimeAdapter.subscribe(instanceId, _handler as (msg: unknown) => void);
-          return;
-        }
-        // No-op with warning
-        if (!app.serverlessRealtimeWarningLogged) {
-          console.warn("[MCP] Realtime disabled - provide realtimeAdapter for production");
-          app.serverlessRealtimeWarningLogged = true;
-        }
-      },
-      onConnect: (_handler: () => void) => {
-        if (realtimeAdapter) {
-          // Realtime adapter handles connection
-          return;
-        }
-        // No-op - no warning needed, same as onMessage
-      },
-      websocketUrl,
-    };
-  }
-
-  /**
-   * Format tool result for serverless response.
-   * Shared between Vercel and Lambda adapters.
-   * Must include all fields that formatToolResult includes (title, inlineHeight, etc.).
-   */
-  private formatServerlessResult(result: ToolResult, instanceId: string, websocketUrl?: string) {
-    const text = result.text || JSON.stringify(result.data || {});
-    
-    return {
-      content: [{ type: "text", text }],
-      structuredContent: {
-        ...result.data,
-        ...(result.title && { title: result.title }),
-        ...(result.inlineHeight && { inlineHeight: result.inlineHeight }),
-        instanceId,
-        ...(websocketUrl && { websocketUrl }),
-      },
-      _meta: { "openai/widgetSessionId": instanceId },
-      ...(result.isError && { isError: true }),
-    };
-  }
-
-  /**
-   * Create a Vercel serverless function handler.
-   * Handles MCP JSON-RPC protocol directly - no mcp-handler or Next.js needed.
-   */
-  private createVercelHandler(options?: import("./types.js").VercelMcpOptions) {
-    const { stateAdapter, realtimeAdapter } = options || {};
-    const app = this;
-
-    const corsHeaders = {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Accept, Mcp-Session-Id",
-      "Content-Type": "application/json",
-    };
-
-    // Handler for Vercel serverless functions (req, res) or Edge (Request) -> Response
-    return async (reqOrRequest: any, res?: any): Promise<any> => {
-      // Support both Edge (Request object) and Node.js (req, res) patterns
-      const isEdge = reqOrRequest instanceof Request;
-      
-      // Handle CORS preflight
-      if (isEdge ? reqOrRequest.method === "OPTIONS" : reqOrRequest.method === "OPTIONS") {
-        if (isEdge) {
-          return new Response(null, { status: 204, headers: corsHeaders });
-        }
-        res.status(204).end();
-        return;
-      }
-
-      // Parse body
-      let body: any = {};
-      try {
-        if (isEdge) {
-          body = await reqOrRequest.json();
-        } else if (reqOrRequest.body) {
-          body = typeof reqOrRequest.body === "string" ? JSON.parse(reqOrRequest.body) : reqOrRequest.body;
-        }
-      } catch {
-        const errorResponse = { jsonrpc: "2.0", error: { code: -32700, message: "Parse error" }, id: null };
-        if (isEdge) {
-          return new Response(JSON.stringify(errorResponse), { status: 400, headers: corsHeaders });
-        }
-        res.status(400).json(errorResponse);
-        return;
-      }
-
-      try {
-        const result = await app.handleMcpRequest(body, { stateAdapter, realtimeAdapter });
-        
-        if (isEdge) {
-          return new Response(JSON.stringify(result), { status: 200, headers: corsHeaders });
-        }
-        res.status(200).json(result);
-      } catch (error) {
-        const err = error instanceof Error ? error : new Error(String(error));
-        const errorResponse = { jsonrpc: "2.0", error: { code: -32603, message: err.message }, id: body.id ?? null };
-        
-        if (isEdge) {
-          return new Response(JSON.stringify(errorResponse), { status: 500, headers: corsHeaders });
-        }
-        res.status(500).json(errorResponse);
-      }
-    };
-  }
-
-  /**
-   * Handle an MCP JSON-RPC request.
-   * Shared logic for all serverless handlers.
-   */
-  private async handleMcpRequest(
-    body: any,
-    options: { stateAdapter?: import("./types.js").StateAdapter; realtimeAdapter?: import("./types.js").RealtimeAdapter }
-  ): Promise<any> {
-    const { stateAdapter, realtimeAdapter } = options;
+  async handleMcpRequest(body: {
+    jsonrpc?: string;
+    id?: number | string | null;
+    method?: string;
+    params?: Record<string, unknown>;
+  }): Promise<{
+    jsonrpc: string;
+    id: number | string | null;
+    result?: unknown;
+    error?: { code: number; message: string };
+  }> {
     const method = body.method;
     const params = body.params;
-    const id = body.id;
+    const id = body.id ?? null;
 
     // Initialize
     if (method === "initialize") {
-    return {
+      return {
         jsonrpc: "2.0",
         result: {
           protocolVersion: "2024-11-05",
@@ -631,9 +444,9 @@ export class App {
 
     // Call tool
     if (method === "tools/call") {
-      const toolName = params?.name;
-      const args = params?.arguments || {};
-      const definition = this.tools.get(toolName);
+      const toolName = params?.name as string | undefined;
+      const args = (params?.arguments || {}) as Record<string, unknown>;
+      const definition = this.tools.get(toolName || "");
 
       if (!definition) {
         return { jsonrpc: "2.0", error: { code: -32601, message: `Tool not found: ${toolName}` }, id };
@@ -643,11 +456,19 @@ export class App {
       const input = toolConfig.input ? toolConfig.input.parse(args) : args;
       const instanceId = (args.instanceId as string) || this.generateInstanceId();
 
-      const context = this.createServerlessContext({ instanceId, stateAdapter, realtimeAdapter });
-      const result = await handler(input, context);
-      const formatted = this.formatServerlessResult(result, instanceId, context.websocketUrl);
+      // Create a simple context for direct request handling
+      const context: ToolContext = {
+        instanceId,
+        getState: <T>() => this.instanceState.get(instanceId) as T | undefined,
+        setState: <T>(state: T) => { this.instanceState.set(instanceId, state); },
+        send: () => {},
+        onMessage: () => {},
+        onConnect: () => {},
+        websocketUrl: undefined,
+      };
 
-      return { jsonrpc: "2.0", result: formatted, id };
+      const result = await handler(input, context);
+      return { jsonrpc: "2.0", result: this.formatToolResult(result, instanceId), id };
     }
 
     // List resources
@@ -677,15 +498,15 @@ export class App {
 
     // Read resource
     if (method === "resources/read") {
-      const uri = params?.uri;
-      const resourceDef = this.resources.get(uri);
+      const uri = params?.uri as string | undefined;
+      const resourceDef = this.resources.get(uri || "");
 
       if (!resourceDef) {
         return { jsonrpc: "2.0", error: { code: -32601, message: `Resource not found: ${uri}` }, id };
       }
 
       const { config } = resourceDef;
-      let html = typeof config.html === "function" ? await config.html() : config.html;
+      const html = typeof config.html === "function" ? await config.html() : config.html;
 
       const mcpAppsMeta: Record<string, unknown> = {
         ui: {
@@ -765,59 +586,6 @@ export class App {
       }
     }
     return { type: "object", additionalProperties: true };
-  }
-
-  /**
-   * Create an AWS Lambda handler function.
-   */
-  private createLambdaHandler(options?: import("./types.js").AwsLambdaOptions) {
-    const { stateAdapter, realtimeAdapter } = options || {};
-    const app = this;
-
-    const corsHeaders = {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Accept, Mcp-Session-Id",
-      "Content-Type": "application/json",
-    };
-
-    return async (event: any, _lambdaContext: any) => {
-      if (event.httpMethod === "OPTIONS") {
-        return { statusCode: 204, headers: corsHeaders, body: "" };
-      }
-
-      let body: any = {};
-      if (event.body) {
-        try {
-          body = JSON.parse(event.isBase64Encoded
-            ? Buffer.from(event.body, "base64").toString()
-            : event.body
-          );
-        } catch {
-          return {
-            statusCode: 400,
-            headers: corsHeaders,
-            body: JSON.stringify({ jsonrpc: "2.0", error: { code: -32700, message: "Parse error" }, id: null }),
-          };
-        }
-      }
-
-      try {
-        const result = await app.handleMcpRequest(body, { stateAdapter, realtimeAdapter });
-        return {
-          statusCode: 200,
-          headers: corsHeaders,
-          body: JSON.stringify(result),
-        };
-      } catch (error) {
-        const err = error instanceof Error ? error : new Error(String(error));
-        return {
-          statusCode: 500,
-          headers: corsHeaders,
-          body: JSON.stringify({ jsonrpc: "2.0", error: { code: -32603, message: err.message }, id: body.id ?? null }),
-        };
-      }
-    };
   }
 
   /**
