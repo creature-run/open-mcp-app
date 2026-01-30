@@ -28,6 +28,7 @@ export type {
 export type {
   UnifiedHostClient,
   UnifiedHostClientEvents,
+  ExperimentalHostApi,
   AdapterKind,
   HostAdapter,
   AdapterFactory,

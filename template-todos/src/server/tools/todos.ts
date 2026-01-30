@@ -1,13 +1,13 @@
 /**
- * Todos Tool
+ * Todos Tools
  *
- * Single tool for all todo operations. All actions route to the same UI.
+ * Separate tools for each todo operation. All tools route to the same UI.
  *
- * Actions:
- * - list: Show all todos in interactive list
- * - add: Create a new todo item
- * - toggle: Toggle a todo's completed status
- * - remove: Delete a todo item
+ * Tools:
+ * - todos_list: Show all todos in interactive list
+ * - todos_add: Create a new todo item
+ * - todos_toggle: Toggle a todo's completed status
+ * - todos_remove: Delete a todo item
  *
  * Todos are scoped by orgId and projectId from Creature identity.
  */
@@ -29,31 +29,29 @@ import {
 } from "../lib/utils.js";
 
 // =============================================================================
-// Input Schema
+// Input Schemas
 // =============================================================================
 
-const TodosSchema = z.object({
-  action: z
-    .enum(["list", "add", "toggle", "remove"])
-    .describe("Action to perform on todos"),
-  text: z
-    .string()
-    .optional()
-    .describe("Todo text - required for 'add' action"),
-  id: z
-    .string()
-    .optional()
-    .describe("Todo ID - required for 'toggle' and 'remove' actions"),
+const TodosListSchema = z.object({});
+
+const TodosAddSchema = z.object({
+  text: z.string().describe("The todo text to add"),
 });
 
-type TodosInput = z.infer<typeof TodosSchema>;
+const TodosToggleSchema = z.object({
+  id: z.string().describe("The ID of the todo to toggle"),
+});
+
+const TodosRemoveSchema = z.object({
+  id: z.string().describe("The ID of the todo to remove"),
+});
 
 // =============================================================================
-// Action Handlers
+// Tool Handlers
 // =============================================================================
 
 /**
- * Handle 'list' action - show all todos.
+ * List all todos.
  */
 const handleList = async (store: DataStore<Todo>): Promise<ToolResult> => {
   const todos = await getAllTodos(store);
@@ -63,7 +61,7 @@ const handleList = async (store: DataStore<Todo>): Promise<ToolResult> => {
     return {
       data: { todos: [] },
       title: "Todos (0)",
-      text: "No todos yet. Use action 'add' with text to create one.",
+      text: "No todos yet. Use todos_add to create one.",
     };
   }
 
@@ -75,20 +73,12 @@ const handleList = async (store: DataStore<Todo>): Promise<ToolResult> => {
 };
 
 /**
- * Handle 'add' action - create a new todo item.
+ * Add a new todo item.
  */
 const handleAdd = async (
-  { text }: TodosInput,
+  text: string,
   store: DataStore<Todo>
 ): Promise<ToolResult> => {
-  if (!text) {
-    return {
-      data: { error: "text is required for 'add' action" },
-      text: "text is required for 'add' action",
-      isError: true,
-    };
-  }
-
   const now = new Date().toISOString();
   const todo: Todo = {
     id: generateTodoId(),
@@ -111,20 +101,12 @@ const handleAdd = async (
 };
 
 /**
- * Handle 'toggle' action - toggle a todo's completed status.
+ * Toggle a todo's completed status.
  */
 const handleToggle = async (
-  { id }: TodosInput,
+  id: string,
   store: DataStore<Todo>
 ): Promise<ToolResult> => {
-  if (!id) {
-    return {
-      data: { error: "id is required for 'toggle' action" },
-      text: "id is required for 'toggle' action",
-      isError: true,
-    };
-  }
-
   const todo = await store.get(id);
   if (!todo) {
     return {
@@ -150,20 +132,12 @@ const handleToggle = async (
 };
 
 /**
- * Handle 'remove' action - delete a todo item.
+ * Remove a todo item.
  */
 const handleRemove = async (
-  { id }: TodosInput,
+  id: string,
   store: DataStore<Todo>
 ): Promise<ToolResult> => {
-  if (!id) {
-    return {
-      data: { error: "id is required for 'remove' action" },
-      text: "id is required for 'remove' action",
-      isError: true,
-    };
-  }
-
   const todo = await store.get(id);
   if (!todo) {
     return {
@@ -191,45 +165,73 @@ const handleRemove = async (
 // =============================================================================
 
 /**
- * Register the todos tool.
+ * Register all todos tools.
  *
- * Single tool for all todo operations. Results are routed to the pip
+ * Separate tools for each operation. Results are routed to the pip
  * for UI updates.
  */
-export const registerTodosTool = (app: App) => {
+export const registerTodosTools = (app: App) => {
+  // List todos
   app.tool(
-    "todos",
+    "todos_list",
     {
-      description: `Manage todos. Actions:
-- list: Show all todos in interactive list
-- add: Create a new todo (requires text)
-- toggle: Toggle completed status (requires id)
-- remove: Delete a todo (requires id)`,
-      input: TodosSchema,
+      description: "List all todos and display them in the interactive todo list UI",
+      input: TodosListSchema,
       ui: TODOS_UI_URI,
       visibility: ["model", "app"],
       displayModes: ["pip", "inline"],
       defaultDisplayMode: "pip",
     },
-    async (input: TodosInput, context: ToolContext) => {
-      return withAuth(context, async (store) => {
-        switch (input.action) {
-          case "list":
-            return handleList(store);
-          case "add":
-            return handleAdd(input, store);
-          case "toggle":
-            return handleToggle(input, store);
-          case "remove":
-            return handleRemove(input, store);
-          default:
-            return {
-              data: { error: `Unknown action: ${input.action}` },
-              text: `Unknown action: ${input.action}`,
-              isError: true,
-            };
-        }
-      });
+    async (_input: z.infer<typeof TodosListSchema>, context: ToolContext) => {
+      return withAuth(context, async (store) => handleList(store));
+    }
+  );
+
+  // Add todo
+  app.tool(
+    "todos_add",
+    {
+      description: "Add a new todo item to the list",
+      input: TodosAddSchema,
+      ui: TODOS_UI_URI,
+      visibility: ["model", "app"],
+      displayModes: ["pip", "inline"],
+      defaultDisplayMode: "pip",
+    },
+    async (input: z.infer<typeof TodosAddSchema>, context: ToolContext) => {
+      return withAuth(context, async (store) => handleAdd(input.text, store));
+    }
+  );
+
+  // Toggle todo
+  app.tool(
+    "todos_toggle",
+    {
+      description: "Toggle a todo's completed status",
+      input: TodosToggleSchema,
+      ui: TODOS_UI_URI,
+      visibility: ["model", "app"],
+      displayModes: ["pip", "inline"],
+      defaultDisplayMode: "pip",
+    },
+    async (input: z.infer<typeof TodosToggleSchema>, context: ToolContext) => {
+      return withAuth(context, async (store) => handleToggle(input.id, store));
+    }
+  );
+
+  // Remove todo
+  app.tool(
+    "todos_remove",
+    {
+      description: "Remove a todo item from the list",
+      input: TodosRemoveSchema,
+      ui: TODOS_UI_URI,
+      visibility: ["model", "app"],
+      displayModes: ["pip", "inline"],
+      defaultDisplayMode: "pip",
+    },
+    async (input: z.infer<typeof TodosRemoveSchema>, context: ToolContext) => {
+      return withAuth(context, async (store) => handleRemove(input.id, store));
     }
   );
 };

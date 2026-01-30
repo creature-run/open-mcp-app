@@ -13,9 +13,16 @@
  * - Persists via tool calls to the server
  * - Widget state for restoration on refresh/popout
  *
+ * Tools (separate tools for each action):
+ * - todos_list: List all todos
+ * - todos_add: Add a new todo
+ * - todos_toggle: Toggle completion status
+ * - todos_remove: Delete a todo
+ *
  * SDK hooks used:
- * - useToolResult: Receive todo data from tool calls
- * - useHost: Connect to host, call tools, and persist widget state
+ * - HostProvider: Provides host client to child components via context
+ * - useHost: Access callTool, isReady, log, etc. from context
+ * - experimental_widgetState: Persist UI state across sessions
  * - initStyles: Inject environment-specific CSS variable defaults
  *
  * The SDK automatically detects the host environment and provides a unified
@@ -29,7 +36,7 @@ const environment = detectEnvironment();
 initStyles({ environment });
 
 import { useEffect, useCallback, useState, useRef, type FormEvent } from "react";
-import { useHost, useToolResult, type Environment } from "open-mcp-app/react";
+import { HostProvider, useHost, type Environment } from "open-mcp-app/react";
 import "./styles.css";
 
 // =============================================================================
@@ -222,9 +229,9 @@ function getEnvironmentLabel(env: Environment): string {
 /**
  * Main todo list page component.
  *
- * Uses the MCP Apps SDK hooks:
- * - useToolResult: Receive data from tool calls
- * - useHost: Connect to host, call tools, log messages, and persist widget state
+ * Uses the MCP Apps SDK with HostProvider pattern:
+ * - HostProvider: Wraps the app to provide host client via context
+ * - useHost: Access callTool, isReady, log, experimental_widgetState from context
  *
  * The component works identically across all supported hosts:
  * - Creature (MCP Apps): Full feature support including DevConsole logging
@@ -232,29 +239,31 @@ function getEnvironmentLabel(env: Environment): string {
  * - Standalone: For development/testing outside a host
  */
 export default function Page() {
+  return (
+    <HostProvider name="mcp-template-todos" version="0.1.0">
+      <TodoApp />
+    </HostProvider>
+  );
+}
+
+/**
+ * Inner todo app component that uses useHost() with HostProvider.
+ */
+function TodoApp() {
   const [todos, setTodos] = useState<Todo[]>([]);
-  const { data, onToolResult } = useToolResult<TodoData>();
   const hasLoggedReady = useRef(false);
 
-  /**
-   * Connect to host and get widget state for persistence.
-   *
-   * The SDK automatically detects the host environment:
-   * - In Creature/MCP Apps: Uses PostMessage protocol
-   * - In ChatGPT: Uses window.openai bridge
-   * - Standalone: Provides fallback behavior
-   *
-   * widgetState is restored by the host on PIP refresh/popout.
-   * setWidgetState persists data and notifies the host.
-   */
-  const { callTool, isReady, log, widgetState, setWidgetState, environment: hostEnvironment } = useHost({
-    name: "mcp-template-todos",
-    version: "0.1.0",
-    onToolResult,
-  });
+  // Get host from context (HostProvider)
+  const { callTool, isReady, log, experimental_widgetState, onToolResult, environment: hostEnvironment } = useHost();
 
-  // Cast widget state to our expected type
-  const typedWidgetState = widgetState as TodoWidgetState | null;
+  // Get widget state tuple for reading and updating
+  const [widgetState, setWidgetState] = experimental_widgetState<TodoWidgetState>();
+
+  // Separate tool callers for each action
+  const [listTodos, listState] = callTool<TodoData>("todos_list");
+  const [addTodo, addState] = callTool<TodoData>("todos_add");
+  const [toggleTodo, toggleState] = callTool<TodoData>("todos_toggle");
+  const [removeTodo, removeState] = callTool<TodoData>("todos_remove");
 
   /**
    * Log when connection is ready.
@@ -273,92 +282,112 @@ export default function Page() {
    * Todos are stored in privateContent (not visible to AI).
    */
   useEffect(() => {
-    const savedTodos = typedWidgetState?.privateContent?.todos;
+    const savedTodos = widgetState?.privateContent?.todos;
     if (savedTodos && savedTodos.length > 0 && todos.length === 0) {
       log.debug("Restoring todos from widget state", { count: savedTodos.length });
       setTodos(savedTodos);
     }
-  }, [typedWidgetState, todos.length, log]);
+  }, [widgetState, todos.length, log]);
 
   /**
-   * Handle tool result data updates.
-   * Updates local state and persists to widget state.
+   * Helper to update todos from any tool result data.
+   */
+  const updateTodosFromData = useCallback(
+    (data: TodoData | null) => {
+      if (data?.todos) {
+        setTodos(data.todos);
+        log.debug("Todos updated", { count: data.todos.length });
+
+        // Persist to widget state
+        // modelContent: concise summary for the agent
+        // privateContent: full todos list for UI restoration
+        const incompleteCount = data.todos.filter((t: Todo) => !t.completed).length;
+        setWidgetState({
+          modelContent: {
+            countTotal: data.todos.length,
+            countIncomplete: incompleteCount,
+          },
+          privateContent: {
+            todos: data.todos,
+            lastViewedAt: new Date().toISOString(),
+          },
+        });
+      }
+    },
+    [log, setWidgetState]
+  );
+
+  // Update todos when UI-initiated tool calls return data
+  useEffect(() => updateTodosFromData(listState.data), [listState.data, updateTodosFromData]);
+  useEffect(() => updateTodosFromData(addState.data), [addState.data, updateTodosFromData]);
+  useEffect(() => updateTodosFromData(toggleState.data), [toggleState.data, updateTodosFromData]);
+  useEffect(() => updateTodosFromData(removeState.data), [removeState.data, updateTodosFromData]);
+
+  /**
+   * Subscribe to agent-initiated tool calls.
+   * When the agent calls a tool (not the UI), we receive a tool-result notification.
+   * Filter by source === "agent" to avoid duplicate updates from UI calls.
    */
   useEffect(() => {
-    if (data?.todos) {
-      setTodos(data.todos);
-      log.debug("Todos updated", { count: data.todos.length });
-
-      // Persist to widget state
-      // modelContent: concise summary for the agent
-      // privateContent: full todos list for UI restoration
-      const incompleteCount = data.todos.filter((t) => !t.completed).length;
-      setWidgetState({
-        modelContent: {
-          countTotal: data.todos.length,
-          countIncomplete: incompleteCount,
-        },
-        privateContent: {
-          todos: data.todos,
-          lastViewedAt: new Date().toISOString(),
-        },
-      });
-    }
-  }, [data, log, setWidgetState]);
+    return onToolResult((result) => {
+      if (result.source === "agent") {
+        updateTodosFromData(result.structuredContent as TodoData);
+      }
+    });
+  }, [onToolResult, updateTodosFromData]);
 
   /**
    * Fetch initial todos when host connection is ready.
-   * Uses todos tool to list all todos.
    */
   useEffect(() => {
     if (isReady) {
       log.debug("Fetching initial todos");
-      callTool("todos", { action: "list" });
+      listTodos();
     }
-  }, [isReady, callTool, log]);
+  }, [isReady, listTodos, log]);
 
   /**
-   * Add a new todo item using todos tool.
+   * Add a new todo item.
    */
   const handleAdd = useCallback(
     async ({ text }: { text: string }) => {
       log.info("Adding todo", { text });
       try {
-        await callTool("todos", { action: "add", text });
+        await addTodo({ text });
       } catch (err) {
         log.error("Failed to add todo", { error: String(err) });
       }
     },
-    [callTool, log]
+    [addTodo, log]
   );
 
   /**
-   * Toggle a todo's completed status using todos tool.
+   * Toggle a todo's completed status.
    */
   const handleToggle = useCallback(
     async ({ id }: { id: string }) => {
       try {
-        await callTool("todos", { action: "toggle", id });
+        await toggleTodo({ id });
       } catch (err) {
         log.error("Failed to toggle todo", { id, error: String(err) });
       }
     },
-    [callTool, log]
+    [toggleTodo, log]
   );
 
   /**
-   * Delete a todo item using todos tool.
+   * Delete a todo item.
    */
   const handleDelete = useCallback(
     async ({ id }: { id: string }) => {
       log.info("Deleting todo", { id });
       try {
-        await callTool("todos", { action: "remove", id });
+        await removeTodo({ id });
       } catch (err) {
         log.error("Failed to delete todo", { id, error: String(err) });
       }
     },
-    [callTool, log]
+    [removeTodo, log]
   );
 
   const completedCount = todos.filter((t) => t.completed).length;

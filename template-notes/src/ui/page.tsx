@@ -19,8 +19,8 @@
  * - Full markdown support via Milkdown
  *
  * SDK hooks used:
- * - useToolResult: Receive note data from tool calls
- * - useHost: Connect to host, call tools, and persist widget state
+ * - HostProvider: Provides host client to child components via context
+ * - useHost: Access callTool, isReady, log, experimental_widgetState from context
  * - initStyles: Inject environment-specific CSS variable defaults
  *
  * The SDK automatically detects the host environment and provides a unified
@@ -34,7 +34,7 @@ const environment = detectEnvironment();
 initStyles({ environment });
 
 import { useEffect, useCallback, useState, useRef, useMemo } from "react";
-import { useHost, useToolResult, type Environment } from "open-mcp-app/react";
+import { HostProvider, useHost, type Environment } from "open-mcp-app/react";
 import MilkdownEditor, { type MilkdownEditorRef } from "./MilkdownEditor";
 import "./styles.css";
 
@@ -317,12 +317,27 @@ function getEnvironmentLabel(env: Environment): string {
 /**
  * Main notes page component.
  *
+ * Uses the MCP Apps SDK with HostProvider pattern:
+ * - HostProvider: Wraps the app to provide host client via context
+ * - useHost: Access callTool, isReady, log, experimental_widgetState from context
+ *
  * The component works identically across all supported hosts:
  * - Creature (MCP Apps): Full feature support including DevConsole logging
  * - ChatGPT Apps: Core features work, logging falls back to console
  * - Standalone: For development/testing outside a host
  */
 export default function Page() {
+  return (
+    <HostProvider name="mcp-template-notes" version="0.1.0">
+      <NotesApp />
+    </HostProvider>
+  );
+}
+
+/**
+ * Inner notes app component that uses useHost() with HostProvider.
+ */
+function NotesApp() {
   const [view, setView] = useState<ViewType>("editor");
   const [note, setNote] = useState<Note | null>(null);
   const [notes, setNotes] = useState<NoteSummary[]>([]);
@@ -343,23 +358,14 @@ export default function Page() {
   /** Ref to the Milkdown editor for imperative content updates */
   const editorRef = useRef<MilkdownEditorRef>(null);
 
-  const { data, onToolResult } = useToolResult<NoteData>();
+  // Get host from context (HostProvider)
+  const { callTool, isReady, log, experimental_widgetState, environment: hostEnvironment } = useHost();
 
-  /**
-   * Connect to host and get widget state for persistence.
-   *
-   * The SDK automatically detects the host environment:
-   * - In Creature/MCP Apps: Uses PostMessage protocol
-   * - In ChatGPT: Uses window.openai bridge
-   * - Standalone: Provides fallback behavior
-   */
-  const { callTool, isReady, log, widgetState, setWidgetState, environment: hostEnvironment } = useHost({
-    name: "mcp-template-notes",
-    version: "0.1.0",
-    onToolResult,
-  });
+  // Get widget state tuple for reading and updating
+  const [widgetState, setWidgetState] = experimental_widgetState<NoteWidgetState>();
 
-  const typedWidgetState = widgetState as NoteWidgetState | null;
+  // Get the notes tool caller
+  const [notesTool, notesState] = callTool<NoteData>("notes");
 
   /**
    * Save note via tool call.
@@ -369,7 +375,7 @@ export default function Page() {
       setIsSaving(true);
       lastSavedContentRef.current = newContent;
       try {
-        await callTool("notes", {
+        await notesTool({
           action: "save",
           noteId,
           title: newTitle,
@@ -384,7 +390,7 @@ export default function Page() {
         setIsSaving(false);
       }
     },
-    [callTool, log]
+    [notesTool, log]
   );
 
   /**
@@ -393,7 +399,7 @@ export default function Page() {
   const openNote = useCallback(
     async (noteId: string) => {
       try {
-        await callTool("notes", {
+        await notesTool({
           action: "open",
           noteId,
           instanceId: instanceIdRef.current ?? undefined,
@@ -403,7 +409,7 @@ export default function Page() {
         log.error("Failed to open note", { error: String(err) });
       }
     },
-    [callTool, log]
+    [notesTool, log]
   );
 
   /**
@@ -411,7 +417,7 @@ export default function Page() {
    */
   const createNote = useCallback(async () => {
     try {
-      await callTool("notes", {
+      await notesTool({
         action: "create",
         instanceId: instanceIdRef.current ?? undefined,
       });
@@ -419,14 +425,14 @@ export default function Page() {
     } catch (err) {
       log.error("Failed to create note", { error: String(err) });
     }
-  }, [callTool, log]);
+  }, [notesTool, log]);
 
   /**
    * Go back to list view.
    */
   const goToList = useCallback(async () => {
     try {
-      await callTool("notes", {
+      await notesTool({
         action: "list",
         instanceId: instanceIdRef.current ?? undefined,
       });
@@ -434,7 +440,7 @@ export default function Page() {
     } catch (err) {
       log.error("Failed to load list", { error: String(err) });
     }
-  }, [callTool, log]);
+  }, [notesTool, log]);
 
   /**
    * Log when connection is ready.
@@ -451,6 +457,7 @@ export default function Page() {
    * Handle data from tool results.
    */
   useEffect(() => {
+    const data = notesState.data;
     if (!data) return;
 
     // Extract instanceId from data
@@ -487,14 +494,14 @@ export default function Page() {
         }
       }
     }
-  }, [data, log, note?.id]);
+  }, [notesState.data, log, note?.id]);
 
   /**
    * Restore from widget state if no data.
    */
   useEffect(() => {
-    if (!data && typedWidgetState?.privateContent) {
-      const { lastView, lastNote, lastNotes } = typedWidgetState.privateContent;
+    if (!notesState.data && widgetState?.privateContent) {
+      const { lastView, lastNote, lastNotes } = widgetState.privateContent;
 
       if (lastView === "list" && lastNotes) {
         setView("list");
@@ -506,7 +513,7 @@ export default function Page() {
         log.debug("Note restored from widget state", { id: lastNote.id });
       }
     }
-  }, [typedWidgetState, data, log]);
+  }, [widgetState, notesState.data, log]);
 
   /**
    * Persist state to widget state.
@@ -553,7 +560,7 @@ export default function Page() {
     );
   }
 
-      if (note) {
+  if (note) {
     return (
       <EditorView
         note={note}

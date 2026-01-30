@@ -130,6 +130,7 @@ export class McpAppsBaseHostClient extends McpAppsSubscribable implements BaseHo
       content: this.extractTextContent(sdkResult.content),
       structuredContent: sdkResult.structuredContent as T,
       isError: sdkResult.isError,
+      source: "ui",
     };
 
     this.emit("tool-result", result as ToolResult);

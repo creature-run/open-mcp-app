@@ -21,6 +21,7 @@ import type {
   AdapterKind,
   HostAdapter,
   UnifiedHostClientEvents,
+  ExperimentalHostApi,
 } from "../types.js";
 
 /**
@@ -69,6 +70,29 @@ export class ChatGptAdapter implements HostAdapter {
   }
 
   /**
+   * Experimental APIs for ChatGPT.
+   * Most are no-ops since ChatGPT doesn't support MCP Apps extensions.
+   */
+  get experimental(): ExperimentalHostApi {
+    return {
+      sendNotification: (_method: string, _params: unknown) => {
+        // No-op on ChatGPT
+      },
+      setWidgetState: (state: WidgetState | null) => {
+        // ChatGPT supports widget state via native bridge
+        this.base.setWidgetState(state);
+      },
+      setTitle: (_title: string) => {
+        // No-op on ChatGPT
+      },
+      getCreatureStyles: () => {
+        // Not available on ChatGPT
+        return null;
+      },
+    };
+  }
+
+  /**
    * Get host context - returns null for ChatGPT as it doesn't use MCP Apps protocol.
    */
   getHostContext(): HostContext | null {
@@ -88,24 +112,6 @@ export class ChatGptAdapter implements HostAdapter {
     args: Record<string, unknown>
   ): Promise<ToolResult<T>> {
     return this.base.callTool<T>(toolName, args);
-  }
-
-  /**
-   * Send notification - not supported on ChatGPT.
-   */
-  sendNotification(_method: string, _params: unknown): void {
-    // No-op on ChatGPT
-  }
-
-  setWidgetState(state: WidgetState | null): void {
-    this.base.setWidgetState(state);
-  }
-
-  /**
-   * Set pip/widget title - not supported on ChatGPT.
-   */
-  setTitle(_title: string): void {
-    // No-op on ChatGPT
   }
 
   async requestDisplayMode(params: { mode: DisplayMode }): Promise<{ mode: DisplayMode }> {

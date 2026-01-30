@@ -23,6 +23,7 @@ import type {
   AdapterKind,
   HostAdapter,
   UnifiedHostClientEvents,
+  ExperimentalHostApi,
 } from "../types.js";
 
 /**
@@ -87,6 +88,28 @@ export class McpAppsAdapter implements HostAdapter {
   }
 
   /**
+   * Experimental APIs for non-spec extensions.
+   * Base MCP Apps adapter provides minimal implementations - CreatureAdapter overrides.
+   */
+  get experimental(): ExperimentalHostApi {
+    return {
+      sendNotification: (method: string, params: unknown) => {
+        this.base.sendNotification(method, params);
+      },
+      setWidgetState: (state: WidgetState | null) => {
+        this.base.setWidgetState(state);
+      },
+      setTitle: (_title: string) => {
+        // No-op on generic MCP Apps hosts - only Creature supports this
+      },
+      getCreatureStyles: () => {
+        // Not available on generic MCP Apps hosts
+        return null;
+      },
+    };
+  }
+
+  /**
    * Get the host context received from the host.
    * Useful for checking host-specific capabilities.
    */
@@ -107,22 +130,6 @@ export class McpAppsAdapter implements HostAdapter {
     args: Record<string, unknown>
   ): Promise<ToolResult<T>> {
     return this.base.callTool<T>(toolName, args);
-  }
-
-  sendNotification(method: string, params: unknown): void {
-    this.base.sendNotification(method, params);
-  }
-
-  setWidgetState(state: WidgetState | null): void {
-    this.base.setWidgetState(state);
-  }
-
-  /**
-   * Set pip/widget title.
-   * Sends a notification - hosts that support it will update the title.
-   */
-  setTitle(title: string): void {
-    this.base.sendNotification("ui/notifications/title-changed", { title });
   }
 
   async requestDisplayMode(params: { mode: DisplayMode }): Promise<{ mode: DisplayMode }> {

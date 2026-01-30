@@ -1,43 +1,227 @@
-import { useSyncExternalStore, useEffect, useRef, useMemo, useState } from "react";
+import { useSyncExternalStore, useEffect, useRef, useMemo, useState, useCallback } from "react";
 import { createHost, detectEnvironment } from "../core/index.js";
-import type { UnifiedHostClient, Environment, HostContext, AdapterKind } from "../core/index.js";
-import type { UseHostConfig, UseHostReturn, Logger } from "./types.js";
+import type { UnifiedHostClient, Environment, HostContext, AdapterKind, ToolResult, WidgetState } from "../core/index.js";
+import type { UseHostConfig, UseHostReturn, Logger, ToolCallState, ToolCallTuple, ToolCallFunction } from "./types.js";
+import { useHostClientOptional } from "./HostContext.js";
 
 export { detectEnvironment };
 export type { Environment };
 
 /**
- * React hook for connecting to an MCP Apps host.
- *
- * Creates a host client instance and manages its lifecycle. Automatically
- * connects on mount and disconnects on unmount. Uses refs for callbacks
- * to prevent reconnection loops when consumers pass inline functions.
- *
- * @param config - Configuration including app info and event handlers
- * @returns Current state and methods for interacting with the host
- *
- * @example
- * ```tsx
- * const { isReady, callTool, log } = useHost({
- *   name: "my-app",
- *   version: "1.0.0",
- *   onToolResult: (result) => setData(result.structuredContent),
- * });
- *
- * // Logging
- * log("User action"); // default info level
- * log.debug("Verbose info");
- * log.error("Something failed", { error: err.message });
- * ```
+ * Initial state for a tool call.
  */
-export function useHost(config: UseHostConfig): UseHostReturn {
-  const clientRef = useRef<UnifiedHostClient | null>(null);
+const INITIAL_TOOL_STATE: ToolCallState = {
+  status: "idle",
+  data: null,
+  result: null,
+  error: null,
+  isError: false,
+  text: null,
+  title: null,
+  instanceId: null,
+};
 
-  if (!clientRef.current) {
-    clientRef.current = createHost({ name: config.name, version: config.version });
+/**
+ * Extract metadata from a tool result's structuredContent.
+ */
+function extractResultMetadata<T>(result: ToolResult<T>): {
+  data: T | null;
+  title: string | null;
+  instanceId: string | null;
+  text: string | null;
+} {
+  const structured = result.structuredContent as (T & { title?: string; instanceId?: string }) | undefined;
+  let data: T | null = null;
+  let title: string | null = null;
+  let instanceId: string | null = null;
+
+  if (structured) {
+    const { title: resultTitle, instanceId: resultInstanceId, ...rest } = structured;
+    data = rest as T;
+    if (resultTitle) title = resultTitle;
+    if (resultInstanceId) instanceId = resultInstanceId;
   }
 
-  const client = clientRef.current;
+  const text = result.content?.[0]?.text ?? null;
+
+  return { data, title, instanceId, text };
+}
+
+/**
+ * React hook for connecting to an MCP Apps host.
+ *
+ * Can be used in two ways:
+ *
+ * 1. **With HostProvider** (recommended): Call `useHost()` with no arguments
+ *    inside a component wrapped by `<HostProvider>`. The client is shared
+ *    via context, and connection is managed by the provider.
+ *
+ * 2. **Standalone**: Pass config to create and manage your own client.
+ *    The hook handles connection/disconnection automatically.
+ *
+ * @param config - Optional configuration. If omitted, uses HostProvider context.
+ * @returns Current state and methods for interacting with the host
+ *
+ * @example With HostProvider (recommended)
+ * ```tsx
+ * // App.tsx
+ * function App() {
+ *   return (
+ *     <HostProvider name="my-app" version="1.0.0">
+ *       <MyWidget />
+ *     </HostProvider>
+ *   );
+ * }
+ *
+ * // MyWidget.tsx
+ * function MyWidget() {
+ *   const { callTool, isReady, log, experimental_widgetState } = useHost();
+ *   const [widgetState, setWidgetState] = experimental_widgetState();
+ *   const [listTodos, listTodosData] = callTool("todos_list");
+ *
+ *   useEffect(() => {
+ *     if (isReady) listTodos();
+ *   }, [isReady, listTodos]);
+ * }
+ * ```
+ *
+ * @example Standalone (creates own client)
+ * ```tsx
+ * function MyApp() {
+ *   const { isReady, callTool, log } = useHost({
+ *     name: "my-app",
+ *     version: "1.0.0",
+ *   });
+ * }
+ * ```
+ */
+export function useHost(config?: UseHostConfig): UseHostReturn {
+  // Check if we're inside a HostProvider
+  const contextClient = useHostClientOptional();
+
+  // Determine if we should use context or create our own client
+  const useContext = !config && contextClient !== null;
+
+  const clientRef = useRef<UnifiedHostClient | null>(null);
+
+  if (!useContext) {
+    // Standalone mode: create our own client
+    if (!config) {
+      throw new Error(
+        "useHost() requires either a HostProvider wrapper or config argument. " +
+        "Either wrap your app with <HostProvider name=\"...\" version=\"...\"> " +
+        "or pass { name, version } to useHost()."
+      );
+    }
+    if (!clientRef.current) {
+      clientRef.current = createHost({ name: config.name, version: config.version });
+    }
+  }
+
+  // Use context client if available, otherwise our own
+  const client = useContext ? contextClient! : clientRef.current!;
+
+  // ============================================================================
+  // Tool Call State Management
+  // ============================================================================
+
+  /**
+   * Map of tool name -> current state for that tool.
+   * Using useState to trigger re-renders when tool states change.
+   */
+  const [toolStates, setToolStates] = useState<Map<string, ToolCallState>>(
+    () => new Map()
+  );
+
+  /**
+   * Ref to store stable run functions for each tool.
+   * This prevents creating new function identities on every render.
+   */
+  const toolFunctionsRef = useRef<Map<string, ToolCallFunction>>(new Map());
+
+  /**
+   * Update the state for a specific tool.
+   */
+  const updateToolState = useCallback(
+    <T>(toolName: string, newState: Partial<ToolCallState<T>>) => {
+      setToolStates((prev) => {
+        const current = (prev.get(toolName) ?? INITIAL_TOOL_STATE) as ToolCallState<T>;
+        const updated = { ...current, ...newState };
+        const next = new Map(prev);
+        next.set(toolName, updated as ToolCallState);
+        return next;
+      });
+    },
+    []
+  );
+
+  /**
+   * Get or create a stable tool call function for the given tool name.
+   */
+  const getOrCreateToolFunction = useCallback(
+    <T>(toolName: string): ToolCallFunction<T> => {
+      const existing = toolFunctionsRef.current.get(toolName);
+      if (existing) {
+        return existing as ToolCallFunction<T>;
+      }
+
+      const runFn: ToolCallFunction<T> = async (args: Record<string, unknown> = {}) => {
+        // Set loading state
+        updateToolState<T>(toolName, {
+          status: "loading",
+          error: null,
+        });
+
+        try {
+          const result = await client.callTool<T>(toolName, args);
+          const { data, title, instanceId, text } = extractResultMetadata<T>(result);
+
+          // Update state with success
+          updateToolState<T>(toolName, {
+            status: "success",
+            data,
+            result,
+            error: null,
+            isError: result.isError ?? false,
+            text,
+            title,
+            instanceId,
+          });
+
+          return result;
+        } catch (err) {
+          // Update state with error
+          updateToolState<T>(toolName, {
+            status: "error",
+            error: err,
+            isError: true,
+          });
+
+          throw err;
+        }
+      };
+
+      toolFunctionsRef.current.set(toolName, runFn as ToolCallFunction);
+      return runFn;
+    },
+    [client, updateToolState]
+  );
+
+  /**
+   * Factory function that returns a tuple of [runFn, state] for a tool.
+   */
+  const callTool = useCallback(
+    <T = Record<string, unknown>>(toolName: string): ToolCallTuple<T> => {
+      const runFn = getOrCreateToolFunction<T>(toolName);
+      const currentState = (toolStates.get(toolName) ?? INITIAL_TOOL_STATE) as ToolCallState<T>;
+      return [runFn, currentState];
+    },
+    [getOrCreateToolFunction, toolStates]
+  );
+
+  // ============================================================================
+  // Logger
+  // ============================================================================
 
   /**
    * Create a logger function with convenience methods.
@@ -68,16 +252,31 @@ export function useHost(config: UseHostConfig): UseHostReturn {
     return logFn as Logger;
   }, [client]);
 
-  const boundMethods = useMemo(
+  // ============================================================================
+  // Other Methods
+  // ============================================================================
+
+  const requestDisplayMode = useMemo(
+    () => client.requestDisplayMode.bind(client),
+    [client]
+  );
+
+  /**
+   * Wrap experimental APIs for stable references.
+   */
+  const experimental = useMemo(
     () => ({
-      callTool: client.callTool.bind(client),
-      sendNotification: client.sendNotification.bind(client),
-      setWidgetState: client.setWidgetState.bind(client),
-      setTitle: client.setTitle.bind(client),
-      requestDisplayMode: client.requestDisplayMode.bind(client),
+      sendNotification: client.experimental.sendNotification.bind(client.experimental),
+      setWidgetState: client.experimental.setWidgetState.bind(client.experimental),
+      setTitle: client.experimental.setTitle.bind(client.experimental),
+      getCreatureStyles: client.experimental.getCreatureStyles.bind(client.experimental),
     }),
     [client]
   );
+
+  // ============================================================================
+  // Widget State Tuple
+  // ============================================================================
 
   const state = useSyncExternalStore(
     (onStoreChange) => client.subscribe(onStoreChange),
@@ -86,31 +285,70 @@ export function useHost(config: UseHostConfig): UseHostReturn {
   );
 
   /**
+   * Stable setter for widget state.
+   * Using useCallback to ensure stable identity across renders.
+   */
+  const setWidgetState = useCallback(
+    <T extends WidgetState = WidgetState>(newState: T | null) => {
+      client.experimental.setWidgetState(newState);
+    },
+    [client]
+  );
+
+  /**
+   * Returns a useState-like tuple for widget state.
+   * The setter is stable and won't cause infinite render loops.
+   */
+  const experimental_widgetState = useCallback(
+    <T extends WidgetState = WidgetState>(): [T | null, (s: T | null) => void] => {
+      const currentState = state.widgetState as T | null;
+      return [currentState, setWidgetState as (s: T | null) => void];
+    },
+    [state.widgetState, setWidgetState]
+  );
+
+  /**
+   * Subscribe to tool results from external sources (e.g., agent calls).
+   * Returns an unsubscribe function.
+   */
+  const onToolResult = useCallback(
+    (callback: (result: ToolResult) => void): (() => void) => {
+      return client.on("tool-result", callback);
+    },
+    [client]
+  );
+
+  // ============================================================================
+  // Lifecycle & Event Handlers
+  // ============================================================================
+
+  /**
    * Store callbacks in refs to prevent reconnection loops.
    * Consumers often pass inline functions which would change identity on every render,
    * but we don't want that to trigger reconnection.
    */
   const callbacksRef = useRef({
-    onToolInput: config.onToolInput,
-    onToolResult: config.onToolResult,
-    onThemeChange: config.onThemeChange,
-    onTeardown: config.onTeardown,
-    onWidgetStateChange: config.onWidgetStateChange,
+    onToolInput: config?.onToolInput,
+    onToolResult: config?.onToolResult,
+    onThemeChange: config?.onThemeChange,
+    onTeardown: config?.onTeardown,
+    onWidgetStateChange: config?.onWidgetStateChange,
   });
 
   useEffect(() => {
     callbacksRef.current = {
-      onToolInput: config.onToolInput,
-      onToolResult: config.onToolResult,
-      onThemeChange: config.onThemeChange,
-      onTeardown: config.onTeardown,
-      onWidgetStateChange: config.onWidgetStateChange,
+      onToolInput: config?.onToolInput,
+      onToolResult: config?.onToolResult,
+      onThemeChange: config?.onThemeChange,
+      onTeardown: config?.onTeardown,
+      onWidgetStateChange: config?.onWidgetStateChange,
     };
   });
 
   useEffect(() => {
     const unsubs: Array<() => void> = [];
 
+    // Subscribe to events (works for both context and standalone mode)
     unsubs.push(
       client.on("tool-input", (args) => callbacksRef.current.onToolInput?.(args))
     );
@@ -129,27 +367,38 @@ export function useHost(config: UseHostConfig): UseHostReturn {
       )
     );
 
-    client.connect();
+    // Only manage connection in standalone mode (not when using HostProvider)
+    if (!useContext) {
+      client.connect();
+    }
 
     return () => {
       unsubs.forEach((unsub) => unsub());
-      client.disconnect();
+      if (!useContext) {
+        client.disconnect();
+      }
     };
-  }, [client]);
+  }, [client, useContext]);
+
+  // ============================================================================
+  // Return
+  // ============================================================================
 
   return {
     isReady: state.isReady,
     environment: state.environment,
     widgetState: state.widgetState,
-    callTool: boundMethods.callTool,
-    sendNotification: boundMethods.sendNotification,
-    setWidgetState: boundMethods.setWidgetState,
-    setTitle: boundMethods.setTitle,
-    requestDisplayMode: boundMethods.requestDisplayMode,
+    callTool,
+    requestDisplayMode,
     log,
     // Host detection properties (may change after connection for MCP Apps)
     adapterKind: client.adapterKind,
     isCreature: client.isCreature,
     hostContext: client.getHostContext(),
+    // Experimental APIs (non-spec extensions)
+    experimental,
+    experimental_widgetState,
+    // Tool result subscription
+    onToolResult,
   };
 }

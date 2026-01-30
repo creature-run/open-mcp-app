@@ -14,8 +14,9 @@ import { isHost, KNOWN_HOSTS } from "../../base/hostIdentity.js";
 import type {
   HostClientConfig,
   HostContext,
+  WidgetState,
 } from "../../base/types.js";
-import type { AdapterKind } from "../types.js";
+import type { AdapterKind, ExperimentalHostApi } from "../types.js";
 
 /**
  * Extended host context with Creature-specific fields.
@@ -129,10 +130,25 @@ export class CreatureAdapter extends McpAppsAdapter {
   }
 
   /**
-   * Get Creature-specific styles if available.
-   * Returns null when not running in Creature.
+   * Experimental APIs with Creature-specific implementations.
    */
-  getCreatureStyles(): Record<string, string | undefined> | null {
-    return this.base.getCreatureStyles();
+  override get experimental(): ExperimentalHostApi {
+    return {
+      sendNotification: (method: string, params: unknown) => {
+        this.base.sendNotification(method, params);
+      },
+      setWidgetState: (state: WidgetState | null) => {
+        this.base.setWidgetState(state);
+      },
+      setTitle: (title: string) => {
+        // Only send notification if actually connected to Creature
+        if (this.isCreature) {
+          this.base.sendNotification("ui/notifications/title-changed", { title });
+        }
+      },
+      getCreatureStyles: () => {
+        return this.base.getCreatureStyles();
+      },
+    };
   }
 }

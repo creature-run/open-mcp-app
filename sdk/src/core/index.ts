@@ -171,6 +171,7 @@ export type {
   HostAdapter,
   UnifiedHostClient,
   UnifiedHostClientEvents,
+  ExperimentalHostApi,
 } from "./providers/index.js";
 
 // Adapter classes (for explicit adapter selection)

@@ -21,6 +21,7 @@ import type {
   AdapterKind,
   HostAdapter,
   UnifiedHostClientEvents,
+  ExperimentalHostApi,
 } from "../types.js";
 
 /**
@@ -78,6 +79,28 @@ export class StandaloneAdapter implements HostAdapter {
   }
 
   /**
+   * Experimental APIs for standalone mode.
+   * All methods are logged for development/debugging purposes.
+   */
+  get experimental(): ExperimentalHostApi {
+    return {
+      sendNotification: (method: string, params: unknown) => {
+        console.debug(`[Standalone] experimental.sendNotification("${method}")`, params);
+      },
+      setWidgetState: (state: WidgetState | null) => {
+        this.base.setWidgetState(state);
+      },
+      setTitle: (title: string) => {
+        console.debug(`[Standalone] experimental.setTitle("${title}")`);
+      },
+      getCreatureStyles: () => {
+        // Not available in standalone mode
+        return null;
+      },
+    };
+  }
+
+  /**
    * Get host context - returns null for standalone mode.
    */
   getHostContext(): HostContext | null {
@@ -97,24 +120,6 @@ export class StandaloneAdapter implements HostAdapter {
     args: Record<string, unknown>
   ): Promise<ToolResult<T>> {
     return this.base.callTool<T>(toolName, args);
-  }
-
-  /**
-   * Send notification - logged in standalone mode.
-   */
-  sendNotification(method: string, params: unknown): void {
-    console.debug(`[Standalone] sendNotification("${method}")`, params);
-  }
-
-  setWidgetState(state: WidgetState | null): void {
-    this.base.setWidgetState(state);
-  }
-
-  /**
-   * Set pip/widget title - logged in standalone mode.
-   */
-  setTitle(title: string): void {
-    console.debug(`[Standalone] setTitle("${title}")`);
   }
 
   async requestDisplayMode(params: { mode: DisplayMode }): Promise<{ mode: DisplayMode }> {

@@ -7,9 +7,9 @@ import type {
   HostContext,
   WebSocketStatus,
 } from "../core/types.js";
-import type { AdapterKind } from "../core/providers/types.js";
+import type { AdapterKind, ExperimentalHostApi } from "../core/providers/types.js";
 
-export type { DisplayMode, Environment, LogLevel, ToolResult, WidgetState, HostContext, WebSocketStatus, AdapterKind };
+export type { DisplayMode, Environment, LogLevel, ToolResult, WidgetState, HostContext, WebSocketStatus, AdapterKind, ExperimentalHostApi };
 
 export { type StructuredWidgetState } from "../core/types.js";
 
@@ -27,6 +27,55 @@ export interface UseHostConfig {
   /** Called when widget state changes (restored from host or updated) */
   onWidgetStateChange?: (widgetState: WidgetState | null) => void;
 }
+
+// ============================================================================
+// Tool Calling
+// ============================================================================
+
+/**
+ * Status of a tool call.
+ */
+export type ToolCallStatus = "idle" | "loading" | "success" | "error";
+
+/**
+ * State returned from a tool call.
+ * Contains the status, data, and metadata from the tool result.
+ */
+export interface ToolCallState<T = Record<string, unknown>> {
+  /** Current status of the tool call */
+  status: ToolCallStatus;
+  /** Structured data from tool result (from structuredContent) */
+  data: T | null;
+  /** Full tool result object */
+  result: ToolResult<T> | null;
+  /** Error if the tool call failed */
+  error: unknown | null;
+  /** Whether the result is an error (from isError flag or thrown exception) */
+  isError: boolean;
+  /** Text content for AI context (from content[0].text) */
+  text: string | null;
+  /** Title for PIP tab (from structuredContent.title) */
+  title: string | null;
+  /** Instance ID for this widget (from structuredContent.instanceId) */
+  instanceId: string | null;
+}
+
+/**
+ * Function to call a tool with optional arguments.
+ * Returns a promise that resolves to the tool result.
+ */
+export type ToolCallFunction<T = Record<string, unknown>> = (
+  args?: Record<string, unknown>
+) => Promise<ToolResult<T>>;
+
+/**
+ * Tuple returned from callTool().
+ * First element is the function to call the tool, second is the current state.
+ */
+export type ToolCallTuple<T = Record<string, unknown>> = [
+  ToolCallFunction<T>,
+  ToolCallState<T>
+];
 
 /**
  * Logger interface with convenience methods for each log level.
@@ -70,25 +119,38 @@ export interface Logger {
 
 export interface UseHostReturn {
   isReady: boolean;
-  callTool: <T = Record<string, unknown>>(
-    toolName: string,
-    args: Record<string, unknown>
-  ) => Promise<ToolResult<T>>;
-  sendNotification: (method: string, params: unknown) => void;
-  environment: Environment;
-  widgetState: WidgetState | null;
-  setWidgetState: (state: WidgetState | null) => void;
+
   /**
-   * Set the pip/widget title displayed in the host UI.
+   * Get a tool caller for the given tool name.
+   * Returns a tuple of [callFn, state] where:
+   * - callFn: Function to call the tool with optional args (defaults to {})
+   * - state: Current state of the tool call (status, data, error, etc.)
    *
-   * Useful for updating the title based on user actions (e.g., switching tabs)
-   * without making a tool call.
+   * @example
+   * ```tsx
+   * const { callTool, isReady } = useHost({ name: "my-app", version: "1.0.0" });
+   * const [listTodos, listTodosState] = callTool<TodoData>("todos_list");
+   * const [addTodo, addTodoState] = callTool<TodoData>("todos_add");
    *
-   * Note: Creature-specific extension, no-op on ChatGPT Apps.
+   * useEffect(() => {
+   *   if (isReady) {
+   *     listTodos(); // Call with no args
+   *   }
+   * }, [isReady, listTodos]);
    *
-   * @param title - The new title to display
+   * // Use the state
+   * if (listTodosState.status === "loading") return <Spinner />;
+   * if (listTodosState.data) return <TodoList todos={listTodosState.data.todos} />;
+   *
+   * // Call with args
+   * <button onClick={() => addTodo({ text: "New todo" })}>Add</button>
+   * ```
    */
-  setTitle: (title: string) => void;
+  callTool: <T = Record<string, unknown>>(toolName: string) => ToolCallTuple<T>;
+
+  environment: Environment;
+  /** Current widget state (read-only). Use experimental_widgetState() for read/write access. */
+  widgetState: WidgetState | null;
   requestDisplayMode: (params: { mode: DisplayMode }) => Promise<{ mode: DisplayMode }>;
 
   /**
@@ -133,6 +195,75 @@ export interface UseHostReturn {
    * ```
    */
   log: Logger;
+
+  /**
+   * Experimental APIs that are not part of the MCP Apps spec.
+   *
+   * These APIs provide access to Creature-specific features and other
+   * non-standard extensions. They may change or be removed in future versions.
+   *
+   * @example
+   * ```tsx
+   * const { experimental, isCreature } = useHost({ name: "my-app", version: "1.0.0" });
+   *
+   * // Set widget state (non-spec extension)
+   * experimental.setWidgetState({ count: 42 });
+   *
+   * // Set title (Creature-only)
+   * if (isCreature) {
+   *   experimental.setTitle("My Widget");
+   * }
+   *
+   * // Get Creature-specific styles
+   * const styles = experimental.getCreatureStyles();
+   * ```
+   */
+  experimental: ExperimentalHostApi;
+
+  /**
+   * Get widget state as a useState-like tuple.
+   * Returns [state, setState] for reading and updating widget state.
+   *
+   * Widget state is persisted by the host across sessions and restored
+   * when the widget is re-opened.
+   *
+   * @example
+   * ```tsx
+   * const { experimental_widgetState } = useHost({ name: "my-app", version: "1.0.0" });
+   * const [widgetState, setWidgetState] = experimental_widgetState<MyState>();
+   *
+   * return (
+   *   <button onClick={() => setWidgetState({ count: (widgetState?.count ?? 0) + 1 })}>
+   *     Count: {widgetState?.count ?? 0}
+   *   </button>
+   * );
+   * ```
+   */
+  experimental_widgetState: <T extends WidgetState = WidgetState>() => [
+    T | null,
+    (state: T | null) => void
+  ];
+
+  /**
+   * Subscribe to tool results from external sources (e.g., agent calls).
+   *
+   * This allows reacting to tool calls made by the agent, not just UI-initiated calls.
+   * Returns an unsubscribe function.
+   *
+   * @example
+   * ```tsx
+   * const { onToolResult } = useHost();
+   *
+   * useEffect(() => {
+   *   return onToolResult((result) => {
+   *     if (result.structuredContent?.todos) {
+   *       setTodos(result.structuredContent.todos);
+   *     }
+   *   });
+   * }, [onToolResult]);
+   * ```
+   */
+  onToolResult: (callback: (result: ToolResult) => void) => () => void;
 }
 
 // ============================================================================

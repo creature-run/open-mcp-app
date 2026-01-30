@@ -3,6 +3,10 @@ export { useToolResult } from "./useToolResult.js";
 export { useWebSocket } from "./useWebSocket.js";
 export { CreatureIcon } from "./CreatureIcon.js";
 
+// Host Provider for context-based hooks
+export { HostProvider } from "./HostContext.js";
+export type { HostProviderProps } from "./HostContext.js";
+
 export type {
   DisplayMode,
   UseHostConfig,
@@ -19,6 +23,11 @@ export type {
   WidgetState,
   StructuredWidgetState,
   WebSocketStatus,
+  // Tool calling types
+  ToolCallStatus,
+  ToolCallState,
+  ToolCallFunction,
+  ToolCallTuple,
 } from "./types.js";
 
 // Adapter-based exports
@@ -48,6 +57,7 @@ export type {
   // Unified types
   UnifiedHostClient,
   UnifiedHostClientEvents,
+  ExperimentalHostApi,
   AdapterKind,
   HostAdapter,
   HostIdentity,

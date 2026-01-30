@@ -28,6 +28,7 @@ import type {
   AdapterKind,
   HostAdapter,
   UnifiedHostClientEvents,
+  ExperimentalHostApi,
 } from "../types.js";
 
 /**
@@ -137,15 +138,31 @@ export class UpgradingMcpAppsClient implements HostAdapter {
   }
 
   // ============================================================================
-  // Creature-Specific Extensions (gracefully no-op when not in Creature)
+  // Experimental APIs
   // ============================================================================
 
   /**
-   * Get Creature-specific styles if available.
-   * Returns null when not running in Creature.
+   * Experimental APIs with dynamic Creature support.
+   * Methods like setTitle will only work when isCreature is true.
    */
-  getCreatureStyles(): Record<string, string | undefined> | null {
-    return this.base.getCreatureStyles();
+  get experimental(): ExperimentalHostApi {
+    return {
+      sendNotification: (method: string, params: unknown) => {
+        this.base.sendNotification(method, params);
+      },
+      setWidgetState: (state: WidgetState | null) => {
+        this.base.setWidgetState(state);
+      },
+      setTitle: (title: string) => {
+        // Only send notification if actually connected to Creature
+        if (this.isCreature) {
+          this.base.sendNotification("ui/notifications/title-changed", { title });
+        }
+      },
+      getCreatureStyles: () => {
+        return this.base.getCreatureStyles();
+      },
+    };
   }
 
   // ============================================================================
@@ -169,22 +186,6 @@ export class UpgradingMcpAppsClient implements HostAdapter {
     args: Record<string, unknown>
   ): Promise<ToolResult<T>> {
     return this.base.callTool<T>(toolName, args);
-  }
-
-  sendNotification(method: string, params: unknown): void {
-    this.base.sendNotification(method, params);
-  }
-
-  setWidgetState(state: WidgetState | null): void {
-    this.base.setWidgetState(state);
-  }
-
-  /**
-   * Set pip/widget title.
-   * Sends a notification - hosts that support it will update the title.
-   */
-  setTitle(title: string): void {
-    this.base.sendNotification("ui/notifications/title-changed", { title });
   }
 
   async requestDisplayMode(params: { mode: DisplayMode }): Promise<{ mode: DisplayMode }> {

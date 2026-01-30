@@ -18,4 +18,5 @@ export type {
   HostAdapter,
   UnifiedHostClient,
   UnifiedHostClientEvents,
+  ExperimentalHostApi,
 } from "./types.js";
