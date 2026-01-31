@@ -23,6 +23,7 @@ import { MIME_TYPES } from "./types.js";
 import { svgToDataUri, isInitializeRequest, injectHmrClient, readHmrConfig, htmlLoader, HMR_PORT_OFFSET } from "./utils.js";
 import { WebSocketManager } from "./websocket.js";
 import type { WebSocketConnection } from "./types.js";
+import { setCurrentServer } from "./storageRpc.js";
 
 
 // ============================================================================
@@ -731,6 +732,10 @@ export class App {
         transport = this.createTransport();
         const server = this.createMcpServer();
         await server.connect(transport);
+        
+        // Set the current server for storage RPC access
+        setCurrentServer(server);
+        
         await transport.handleRequest(req, res, req.body);
         return;
       } else {
