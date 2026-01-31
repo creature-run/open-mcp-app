@@ -410,11 +410,22 @@ export function experimental_rmdirSync(relativePath: string): void {
 // KV Store APIs (Creature Extension)
 // ============================================================================
 
+import {
+  isStorageRpcAvailable,
+  rpcKvGet,
+  rpcKvSet,
+  rpcKvDelete,
+  rpcKvList,
+  rpcKvSearch,
+  rpcBlobPut,
+  rpcBlobGet,
+  rpcBlobDelete,
+  rpcBlobList,
+  type KvSearchResult,
+} from "./storageRpc.js";
+
 /** Maximum key length for KV store */
 const MAX_KEY_LENGTH = 256;
-
-/** KV store file name */
-const KV_FILENAME = "kv.json";
 
 /**
  * Sanitize a key to prevent security issues.
@@ -442,91 +453,6 @@ const sanitizeKey = (key: string): string => {
 };
 
 /**
- * Get the path to the KV store file.
- */
-const getKvFilePath = (): string | null => {
-  const storageDir = getStorageDir();
-  if (!storageDir) return null;
-  return path.join(storageDir, KV_FILENAME);
-};
-
-/**
- * Read the KV store from disk.
- */
-const readKvStore = async (): Promise<Record<string, string> | null> => {
-  const kvPath = getKvFilePath();
-  if (!kvPath) return null;
-
-  try {
-    const data = await fsPromises.readFile(kvPath, "utf-8");
-    return JSON.parse(data);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      return {};
-    }
-    throw error;
-  }
-};
-
-/**
- * Read the KV store from disk synchronously.
- */
-const readKvStoreSync = (): Record<string, string> | null => {
-  const kvPath = getKvFilePath();
-  if (!kvPath) return null;
-
-  try {
-    const data = fs.readFileSync(kvPath, "utf-8");
-    return JSON.parse(data);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      return {};
-    }
-    throw error;
-  }
-};
-
-/**
- * Write the KV store to disk atomically.
- */
-const writeKvStore = async (store: Record<string, string>): Promise<void> => {
-  const kvPath = getKvFilePath();
-  if (!kvPath) {
-    throw new Error("Storage not available");
-  }
-
-  const storageDir = getStorageDir()!;
-  const tempPath = `${kvPath}.tmp.${Date.now()}`;
-
-  // Ensure directory exists
-  await fsPromises.mkdir(storageDir, { recursive: true });
-
-  // Write to temp file then rename (atomic on most filesystems)
-  await fsPromises.writeFile(tempPath, JSON.stringify(store, null, 2), "utf-8");
-  await fsPromises.rename(tempPath, kvPath);
-};
-
-/**
- * Write the KV store to disk synchronously.
- */
-const writeKvStoreSync = (store: Record<string, string>): void => {
-  const kvPath = getKvFilePath();
-  if (!kvPath) {
-    throw new Error("Storage not available");
-  }
-
-  const storageDir = getStorageDir()!;
-  const tempPath = `${kvPath}.tmp.${Date.now()}`;
-
-  // Ensure directory exists
-  fs.mkdirSync(storageDir, { recursive: true });
-
-  // Write to temp file then rename
-  fs.writeFileSync(tempPath, JSON.stringify(store, null, 2), "utf-8");
-  fs.renameSync(tempPath, kvPath);
-};
-
-/**
  * Check if KV storage is available.
  *
  * Returns true if running inside Creature with storage enabled.
@@ -546,11 +472,15 @@ const writeKvStoreSync = (store: Record<string, string>): void => {
  * ```
  */
 export function experimental_kvIsAvailable(): boolean {
-  return getStorageDir() !== null;
+  // KV is available if we're in Creature (storage RPC or env var is set)
+  return isStorageRpcAvailable() || getStorageDir() !== null;
 }
 
 /**
  * Get a value from the KV store.
+ *
+ * Uses RPC to communicate with the Creature host for storage operations.
+ * This ensures consistent behavior for both local and hosted MCPs.
  *
  * @param key - The key to retrieve
  * @returns The value, or null if not found or storage unavailable
@@ -567,26 +497,42 @@ export function experimental_kvIsAvailable(): boolean {
  */
 export async function experimental_kvGet(key: string): Promise<string | null> {
   const sanitizedKey = sanitizeKey(key);
-  const store = await readKvStore();
-  if (!store) return null;
-  return store[sanitizedKey] ?? null;
+  
+  // Use RPC when available (preferred path for both local and hosted MCPs)
+  if (isStorageRpcAvailable()) {
+    try {
+      return await rpcKvGet(sanitizedKey);
+    } catch (error) {
+      console.error("[KV] RPC error in kvGet:", error);
+      return null;
+    }
+  }
+  
+  // Fallback: not in Creature or no server connection
+  return null;
 }
 
 /**
  * Get a value from the KV store synchronously.
  *
+ * Note: Sync variants are not supported with RPC and will return null.
+ * Use the async version for reliable cross-platform behavior.
+ *
  * @param key - The key to retrieve
  * @returns The value, or null if not found or storage unavailable
+ * @deprecated Use experimental_kvGet instead for cross-platform support
  */
 export function experimental_kvGetSync(key: string): string | null {
-  const sanitizedKey = sanitizeKey(key);
-  const store = readKvStoreSync();
-  if (!store) return null;
-  return store[sanitizedKey] ?? null;
+  // Sync operations cannot use RPC - return null
+  console.warn("[KV] experimental_kvGetSync is deprecated. Use experimental_kvGet for cross-platform support.");
+  return null;
 }
 
 /**
  * Set a value in the KV store.
+ *
+ * Uses RPC to communicate with the Creature host for storage operations.
+ * This ensures consistent behavior for both local and hosted MCPs.
  *
  * @param key - The key to set
  * @param value - The value to store (string)
@@ -601,33 +547,43 @@ export function experimental_kvGetSync(key: string): string | null {
  */
 export async function experimental_kvSet(key: string, value: string): Promise<boolean> {
   const sanitizedKey = sanitizeKey(key);
-  const store = await readKvStore();
-  if (!store) return false;
-
-  store[sanitizedKey] = value;
-  await writeKvStore(store);
-  return true;
+  
+  // Use RPC when available (preferred path for both local and hosted MCPs)
+  if (isStorageRpcAvailable()) {
+    try {
+      return await rpcKvSet(sanitizedKey, value);
+    } catch (error) {
+      console.error("[KV] RPC error in kvSet:", error);
+      return false;
+    }
+  }
+  
+  // Fallback: not in Creature or no server connection
+  return false;
 }
 
 /**
  * Set a value in the KV store synchronously.
  *
+ * Note: Sync variants are not supported with RPC and will return false.
+ * Use the async version for reliable cross-platform behavior.
+ *
  * @param key - The key to set
  * @param value - The value to store (string)
  * @returns true if successful, false if storage unavailable
+ * @deprecated Use experimental_kvSet instead for cross-platform support
  */
 export function experimental_kvSetSync(key: string, value: string): boolean {
-  const sanitizedKey = sanitizeKey(key);
-  const store = readKvStoreSync();
-  if (!store) return false;
-
-  store[sanitizedKey] = value;
-  writeKvStoreSync(store);
-  return true;
+  // Sync operations cannot use RPC - return false
+  console.warn("[KV] experimental_kvSetSync is deprecated. Use experimental_kvSet for cross-platform support.");
+  return false;
 }
 
 /**
  * Delete a key from the KV store.
+ *
+ * Uses RPC to communicate with the Creature host for storage operations.
+ * This ensures consistent behavior for both local and hosted MCPs.
  *
  * @param key - The key to delete
  * @returns true if the key existed and was deleted, false otherwise
@@ -641,34 +597,42 @@ export function experimental_kvSetSync(key: string, value: string): boolean {
  */
 export async function experimental_kvDelete(key: string): Promise<boolean> {
   const sanitizedKey = sanitizeKey(key);
-  const store = await readKvStore();
-  if (!store) return false;
-
-  const existed = sanitizedKey in store;
-  delete store[sanitizedKey];
-  await writeKvStore(store);
-  return existed;
+  
+  // Use RPC when available (preferred path for both local and hosted MCPs)
+  if (isStorageRpcAvailable()) {
+    try {
+      return await rpcKvDelete(sanitizedKey);
+    } catch (error) {
+      console.error("[KV] RPC error in kvDelete:", error);
+      return false;
+    }
+  }
+  
+  // Fallback: not in Creature or no server connection
+  return false;
 }
 
 /**
  * Delete a key from the KV store synchronously.
  *
+ * Note: Sync variants are not supported with RPC and will return false.
+ * Use the async version for reliable cross-platform behavior.
+ *
  * @param key - The key to delete
  * @returns true if the key existed and was deleted, false otherwise
+ * @deprecated Use experimental_kvDelete instead for cross-platform support
  */
 export function experimental_kvDeleteSync(key: string): boolean {
-  const sanitizedKey = sanitizeKey(key);
-  const store = readKvStoreSync();
-  if (!store) return false;
-
-  const existed = sanitizedKey in store;
-  delete store[sanitizedKey];
-  writeKvStoreSync(store);
-  return existed;
+  // Sync operations cannot use RPC - return false
+  console.warn("[KV] experimental_kvDeleteSync is deprecated. Use experimental_kvDelete for cross-platform support.");
+  return false;
 }
 
 /**
  * List keys in the KV store.
+ *
+ * Uses RPC to communicate with the Creature host for storage operations.
+ * This ensures consistent behavior for both local and hosted MCPs.
  *
  * @param prefix - Optional prefix to filter keys
  * @returns Array of matching keys, or null if storage unavailable
@@ -681,34 +645,94 @@ export function experimental_kvDeleteSync(key: string): boolean {
  * ```
  */
 export async function experimental_kvList(prefix?: string): Promise<string[] | null> {
-  const store = await readKvStore();
-  if (!store) return null;
-
-  let keys = Object.keys(store);
-  if (prefix) {
-    const sanitizedPrefix = sanitizeKey(prefix);
-    keys = keys.filter((k) => k.startsWith(sanitizedPrefix));
+  const sanitizedPrefix = prefix ? sanitizeKey(prefix) : undefined;
+  
+  // Use RPC when available (preferred path for both local and hosted MCPs)
+  if (isStorageRpcAvailable()) {
+    try {
+      return await rpcKvList(sanitizedPrefix);
+    } catch (error) {
+      console.error("[KV] RPC error in kvList:", error);
+      return null;
+    }
   }
-  return keys;
+  
+  // Fallback: not in Creature or no server connection
+  return null;
 }
 
 /**
  * List keys in the KV store synchronously.
  *
+ * Note: Sync variants are not supported with RPC and will return null.
+ * Use the async version for reliable cross-platform behavior.
+ *
  * @param prefix - Optional prefix to filter keys
  * @returns Array of matching keys, or null if storage unavailable
+ * @deprecated Use experimental_kvList instead for cross-platform support
  */
 export function experimental_kvListSync(prefix?: string): string[] | null {
-  const store = readKvStoreSync();
-  if (!store) return null;
-
-  let keys = Object.keys(store);
-  if (prefix) {
-    const sanitizedPrefix = sanitizeKey(prefix);
-    keys = keys.filter((k) => k.startsWith(sanitizedPrefix));
-  }
-  return keys;
+  // Sync operations cannot use RPC - return null
+  console.warn("[KV] experimental_kvListSync is deprecated. Use experimental_kvList for cross-platform support.");
+  return null;
 }
+
+/**
+ * Search values in the KV store using full-text search.
+ *
+ * Uses SQLite FTS5 on the Creature host for efficient full-text search.
+ * Returns results ranked by relevance with optional snippets.
+ *
+ * @param query - The search query (uses SQLite FTS5 syntax)
+ * @param options - Search options
+ * @param options.prefix - Optional key prefix to filter results
+ * @param options.limit - Maximum number of results (default 50, max 100)
+ * @returns Array of search results, or null if storage unavailable
+ *
+ * @example
+ * ```typescript
+ * import { experimental_kvSearch } from "open-mcp-app/server";
+ *
+ * // Search for notes containing "meeting"
+ * const results = await experimental_kvSearch("meeting");
+ *
+ * // Search with prefix filter
+ * const todoResults = await experimental_kvSearch("urgent", { prefix: "todos:" });
+ *
+ * for (const result of results ?? []) {
+ *   console.log(result.key, result.snippet, result.score);
+ * }
+ * ```
+ */
+export async function experimental_kvSearch(
+  query: string,
+  options?: { prefix?: string; limit?: number }
+): Promise<KvSearchResult[] | null> {
+  if (!query || query.trim().length === 0) {
+    throw new Error("Search query cannot be empty");
+  }
+  
+  const sanitizedPrefix = options?.prefix ? sanitizeKey(options.prefix) : undefined;
+  
+  // Use RPC when available
+  if (isStorageRpcAvailable()) {
+    try {
+      return await rpcKvSearch(query, {
+        prefix: sanitizedPrefix,
+        limit: options?.limit,
+      });
+    } catch (error) {
+      console.error("[KV] RPC error in kvSearch:", error);
+      return null;
+    }
+  }
+  
+  // Fallback: not in Creature or no server connection
+  return null;
+}
+
+// Re-export KvSearchResult type for consumers
+export type { KvSearchResult };
 
 // ============================================================================
 // Blob Store APIs (Creature Extension)
@@ -716,18 +740,6 @@ export function experimental_kvListSync(prefix?: string): string[] | null {
 
 /** Maximum blob size in bytes (10MB) */
 const MAX_BLOB_SIZE = 10 * 1024 * 1024;
-
-/** Blobs directory name */
-const BLOBS_DIRNAME = "blobs";
-
-/**
- * Get the blobs directory path.
- */
-const getBlobsDir = (): string | null => {
-  const storageDir = getStorageDir();
-  if (!storageDir) return null;
-  return path.join(storageDir, BLOBS_DIRNAME);
-};
 
 /**
  * Check if blob storage is available.
@@ -738,11 +750,14 @@ const getBlobsDir = (): string | null => {
  * @returns true if blob storage is available
  */
 export function experimental_blobIsAvailable(): boolean {
-  return getStorageDir() !== null;
+  return isStorageRpcAvailable() || getStorageDir() !== null;
 }
 
 /**
  * Store a blob.
+ *
+ * Uses RPC to communicate with the Creature host for storage operations.
+ * This ensures consistent behavior for both local and hosted MCPs.
  *
  * @param name - The blob name (acts as a path within the blobs directory)
  * @param data - The blob data as a Buffer or Uint8Array
@@ -762,73 +777,53 @@ export async function experimental_blobPut(
   data: Buffer | Uint8Array,
   mimeType?: string
 ): Promise<{ success: true; size: number } | null> {
-  const blobsDir = getBlobsDir();
-  if (!blobsDir) return null;
-
   const sanitizedName = sanitizeKey(name);
 
   if (data.length > MAX_BLOB_SIZE) {
     throw new Error(`Blob exceeds maximum size of ${MAX_BLOB_SIZE} bytes`);
   }
 
-  const blobPath = path.join(blobsDir, sanitizedName);
-
-  // Ensure directory exists
-  await fsPromises.mkdir(path.dirname(blobPath), { recursive: true });
-
-  // Write the blob
-  await fsPromises.writeFile(blobPath, data);
-
-  // Store metadata if provided
-  if (mimeType) {
-    const metaPath = `${blobPath}.meta.json`;
-    await fsPromises.writeFile(metaPath, JSON.stringify({ mimeType }), "utf-8");
+  // Use RPC when available
+  if (isStorageRpcAvailable()) {
+    try {
+      return await rpcBlobPut(sanitizedName, data, mimeType);
+    } catch (error) {
+      console.error("[Blob] RPC error in blobPut:", error);
+      return null;
+    }
   }
 
-  return { success: true, size: data.length };
+  // Fallback: not in Creature or no server connection
+  return null;
 }
 
 /**
  * Store a blob synchronously.
  *
+ * Note: Sync variants are not supported with RPC and will return null.
+ * Use the async version for reliable cross-platform behavior.
+ *
  * @param name - The blob name
  * @param data - The blob data
  * @param mimeType - Optional MIME type metadata
  * @returns Object with success and size, or null if storage unavailable
+ * @deprecated Use experimental_blobPut instead for cross-platform support
  */
 export function experimental_blobPutSync(
   name: string,
   data: Buffer | Uint8Array,
   mimeType?: string
 ): { success: true; size: number } | null {
-  const blobsDir = getBlobsDir();
-  if (!blobsDir) return null;
-
-  const sanitizedName = sanitizeKey(name);
-
-  if (data.length > MAX_BLOB_SIZE) {
-    throw new Error(`Blob exceeds maximum size of ${MAX_BLOB_SIZE} bytes`);
-  }
-
-  const blobPath = path.join(blobsDir, sanitizedName);
-
-  // Ensure directory exists
-  fs.mkdirSync(path.dirname(blobPath), { recursive: true });
-
-  // Write the blob
-  fs.writeFileSync(blobPath, data);
-
-  // Store metadata if provided
-  if (mimeType) {
-    const metaPath = `${blobPath}.meta.json`;
-    fs.writeFileSync(metaPath, JSON.stringify({ mimeType }), "utf-8");
-  }
-
-  return { success: true, size: data.length };
+  // Sync operations cannot use RPC - return null
+  console.warn("[Blob] experimental_blobPutSync is deprecated. Use experimental_blobPut for cross-platform support.");
+  return null;
 }
 
 /**
  * Retrieve a blob.
+ *
+ * Uses RPC to communicate with the Creature host for storage operations.
+ * This ensures consistent behavior for both local and hosted MCPs.
  *
  * @param name - The blob name
  * @returns Object with data and optional mimeType, or null if not found
@@ -847,75 +842,44 @@ export function experimental_blobPutSync(
 export async function experimental_blobGet(
   name: string
 ): Promise<{ data: Buffer; mimeType?: string } | null> {
-  const blobsDir = getBlobsDir();
-  if (!blobsDir) return null;
-
   const sanitizedName = sanitizeKey(name);
-  const blobPath = path.join(blobsDir, sanitizedName);
 
-  try {
-    const data = await fsPromises.readFile(blobPath);
-
-    // Try to read metadata
-    let mimeType: string | undefined;
+  // Use RPC when available
+  if (isStorageRpcAvailable()) {
     try {
-      const metaPath = `${blobPath}.meta.json`;
-      const metaStr = await fsPromises.readFile(metaPath, "utf-8");
-      const meta = JSON.parse(metaStr);
-      mimeType = meta.mimeType;
-    } catch {
-      // No metadata file, that's ok
-    }
-
-    return { data, mimeType };
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return await rpcBlobGet(sanitizedName);
+    } catch (error) {
+      console.error("[Blob] RPC error in blobGet:", error);
       return null;
     }
-    throw error;
   }
-}
 
+  // Fallback: not in Creature or no server connection
+  return null;
+}
 /**
  * Retrieve a blob synchronously.
  *
+ * Note: Sync variants are not supported with RPC and will return null.
+ * Use the async version for reliable cross-platform behavior.
+ *
  * @param name - The blob name
  * @returns Object with data and optional mimeType, or null if not found
+ * @deprecated Use experimental_blobGet instead for cross-platform support
  */
 export function experimental_blobGetSync(
   name: string
 ): { data: Buffer; mimeType?: string } | null {
-  const blobsDir = getBlobsDir();
-  if (!blobsDir) return null;
-
-  const sanitizedName = sanitizeKey(name);
-  const blobPath = path.join(blobsDir, sanitizedName);
-
-  try {
-    const data = fs.readFileSync(blobPath);
-
-    // Try to read metadata
-    let mimeType: string | undefined;
-    try {
-      const metaPath = `${blobPath}.meta.json`;
-      const metaStr = fs.readFileSync(metaPath, "utf-8");
-      const meta = JSON.parse(metaStr);
-      mimeType = meta.mimeType;
-    } catch {
-      // No metadata file, that's ok
-    }
-
-    return { data, mimeType };
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      return null;
-    }
-    throw error;
-  }
+  // Sync operations cannot use RPC - return null
+  console.warn("[Blob] experimental_blobGetSync is deprecated. Use experimental_blobGet for cross-platform support.");
+  return null;
 }
 
 /**
  * Delete a blob.
+ *
+ * Uses RPC to communicate with the Creature host for storage operations.
+ * This ensures consistent behavior for both local and hosted MCPs.
  *
  * @param name - The blob name
  * @returns true if deleted, false if not found or storage unavailable
@@ -928,61 +892,43 @@ export function experimental_blobGetSync(
  * ```
  */
 export async function experimental_blobDelete(name: string): Promise<boolean> {
-  const blobsDir = getBlobsDir();
-  if (!blobsDir) return false;
-
   const sanitizedName = sanitizeKey(name);
-  const blobPath = path.join(blobsDir, sanitizedName);
 
-  try {
-    await fsPromises.unlink(blobPath);
-    // Try to delete metadata too
+  // Use RPC when available
+  if (isStorageRpcAvailable()) {
     try {
-      await fsPromises.unlink(`${blobPath}.meta.json`);
-    } catch {
-      // No metadata file, that's ok
-    }
-    return true;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return await rpcBlobDelete(sanitizedName);
+    } catch (error) {
+      console.error("[Blob] RPC error in blobDelete:", error);
       return false;
     }
-    throw error;
   }
+
+  // Fallback: not in Creature or no server connection
+  return false;
 }
 
 /**
  * Delete a blob synchronously.
  *
+ * Note: Sync variants are not supported with RPC and will return false.
+ * Use the async version for reliable cross-platform behavior.
+ *
  * @param name - The blob name
  * @returns true if deleted, false if not found or storage unavailable
+ * @deprecated Use experimental_blobDelete instead for cross-platform support
  */
 export function experimental_blobDeleteSync(name: string): boolean {
-  const blobsDir = getBlobsDir();
-  if (!blobsDir) return false;
-
-  const sanitizedName = sanitizeKey(name);
-  const blobPath = path.join(blobsDir, sanitizedName);
-
-  try {
-    fs.unlinkSync(blobPath);
-    // Try to delete metadata too
-    try {
-      fs.unlinkSync(`${blobPath}.meta.json`);
-    } catch {
-      // No metadata file, that's ok
-    }
-    return true;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      return false;
-    }
-    throw error;
-  }
+  // Sync operations cannot use RPC - return false
+  console.warn("[Blob] experimental_blobDeleteSync is deprecated. Use experimental_blobDelete for cross-platform support.");
+  return false;
 }
 
 /**
  * List blobs.
+ *
+ * Uses RPC to communicate with the Creature host for storage operations.
+ * This ensures consistent behavior for both local and hosted MCPs.
  *
  * @param prefix - Optional prefix to filter blob names
  * @returns Array of blob names, or null if storage unavailable
@@ -995,54 +941,34 @@ export function experimental_blobDeleteSync(name: string): boolean {
  * ```
  */
 export async function experimental_blobList(prefix?: string): Promise<string[] | null> {
-  const blobsDir = getBlobsDir();
-  if (!blobsDir) return null;
+  const sanitizedPrefix = prefix ? sanitizeKey(prefix) : undefined;
 
-  try {
-    // Read recursively to support nested blob names
-    const entries = await fsPromises.readdir(blobsDir, { recursive: true });
-    let names = (entries as string[])
-      .filter((e) => typeof e === "string" && !e.endsWith(".meta.json"));
-
-    if (prefix) {
-      const sanitizedPrefix = sanitizeKey(prefix);
-      names = names.filter((n) => n.startsWith(sanitizedPrefix));
+  // Use RPC when available
+  if (isStorageRpcAvailable()) {
+    try {
+      return await rpcBlobList(sanitizedPrefix);
+    } catch (error) {
+      console.error("[Blob] RPC error in blobList:", error);
+      return null;
     }
-
-    return names;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      return [];
-    }
-    throw error;
   }
+
+  // Fallback: not in Creature or no server connection
+  return null;
 }
 
 /**
  * List blobs synchronously.
  *
+ * Note: Sync variants are not supported with RPC and will return null.
+ * Use the async version for reliable cross-platform behavior.
+ *
  * @param prefix - Optional prefix to filter blob names
  * @returns Array of blob names, or null if storage unavailable
+ * @deprecated Use experimental_blobList instead for cross-platform support
  */
 export function experimental_blobListSync(prefix?: string): string[] | null {
-  const blobsDir = getBlobsDir();
-  if (!blobsDir) return null;
-
-  try {
-    const entries = fs.readdirSync(blobsDir, { recursive: true });
-    let names = (entries as string[])
-      .filter((e) => typeof e === "string" && !e.endsWith(".meta.json"));
-
-    if (prefix) {
-      const sanitizedPrefix = sanitizeKey(prefix);
-      names = names.filter((n) => n.startsWith(sanitizedPrefix));
-    }
-
-    return names;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      return [];
-    }
-    throw error;
-  }
+  // Sync operations cannot use RPC - return null
+  console.warn("[Blob] experimental_blobListSync is deprecated. Use experimental_blobList for cross-platform support.");
+  return null;
 }

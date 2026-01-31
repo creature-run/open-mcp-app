@@ -49,7 +49,8 @@ export {
   experimental_kvSet,
   experimental_kvDelete,
   experimental_kvList,
-  // KV Store (sync)
+  experimental_kvSearch,
+  // KV Store (sync) - deprecated, use async versions
   experimental_kvGetSync,
   experimental_kvSetSync,
   experimental_kvDeleteSync,
@@ -66,3 +67,4 @@ export {
   experimental_blobDeleteSync,
   experimental_blobListSync,
 } from "./experimental.js";
+export type { KvSearchResult } from "./experimental.js";

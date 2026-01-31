@@ -14,11 +14,22 @@ import {
   experimental_kvSet,
   experimental_kvDelete,
   experimental_kvList,
+  experimental_kvSearch,
+  type KvSearchResult,
 } from "open-mcp-app/server";
 
 // =============================================================================
 // DataStore Interface
 // =============================================================================
+
+/**
+ * Search result with item data and optional snippet.
+ */
+export interface SearchResult<T> {
+  item: T;
+  snippet?: string;
+  score?: number;
+}
 
 /**
  * Generic data store interface for CRUD operations.
@@ -31,6 +42,11 @@ export interface DataStore<T> {
   set(id: string, value: T): Promise<void>;
   delete(id: string): Promise<boolean>;
   list(): Promise<T[]>;
+  /**
+   * Full-text search across stored items.
+   * Returns items that match the query, with optional snippets and relevance scores.
+   */
+  search(query: string, limit?: number): Promise<SearchResult<T>[]>;
 }
 
 // =============================================================================
@@ -94,6 +110,29 @@ class KvStore<T> implements DataStore<T> {
       if (value) {
         try {
           results.push(JSON.parse(value) as T);
+        } catch {
+          // Skip invalid entries
+        }
+      }
+    }
+    return results;
+  }
+
+  async search(query: string, limit?: number): Promise<SearchResult<T>[]> {
+    const prefix = this.scopePrefix();
+    const searchResults = await experimental_kvSearch(query, { prefix, limit });
+    if (!searchResults) return [];
+
+    const results: SearchResult<T>[] = [];
+    for (const result of searchResults) {
+      const value = await experimental_kvGet(result.key);
+      if (value) {
+        try {
+          results.push({
+            item: JSON.parse(value) as T,
+            snippet: result.snippet,
+            score: result.score,
+          });
         } catch {
           // Skip invalid entries
         }
@@ -167,6 +206,47 @@ class InMemoryStore<T> implements DataStore<T> {
       }
     }
     return results;
+  }
+
+  async search(query: string, limit?: number): Promise<SearchResult<T>[]> {
+    // Simple in-memory search: match query terms in stringified values
+    const prefix = this.scopePrefix();
+    const queryLower = query.toLowerCase();
+    const results: SearchResult<T>[] = [];
+
+    for (const [key, value] of sharedInMemoryData) {
+      if (!key.startsWith(prefix)) continue;
+
+      const valueStr = JSON.stringify(value).toLowerCase();
+      if (valueStr.includes(queryLower)) {
+        results.push({
+          item: value as T,
+          // Simple snippet: extract context around the match
+          snippet: this.extractSnippet(valueStr, queryLower),
+        });
+
+        if (limit && results.length >= limit) break;
+      }
+    }
+
+    return results;
+  }
+
+  /**
+   * Extract a snippet around the matched query.
+   */
+  private extractSnippet(text: string, query: string): string {
+    const index = text.indexOf(query);
+    if (index === -1) return text.slice(0, 50);
+    
+    const start = Math.max(0, index - 20);
+    const end = Math.min(text.length, index + query.length + 20);
+    let snippet = text.slice(start, end);
+    
+    if (start > 0) snippet = "..." + snippet;
+    if (end < text.length) snippet = snippet + "...";
+    
+    return snippet;
   }
 }
 

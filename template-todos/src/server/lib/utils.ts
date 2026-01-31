@@ -7,7 +7,7 @@
  * Todos are stored globally within a project (not per-instance).
  */
 
-import { createDataStore, type DataStore } from "./data.js";
+import { createDataStore, type DataStore, type SearchResult } from "./data.js";
 import type { Todo, ToolContext, ToolResult } from "./types.js";
 
 // =============================================================================
@@ -33,6 +33,18 @@ export const getAllTodos = async (store: DataStore<Todo>): Promise<Todo[]> => {
   return all.sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
+};
+
+/**
+ * Search todos using full-text search.
+ * Returns matching todos with optional snippets showing matched context.
+ */
+export const searchTodos = async (
+  store: DataStore<Todo>,
+  query: string,
+  limit?: number
+): Promise<SearchResult<Todo>[]> => {
+  return store.search(query, limit);
 };
 
 /**

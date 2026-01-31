@@ -9,6 +9,7 @@
  * - todos_add: Create one or more todo items
  * - todos_toggle: Toggle one or more todos' completed status
  * - todos_remove: Delete one or more todo items
+ * - todos_search: Full-text search across todos (uses SQLite FTS5)
  *
  * Todos are stored globally within a project and persist across sessions.
  */
@@ -26,8 +27,10 @@ import {
   generateTodoId,
   getAllTodos,
   getTodoCounts,
+  searchTodos,
   withStore,
 } from "../lib/utils.js";
+import type { SearchResult } from "../lib/data.js";
 
 // =============================================================================
 // Input Schemas
@@ -45,6 +48,11 @@ const TodosToggleSchema = z.object({
 
 const TodosRemoveSchema = z.object({
   ids: z.array(z.string()).describe("Array of todo IDs to remove"),
+});
+
+const TodosSearchSchema = z.object({
+  query: z.string().describe("Search query to find matching todos"),
+  limit: z.number().optional().describe("Maximum number of results (default 20)"),
 });
 
 // =============================================================================
@@ -214,6 +222,43 @@ const handleRemove = async (
   };
 };
 
+/**
+ * Search todos using full-text search.
+ */
+const handleSearch = async (
+  query: string,
+  limit: number | undefined,
+  store: DataStore<Todo>
+): Promise<ToolResult> => {
+  const results = await searchTodos(store, query, limit ?? 20);
+
+  if (results.length === 0) {
+    return {
+      data: { query, matches: [] },
+      text: `No todos found matching "${query}"`,
+    };
+  }
+
+  // Format results with snippets
+  const matches = results.map((r: SearchResult<Todo>) => ({
+    id: r.item.id,
+    text: r.item.text,
+    completed: r.item.completed,
+    snippet: r.snippet,
+    score: r.score,
+  }));
+
+  // Get full todo list for display
+  const todos = await getAllTodos(store);
+  const { open } = getTodoCounts(todos);
+
+  return {
+    data: { query, matches, todos },
+    text: `Found ${results.length} todo(s) matching "${query}"`,
+    title: `Todos (${open})`,
+  };
+};
+
 // =============================================================================
 // Tool Registration
 // =============================================================================
@@ -294,6 +339,24 @@ export const registerTodosTools = (app: App) => {
     },
     async (input: z.infer<typeof TodosRemoveSchema>, context: ToolContext) => {
       return withStore(context, async (store) => handleRemove(input.ids, store));
+    }
+  );
+
+  // Search todos (full-text search)
+  app.tool(
+    "todos_search",
+    {
+      description: "Search todos using full-text search. Finds todos containing the search query and returns matching snippets with relevance scores.",
+      input: TodosSearchSchema,
+      ui: TODOS_UI_URI,
+      visibility: ["model", "app"],
+      displayModes: ["pip", "inline"],
+      experimental: {
+        defaultDisplayMode: "pip",
+      },
+    },
+    async (input: z.infer<typeof TodosSearchSchema>, context: ToolContext) => {
+      return withStore(context, async (store) => handleSearch(input.query, input.limit, store));
     }
   );
 };
