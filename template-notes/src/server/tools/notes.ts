@@ -2,15 +2,15 @@
  * Notes Tools
  *
  * Separate tools for each note operation:
- * - notes_list: Show searchable list of all notes
- * - notes_create: Create new note (always new pip)
- * - notes_open: Open existing note in editor
- * - notes_save: Update existing note
- * - notes_delete: Remove a note
+ * - notes_list: Show searchable list of all notes (has UI)
+ * - notes_create: Create new note and open editor (has UI, always new pip)
+ * - notes_open: Open existing note in editor (has UI)
+ * - notes_save: Update existing note (routes to existing pip)
+ * - notes_delete: Remove a note (no UI)
  *
  * View Routing (via views on resource):
  * - "/" → notes_list (single instance for root)
- * - "/editor" → notes_create (creates new, gets noteId from response)
+ * - "/editor" → notes_create (always creates new pip)
  * - "/editor/:noteId" → notes_open, notes_save, notes_delete (one per noteId)
  */
 
@@ -93,7 +93,7 @@ const handleList = async (
 
 /**
  * Create a new note.
- * Always creates a new instance.
+ * Opens a new editor pip with the created note.
  */
 const handleCreate = async (
   { title, content }: z.infer<typeof NotesCreateSchema>,
@@ -109,6 +109,7 @@ const handleCreate = async (
   };
 
   await store.set(note.id, note);
+
   setState<NoteInstanceState>({ noteId: note.id, view: "editor" });
 
   return {
@@ -234,7 +235,7 @@ export const registerNotesTools = (app: App) => {
 
   /**
    * Create a new note.
-   * Always creates a new editor instance.
+   * Opens a new editor pip with the created note.
    */
   app.tool(
     "notes_create",

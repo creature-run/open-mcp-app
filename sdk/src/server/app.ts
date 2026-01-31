@@ -477,6 +477,7 @@ export class App {
           _meta: {
             ui: {
               ...(config.views && { views: config.views }),
+              ...(config.instanceMode && { instanceMode: config.instanceMode }),
               ...(config.icon && {
                 icon: {
                   data: svgToDataUri(config.icon.svg),
@@ -846,6 +847,7 @@ export class App {
           _meta: {
             ui: {
               ...(config.views && { views: config.views }),
+              ...(config.instanceMode && { instanceMode: config.instanceMode }),
               ...(config.icon && {
                 icon: {
                   data: svgToDataUri(config.icon.svg),

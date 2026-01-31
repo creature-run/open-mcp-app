@@ -30,11 +30,11 @@ const app = createApp({
   port: PORT,
   instructions: `This MCP manages notes with separate tools:
 
-- notes_list - Display all notes in a searchable list
-- notes_create - Create a new note (always opens new window)
-- notes_open { noteId } - Open an existing note for editing
-- notes_save { noteId, title, content } - Save changes to a note (no UI change)
-- notes_delete { noteId } - Delete a note (no UI change)
+- notes_list - Display all notes in a searchable list (opens UI)
+- notes_create - Create a new note and open it in an editor (opens UI)
+- notes_open { noteId } - Open an existing note for editing (opens UI)
+- notes_save { noteId, title, content } - Save changes to a note (updates existing UI)
+- notes_delete { noteId } - Delete a note (no UI)
 
 Each note opens in its own editor window. The list view shows all notes.`,
 });
@@ -48,14 +48,15 @@ Each note opens in its own editor window. The list view shows all notes.`,
  *
  * Uses view-based routing to control pip instances:
  * - "/" (root): notes_list - single instance for list view
- * - "/editor": notes_create - creates new editor, gets noteId from response
- * - "/editor/:noteId": one instance per unique noteId
+ * - "/editor": notes_create - always creates new pip
+ * - "/editor/:noteId": notes_open, notes_save, notes_delete - one instance per unique noteId
  */
 app.resource({
   name: "Notes",
   uri: NOTES_UI_URI,
   description: "Markdown notes app with list and editor views",
   displayModes: ["pip"],
+  instanceMode: "multiple",
   html: "../../dist/ui/main.html",
   icon: { svg: ICON_SVG, alt: ICON_ALT },
   views: {

@@ -163,6 +163,16 @@ export interface ResourceConfig {
    */
   views?: Views;
   /**
+   * Instance mode for pip routing.
+   *
+   * - `"single"` (default): One pip per resource. Reuses existing pip if found.
+   * - `"multiple"`: View-based routing. Uses `views` config to determine instances.
+   *
+   * Most apps should use the default ("single"). Use "multiple" for apps that
+   * need separate instances per view (e.g., a notes app with list + multiple editors).
+   */
+  instanceMode?: "single" | "multiple";
+  /**
    * Experimental (non-standard) resource options.
    *
    * These features are host-specific extensions that may not be supported everywhere.
