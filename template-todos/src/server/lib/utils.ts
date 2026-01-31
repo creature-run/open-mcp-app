@@ -4,7 +4,7 @@
  * Shared helper functions used by todo tools.
  * Handles ID generation and store creation.
  *
- * Data is scoped by instanceId for isolation.
+ * Todos are stored globally within a project (not per-instance).
  */
 
 import { createDataStore, type DataStore } from "./data.js";
@@ -60,12 +60,21 @@ export const createTodoStore = (localId: string): DataStore<Todo> => {
 
 /**
  * Wrap tool handlers with store creation.
- * Creates a store scoped by instanceId for data isolation.
+ * 
+ * For persistent storage (KV), we use "global" as the localId so todos
+ * persist across sessions within the same project. The project-level
+ * scoping is handled by the storage directory itself.
+ * 
+ * For in-memory storage (fallback), we also use "global" for consistency.
+ * If per-instance isolation is needed in the future, this could be made
+ * configurable.
  */
 export const withStore = async (
   context: ToolContext,
   handler: (store: DataStore<Todo>) => Promise<ToolResult>
 ): Promise<ToolResult> => {
-  const store = createTodoStore(context.instanceId || "default");
+  // Use "global" for project-wide todos that persist across sessions.
+  // The storage is already scoped by projectId + serverName at the directory level.
+  const store = createTodoStore("global");
   return handler(store);
 };

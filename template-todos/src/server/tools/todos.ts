@@ -10,7 +10,7 @@
  * - todos_toggle: Toggle one or more todos' completed status
  * - todos_remove: Delete one or more todo items
  *
- * Todos are scoped by instanceId.
+ * Todos are stored globally within a project and persist across sessions.
  */
 
 import { z } from "zod";
