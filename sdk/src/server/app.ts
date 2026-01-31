@@ -936,8 +936,13 @@ export class App {
   private registerTools(server: McpServer): void {
     for (const [name, { config, handler }] of this.tools) {
       const toolMeta = this.buildToolMeta(config);
-      const inputSchema = config.input || z.object({});
-      const description = this.buildToolDescription(config, inputSchema);
+      const baseSchema = config.input || z.object({});
+      // Use passthrough to allow host-injected fields (instanceId, _source, _creatureToken)
+      // to pass through MCP SDK validation without being stripped
+      const inputSchema = "passthrough" in baseSchema && typeof (baseSchema as z.AnyZodObject).passthrough === "function"
+        ? (baseSchema as z.AnyZodObject).passthrough()
+        : baseSchema;
+      const description = this.buildToolDescription(config, baseSchema);
       const hasUi = !!config.ui;
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -950,13 +955,16 @@ export class App {
         },
         async (args: Record<string, unknown>) => {
           try {
+            console.log(`[DEBUG SDK] Tool ${name} received args._instanceId:`, args._instanceId, `type:`, typeof args._instanceId);
             const input = config.input ? config.input.parse(args) : args;
 
             // Determine instanceId for tools with UI
-            // Host (control plane) passes instanceId for routing; SDK uses it for state
+            // Host (control plane) passes _instanceId for routing; SDK uses it for state
+            // Note: Uses underscore prefix to avoid collision with tool-defined arguments
             let instanceId: string | undefined;
             if (hasUi && config.ui) {
-              instanceId = this.resolveInstanceId(args.instanceId);
+              instanceId = this.resolveInstanceId(args._instanceId);
+              console.log(`[DEBUG SDK] Resolved instanceId: input=${args._instanceId} → output=${instanceId}`);
             }
 
             // Get resource config for WebSocket setup
