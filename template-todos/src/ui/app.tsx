@@ -235,7 +235,7 @@ function getEnvironmentLabel(env: Environment): string {
  *
  * Uses the MCP Apps SDK with HostProvider pattern:
  * - HostProvider: Wraps the app to provide host client via context
- * - useHost: Access callTool, isReady, log, experimental_widgetState from context
+ * - useHost: Access callTool, isReady, log, exp_widgetState from context
  *
  * The component works identically across all supported hosts:
  * - Creature (MCP Apps): Full feature support including DevConsole logging
