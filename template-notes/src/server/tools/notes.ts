@@ -8,11 +8,10 @@
  * - notes_save: Update existing note
  * - notes_delete: Remove a note
  *
- * Pip Routing (via pipRules on resource):
- * - notes_open/:noteId → find pip where widgetState.modelContent.noteId matches
- * - notes_save/:noteId → find pip where widgetState.modelContent.noteId matches
- * - notes_create → always creates a new pip
- * - notes_list → defaults to "single" (reuse any pip for this resource)
+ * View Routing (via views on resource):
+ * - "/" → notes_list (single instance for root)
+ * - "/editor" → notes_create (creates new, gets noteId from response)
+ * - "/editor/:noteId" → notes_open, notes_save, notes_delete (one per noteId)
  */
 
 import { z } from "zod";
@@ -208,8 +207,8 @@ const handleDelete = async (
 /**
  * Register all notes tools.
  *
- * Pip routing is handled by pipRules on the resource. The control plane
- * finds the correct pip by matching widgetState.modelContent.noteId.
+ * Pip routing is handled by the views config on the resource. The control plane
+ * finds the correct pip by matching path parameters (e.g., noteId) from tool args.
  */
 export const registerNotesTools = (app: App) => {
   /**

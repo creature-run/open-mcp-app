@@ -43,44 +43,35 @@ export interface IconConfig {
 }
 
 // ============================================================================
-// Pip Rules
+// Views (URL-based Routing)
 // ============================================================================
 
 /**
- * Pip rule behavior values.
- * 
- * - "single": One pip per route match. If route has `:param`, one pip per param value.
- * - "new": Always create a new pip for this route.
- */
-export type PipRuleBehavior = "single" | "new";
-
-/**
- * Pip routing rules configuration.
- * 
- * Routes tool calls to pips based on tool name and input parameters.
- * Uses Express-style `:param` syntax to extract routing keys from tool inputs.
- * 
+ * View routing configuration.
+ *
+ * Maps URL-like path patterns to arrays of tool names. The path pattern
+ * determines instance routing behavior automatically:
+ *
+ * - `/` - Root path, single instance
+ * - `/editor` - Creates new instance, becomes `/editor/:noteId` after response
+ * - `/editor/:noteId` - One instance per unique `noteId` value
+ *
  * @example
  * ```typescript
- * pipRules: {
- *   "notes_list": "single",           // one list pip, reuse
- *   "notes_open/:noteId": "single",   // one pip per noteId
- *   "notes_create": "new",            // always new pip
+ * views: {
+ *   "/": ["notes_list"],
+ *   "/editor": ["notes_create"],
+ *   "/editor/:noteId": ["notes_open", "notes_save", "notes_delete"]
  * }
  * ```
- * 
- * Routing logic:
- * - Routes are matched in order of specificity (routes with params first)
- * - "single" means one pip per unique route match
- * - "new" means always create a new pip
- * - Tools not listed default to "single" behavior
- * 
- * The `:param` syntax extracts the value from tool input args:
- * - `notes_open/:noteId` matches tool "notes_open" and uses `args.noteId` as key
- * - If args.noteId is "abc", routes to pip keyed by "notes_open:abc"
- * - If args.noteId is missing, falls back to next matching rule or default
+ *
+ * Routing behavior:
+ * - Params in tool input resolve path before routing (e.g., `notes_open({noteId: "abc"})` → `/editor/abc`)
+ * - Params only in output create new instance, identity assigned from response
+ * - Each unique resolved path gets its own instance on multi-instance hosts
+ * - Single-instance hosts (ChatGPT, etc.) manage view state internally
  */
-export type PipRules = Record<string, PipRuleBehavior>;
+export type Views = Record<string, string[]>;
 
 // ============================================================================
 // Resource Experimental Config
@@ -88,37 +79,16 @@ export type PipRules = Record<string, PipRuleBehavior>;
 
 /**
  * Experimental resource options.
- * 
+ *
  * These are non-standard extensions that may not be supported by all hosts.
  * Per MCP Apps spec, experimental features are namespaced under `experimental`.
  */
 export interface ResourceExperimentalConfig {
   /**
-   * Pip routing rules for this resource.
-   * 
-   * Controls how tool calls are routed to pip instances:
-   * - Use `:param` syntax to route by tool input values
-   * - "single" = one pip per route match (default)
-   * - "new" = always create new pip
-   * 
-   * @example
-   * ```typescript
-   * pipRules: {
-   *   "notes_open/:noteId": "single",  // one pip per noteId
-   *   "notes_create": "new",           // always new pip
-   *   // notes_list: defaults to "single"
-   * }
-   * ```
-   * 
-   * Note: pipRules is only supported on Creature. Other hosts use default behavior.
-   */
-  pipRules?: PipRules;
-
-  /**
    * Enable WebSocket for real-time communication with the UI.
    * When true, SDK automatically manages WebSocket lifecycle and provides
    * `context.send()` and `context.onMessage()` in tool handlers.
-   * 
+   *
    * Note: WebSocket is only supported on Creature. Not part of MCP Apps spec.
    */
   websocket?: boolean;
@@ -136,26 +106,26 @@ export interface ResourceConfig {
   description?: string;
   /** Supported display modes */
   displayModes: DisplayMode[];
-  /** 
+  /**
    * HTML content for the resource.
-   * 
+   *
    * Accepts three formats:
    * 1. **File path** (local development): `"ui/main.html"` - loaded from filesystem
    * 2. **Raw HTML** (serverless-safe): `"<!DOCTYPE html>..."` - used directly
    * 3. **Function** (lazy loading): `() => htmlContent` - called when needed
-   * 
+   *
    * The SDK auto-detects HTML content (starts with `<`) vs file paths.
    * For serverless (Vercel, Lambda), use raw HTML or a function.
-   * 
+   *
    * @example
    * // Local development - file path
    * html: "ui/main.html"
-   * 
+   *
    * @example
    * // Serverless - bundled HTML (import at build time)
    * import { BUNDLED_HTML } from "./ui-bundle.js";
    * html: BUNDLED_HTML
-   * 
+   *
    * @example
    * // Serverless - function (lazy)
    * html: () => fs.readFileSync("./dist/ui/main.html", "utf-8")
@@ -169,8 +139,32 @@ export interface ResourceConfig {
     resourceDomains?: string[];
   };
   /**
+   * View routing configuration.
+   *
+   * Maps URL-like path patterns to arrays of tool names. Determines how
+   * tool calls are routed to instances and how the UI switches views.
+   *
+   * @example
+   * ```typescript
+   * views: {
+   *   "/": ["notes_list"],
+   *   "/editor": ["notes_create"],
+   *   "/editor/:noteId": ["notes_open", "notes_save", "notes_delete"]
+   * }
+   * ```
+   *
+   * Path patterns:
+   * - `/` - Root view, single instance
+   * - `/path` - Static path, creates new instance
+   * - `/path/:param` - One instance per unique param value
+   *
+   * On multi-instance hosts (Creature), each unique resolved path gets its own instance.
+   * On single-instance hosts (ChatGPT, etc.), the SDK manages view state internally.
+   */
+  views?: Views;
+  /**
    * Experimental (non-standard) resource options.
-   * 
+   *
    * These features are host-specific extensions that may not be supported everywhere.
    * Per MCP Apps spec, they are namespaced under `experimental`.
    */

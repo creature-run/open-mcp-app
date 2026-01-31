@@ -5,31 +5,37 @@
  * Separates data/logic concerns from rendering in NotesApp.
  *
  * Responsibilities:
- * - State management (view, note, notes, saving status)
+ * - State management (note, notes, saving status)
  * - Tool call setup and execution
- * - Processing tool results from agent and UI
  * - Widget state persistence and restoration
- * - Initial data fetching
+ * - View routing via useViews hook
  *
- * Initialization Flow:
- * When `isReady` becomes true, we check `exp.getInitialToolResult()`:
- * - If it returns data: View was opened by agent tool call - use that data
- * - If it returns null: View was opened by user - fetch the list
- *
- * This eliminates race conditions between agent-initiated and user-initiated opens.
+ * View Routing:
+ * Uses the useViews hook for automatic view management based on tool results.
+ * Views are defined in the server config and automatically switch based on
+ * which tool was called.
  */
 
-import { useEffect, useCallback, useState, useRef, createContext, useContext, type ReactNode } from "react";
-import { useHost } from "open-mcp-app/react";
+import { useEffect, useCallback, useState, useRef, useMemo, createContext, useContext, type ReactNode } from "react";
+import { useHost, useViews, type Views } from "open-mcp-app/react";
 import type { MilkdownEditorRef } from "./MilkdownEditor";
 import type { Note, NoteSummary, NoteData, NoteWidgetState, ViewType } from "./types";
+
+/**
+ * Views configuration matching server-side definition.
+ */
+const VIEWS: Views = {
+  "/": ["notes_list"],
+  "/editor": ["notes_create"],
+  "/editor/:noteId": ["notes_open", "notes_save", "notes_delete"],
+};
 
 /**
  * Return type for the useNotes hook.
  * Provides everything needed to render the notes UI.
  */
 export interface UseNotesReturn {
-  /** Whether the host connection is ready */
+  /** Whether the hook is ready (host connected and initialized) */
   isReady: boolean;
   /** Current view mode */
   view: ViewType;
@@ -51,125 +57,104 @@ export interface UseNotesReturn {
   createNote: () => Promise<void>;
   /** Refresh the notes list (for polling) */
   refreshList: () => Promise<void>;
+  /** Navigate back to the list view */
+  goToList: () => Promise<void>;
 }
+
+/**
+ * Convert view path to ViewType.
+ * "/" -> "list", anything else -> "editor"
+ */
+const viewPathToViewType = (viewPath: string): ViewType => {
+  return viewPath === "/" ? "list" : "editor";
+};
 
 /**
  * Custom hook for notes state management and tool interactions.
  *
- * Handles all the complexity of:
- * - Managing view state (list vs editor)
- * - Setting up tool callers
- * - Processing tool results from both agent and UI sources
- * - Widget state persistence for session continuity
- * - Initial data fetching with proper race condition handling
+ * Uses useViews for automatic view routing based on tool results.
+ * View state is managed by the SDK - no manual view switching needed.
  */
 export const useNotes = (): UseNotesReturn => {
-  // View and data state
-  const [view, setView] = useState<ViewType>("list");
+  // Use views hook for automatic view routing
+  const { view: viewPath, data: viewData, isInitialized } = useViews<NoteData>(VIEWS);
+
+  // Derive ViewType from path
+  const view = useMemo(() => viewPathToViewType(viewPath), [viewPath]);
+
+  // Data state
   const [note, setNote] = useState<Note | null>(null);
   const [notes, setNotes] = useState<NoteSummary[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
-  // Refs for tracking state across renders
-  const instanceIdRef = useRef<string | null>(null);
-  const hasInitialized = useRef(false);
+  // Refs
   const lastSavedContentRef = useRef<string | null>(null);
   const hasRestoredState = useRef(false);
-  const viewRef = useRef<ViewType>(view); // Ref for stable callback access
-
-  /** Ref to the Milkdown editor for imperative content updates */
   const editorRef = useRef<MilkdownEditorRef>(null);
-
-  // Keep viewRef in sync with view state (for stable callback access)
-  useEffect(() => {
-    viewRef.current = view;
-  }, [view]);
 
   // Get host APIs from context
   const {
     callTool,
-    isReady,
+    isReady: hostReady,
     log,
-    exp,
     exp_widgetState,
-    onToolResult,
     environment: hostEnvironment,
   } = useHost();
+
+  // Combined ready state
+  const isReady = hostReady && isInitialized;
 
   // Widget state for persistence
   const [widgetState, setWidgetState] = exp_widgetState<NoteWidgetState>();
 
-  // Tool callers - all UI-initiated calls return results that we process client-side
-  const [listTool, listState] = callTool<NoteData>("notes_list");
-  const [createTool, createState] = callTool<NoteData>("notes_create");
-  const [openTool, openState] = callTool<NoteData>("notes_open");
-  const [saveTool, saveState] = callTool<NoteData>("notes_save");
+  // Tool callers
+  const [listTool] = callTool<NoteData>("notes_list");
+  const [createTool] = callTool<NoteData>("notes_create");
+  const [openTool] = callTool<NoteData>("notes_open");
+  const [saveTool] = callTool<NoteData>("notes_save");
+
+  // ===========================================================================
+  // Data Processing (from useViews)
+  // ===========================================================================
 
   /**
-   * Process incoming note data from agent or UI tool calls.
-   *
-   * @param data - The note data from a tool result
-   * @param source - Whether this came from "agent" or "ui"
-   *
-   * For list view results:
-   * - Agent-initiated: Always switch to list view (user explicitly asked)
-   * - UI-initiated: Only switch if already in list view (prevents polling from interrupting editing)
-   *
-   * IMPORTANT: This callback uses viewRef instead of view state to avoid
-   * being recreated when view changes. Recreating would cause all effects
-   * watching tool state to re-run with stale data, creating view flip-flops.
+   * Process data from useViews when it changes.
+   * Updates local state for notes list and current note.
    */
-  const processNoteData = useCallback(
-    (data: NoteData | null, source: "agent" | "ui") => {
-      if (!data) return;
+  useEffect(() => {
+    if (!viewData) return;
 
-      // Track instanceId for routing
-      if (data.instanceId) {
-        instanceIdRef.current = data.instanceId;
-      }
+    // List view data
+    if (viewData.notes) {
+      setNotes(viewData.notes);
+      log.debug("Notes list updated", { count: viewData.notes.length });
+    }
 
-      // List view data
-      if (data.view === "list" && data.notes) {
-        setNotes(data.notes);
-        // Agent-initiated list calls always switch to list view
-        // UI-initiated (polling) only updates data without switching view
-        if (source === "agent" || viewRef.current === "list") {
-          setView("list");
-          log.debug("List view updated", { count: data.notes.length, source });
-        } else {
-          log.debug("List data updated while editing", { count: data.notes.length });
-        }
-        return;
-      }
+    // Editor view data
+    if (viewData.note) {
+      const noteData = viewData.note;
+      const isNewNote = note?.id !== noteData.id;
 
-      // Editor view data - switch to editor and load note
-      if (data.note) {
-        setView("editor");
-        const noteData = data.note;
-        const isNewNote = note?.id !== noteData.id;
-
-        if (isNewNote) {
+      if (isNewNote) {
+        setNote(noteData);
+        lastSavedContentRef.current = noteData.content;
+        log.debug("Note loaded", { id: noteData.id, title: noteData.title });
+      } else {
+        // Same note - check for external update
+        const isExternalUpdate = noteData.content !== lastSavedContentRef.current;
+        if (isExternalUpdate) {
           setNote(noteData);
+          editorRef.current?.setContent(noteData.content);
           lastSavedContentRef.current = noteData.content;
-          log.debug("Note loaded", { id: noteData.id, title: noteData.title });
+          log.debug("Note updated externally", { id: noteData.id });
         } else {
-          // Same note - check for external update
-          const isExternalUpdate = noteData.content !== lastSavedContentRef.current;
-          if (isExternalUpdate) {
-            setNote(noteData);
-            editorRef.current?.setContent(noteData.content);
-            lastSavedContentRef.current = noteData.content;
-            log.debug("Note updated externally", { id: noteData.id });
-          } else {
-            // Our own save result - just update metadata
-            setNote(noteData);
-          }
+          // Our own save result - just update metadata
+          setNote(noteData);
         }
       }
-    },
-    [log, note?.id]
-  );
+    }
+  }, [viewData, note?.id, log]);
 
   // ===========================================================================
   // Action Callbacks
@@ -229,8 +214,7 @@ export const useNotes = (): UseNotesReturn => {
   /**
    * Refresh the notes list (for polling).
    * Silent - no logging to keep console clean.
-   *
-   * Only runs while in list view to avoid overriding editor state.
+   * Only runs while in list view.
    */
   const refreshList = useCallback(async () => {
     if (view !== "list") {
@@ -243,77 +227,44 @@ export const useNotes = (): UseNotesReturn => {
     }
   }, [listTool, view]);
 
+  /**
+   * Navigate back to the list view.
+   * Calls notes_list which triggers useViews to switch to "/" view.
+   */
+  const goToList = useCallback(async () => {
+    try {
+      await listTool({});
+      log.debug("Navigating to list view");
+    } catch (err) {
+      log.error("Failed to navigate to list", { error: String(err) });
+    }
+  }, [listTool, log]);
+
   // ===========================================================================
   // Effects
   // ===========================================================================
 
   /**
-   * Initialize app when host is ready.
-   *
-   * Uses getInitialToolResult() to determine how the view was opened:
-   * - If it returns data: Agent opened this view with a tool call - use that data
-   * - If it returns null: User opened this view directly - fetch the list
-   *
-   * This single check replaces the previous complex logic with multiple refs
-   * and race condition handling.
+   * Log connection on ready.
    */
   useEffect(() => {
-    if (!isReady || hasInitialized.current) return;
-    hasInitialized.current = true;
-
-    log.info("Notes app connected", { environment: hostEnvironment });
-
-    const initialResult = exp.getInitialToolResult();
-    if (initialResult) {
-      // View was opened by agent tool call - use the result data
-      log.debug("Initialized from agent tool result");
-      processNoteData(initialResult.structuredContent as unknown as NoteData, "agent");
-    } else {
-      // View was opened by user - fetch initial list
-      log.debug("Initialized by user - fetching list");
-      listTool();
+    if (isReady) {
+      log.info("Notes app connected", { environment: hostEnvironment });
     }
-  }, [isReady, exp, log, hostEnvironment, processNoteData, listTool]);
+  }, [isReady, log, hostEnvironment]);
 
   /**
-   * Subscribe to subsequent agent-initiated tool calls.
-   * After initialization, agent may call additional tools (e.g., open a different note).
+   * Fetch list on user-initiated open (when no initial data).
    */
   useEffect(() => {
-    return onToolResult((result) => {
-      if (result.source === "agent") {
-        processNoteData(result.structuredContent as unknown as NoteData, "agent");
-      }
-    });
-  }, [onToolResult, processNoteData]);
-
-  /**
-   * Handle data from UI-initiated tool calls.
-   * Each tool's result is processed to update the view accordingly.
-   * This is the simple SPA approach - UI calls tool, processes result, updates view.
-   */
-  useEffect(() => {
-    processNoteData(listState.data, "ui");
-  }, [listState.data, processNoteData]);
-
-  useEffect(() => {
-    processNoteData(createState.data, "ui");
-  }, [createState.data, processNoteData]);
-
-  useEffect(() => {
-    processNoteData(openState.data, "ui");
-  }, [openState.data, processNoteData]);
-
-  useEffect(() => {
-    processNoteData(saveState.data, "ui");
-  }, [saveState.data, processNoteData]);
+    if (isReady && viewPath === "/" && !viewData?.notes && notes.length === 0) {
+      listTool({});
+    }
+  }, [isReady, viewPath, viewData?.notes, notes.length, listTool]);
 
   /**
    * Restore from widget state on mount (before initialization completes).
    * Shows previous state immediately while fresh data loads.
-   *
-   * This runs independently of the initialization effect to provide
-   * instant UI feedback while actual data is being fetched.
    */
   useEffect(() => {
     if (hasRestoredState.current || !widgetState?.privateContent) {
@@ -321,13 +272,13 @@ export const useNotes = (): UseNotesReturn => {
     }
     hasRestoredState.current = true;
 
-    const { lastView, lastNote, lastNotes } = widgetState.privateContent;
+    const { lastNote, lastNotes } = widgetState.privateContent;
 
-    if (lastView === "list" && lastNotes) {
+    if (lastNotes) {
       setNotes(lastNotes);
       log.debug("List restored from widget state");
-    } else if (lastView === "editor" && lastNote) {
-      setView("editor");
+    }
+    if (lastNote) {
       setNote(lastNote);
       log.debug("Note restored from widget state", { id: lastNote.id });
     }
@@ -340,7 +291,7 @@ export const useNotes = (): UseNotesReturn => {
     if (view === "list") {
       setWidgetState({
         modelContent: {
-          view: "list",
+          view: "/",
           noteCount: notes.length,
         },
         privateContent: {
@@ -353,7 +304,7 @@ export const useNotes = (): UseNotesReturn => {
       const wordCount = note.content.trim().split(/\s+/).filter(Boolean).length;
       setWidgetState({
         modelContent: {
-          view: "editor",
+          view: viewPath,
           noteId: note.id,
           noteTitle: note.title,
           wordCount,
@@ -365,7 +316,7 @@ export const useNotes = (): UseNotesReturn => {
         },
       });
     }
-  }, [view, note, notes, setWidgetState]);
+  }, [view, viewPath, note, notes, setWidgetState]);
 
   return {
     isReady,
@@ -379,6 +330,7 @@ export const useNotes = (): UseNotesReturn => {
     openNote,
     createNote,
     refreshList,
+    goToList,
   };
 };
 

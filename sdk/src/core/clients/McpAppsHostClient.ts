@@ -398,6 +398,7 @@ export class McpAppsHostClient extends Subscribable implements UnifiedHostClient
         structuredContent: params.structuredContent as Record<string, unknown>,
         isError: params.isError,
         source: params.source as "agent" | "ui",
+        toolName: params.toolName as string | undefined,
       };
 
       // Extract instanceId from structuredContent if present
@@ -465,8 +466,11 @@ export class McpAppsHostClient extends Subscribable implements UnifiedHostClient
         this.hostContext = hostContext;
         this.applyHostContext(hostContext);
 
-        // Determine if view was triggered by tool call
-        this.triggeredByTool = hostContext.openContext?.triggeredBy !== "user";
+        // Determine if view was triggered by tool call.
+        // "tool" (or undefined): wait for tool-result before setting isReady
+        // "user" or "restore": set isReady immediately
+        const triggeredBy = hostContext.openContext?.triggeredBy;
+        this.triggeredByTool = triggeredBy !== "user" && triggeredBy !== "restore";
 
         // Restore widget state if provided by host
         if (hostContext.widgetState) {

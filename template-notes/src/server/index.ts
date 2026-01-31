@@ -45,11 +45,11 @@ Each note opens in its own editor window. The list view shows all notes.`,
 
 /**
  * Notes UI resource.
- * 
- * Uses pipRules to control pip routing:
- * - notes_list: single pip (default), reused for all list calls
- * - notes_open/:noteId: one pip per noteId value
- * - notes_create: always creates a new pip
+ *
+ * Uses view-based routing to control pip instances:
+ * - "/" (root): notes_list - single instance for list view
+ * - "/editor": notes_create - creates new editor, gets noteId from response
+ * - "/editor/:noteId": one instance per unique noteId
  */
 app.resource({
   name: "Notes",
@@ -58,24 +58,10 @@ app.resource({
   displayModes: ["pip"],
   html: "../../dist/ui/main.html",
   icon: { svg: ICON_SVG, alt: ICON_ALT },
-  experimental: {
-    /**
-     * Pip routing rules (for agent-initiated calls only).
-     *
-     * UI-initiated calls from a pip don't go through pip management - they return
-     * results to the calling pip, which handles view switching client-side.
-     *
-     * For agent calls:
-     * - "notes_open/:noteId" → find pip where modelContent.noteId matches
-     * - "notes_save/:noteId" → find pip where modelContent.noteId matches
-     * - "notes_create" → always create new pip (each note gets its own editor)
-     * - notes_list → defaults to "single" (reuse any list pip)
-     */
-    pipRules: {
-      "notes_open/:noteId": "single",
-      "notes_save/:noteId": "single",
-      "notes_create": "new",
-    },
+  views: {
+    "/": ["notes_list"],
+    "/editor": ["notes_create"],
+    "/editor/:noteId": ["notes_open", "notes_save", "notes_delete"],
   },
 });
 

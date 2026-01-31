@@ -469,12 +469,6 @@ export class App {
     if (method === "resources/list") {
       const resources = [];
       for (const [uri, { config }] of this.resources) {
-        // Build experimental metadata (non-standard extensions)
-        const experimental: Record<string, unknown> = {};
-        if (config.experimental?.pipRules) {
-          experimental.pipRules = config.experimental.pipRules;
-        }
-        
         resources.push({
           uri,
           name: config.name,
@@ -482,7 +476,7 @@ export class App {
           mimeType: MIME_TYPES.MCP_APPS,
           _meta: {
             ui: {
-              ...(Object.keys(experimental).length > 0 && { experimental }),
+              ...(config.views && { views: config.views }),
               ...(config.icon && {
                 icon: {
                   data: svgToDataUri(config.icon.svg),
@@ -843,12 +837,6 @@ export class App {
 
   private registerResources(server: McpServer): void {
     for (const [uri, { config }] of this.resources) {
-      // Build experimental metadata (non-standard extensions)
-      const experimental: Record<string, unknown> = {};
-      if (config.experimental?.pipRules) {
-        experimental.pipRules = config.experimental.pipRules;
-      }
-      
       server.registerResource(
         config.name,
         uri,
@@ -857,7 +845,7 @@ export class App {
           description: config.description,
           _meta: {
             ui: {
-              ...(Object.keys(experimental).length > 0 && { experimental }),
+              ...(config.views && { views: config.views }),
               ...(config.icon && {
                 icon: {
                   data: svgToDataUri(config.icon.svg),

@@ -20,7 +20,7 @@ import { useNotesContext } from "./useNotes";
  * The parent (NotesApp) only renders EditorView when a note is loaded.
  */
 export function EditorView() {
-  const { note, saveNote, isSaving, lastSaved, editorRef } = useNotesContext();
+  const { note, saveNote, isSaving, lastSaved, editorRef, goToList } = useNotesContext();
 
   // Initialize with empty strings - will be synced via effect when note is available
   const [title, setTitle] = useState(note?.title ?? "");
@@ -99,6 +99,16 @@ export function EditorView() {
   return (
     <div className="note-container">
       <header className="note-header">
+        <button
+          className="back-button"
+          onClick={goToList}
+          title="Back to notes list"
+          aria-label="Back to notes list"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M19 12H5M12 19l-7-7 7-7"/>
+          </svg>
+        </button>
         <input
           type="text"
           className="note-title"

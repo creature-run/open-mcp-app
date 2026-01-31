@@ -64,6 +64,8 @@ export interface ToolResult<T = Record<string, unknown>> {
   structuredContent?: T;
   isError?: boolean;
   source?: "agent" | "ui";
+  /** Tool name that produced this result (for view routing) */
+  toolName?: string;
 }
 
 // ============================================================================
@@ -79,8 +81,10 @@ export interface OpenContext {
    * How the view was opened:
    * - "tool": Opened by an agent tool call (expect tool-input/tool-result)
    * - "user": Opened directly by user (no tool notifications coming)
+   * - "restore": Restoring previous state (popout, pop-back-in, refresh).
+   *              Uses widgetState.modelContent.view for initial view.
    */
-  triggeredBy: "tool" | "user";
+  triggeredBy: "tool" | "user" | "restore";
 }
 
 /**
