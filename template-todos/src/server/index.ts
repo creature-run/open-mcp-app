@@ -45,6 +45,12 @@ Response style: The user can see the todo list UI, so don't repeat todo contents
 // UI Resources
 // =============================================================================
 
+/**
+ * Todos UI resource.
+ *
+ * Uses view-based routing with a single root view since todos is not a
+ * multi-instance app. All tools map to the "/" view.
+ */
 app.resource({
   name: "Todo List",
   uri: TODOS_UI_URI,
@@ -52,6 +58,9 @@ app.resource({
   displayModes: ["pip", "inline"],
   html: "../../dist/ui/main.html",
   icon: { svg: ICON_SVG, alt: ICON_ALT },
+  views: {
+    "/": ["todos_list", "todos_add", "todos_toggle", "todos_remove"],
+  },
 });
 
 // =============================================================================

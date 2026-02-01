@@ -1,6 +1,7 @@
 export { useHost, detectEnvironment } from "./useHost.js";
 export { useToolResult } from "./useToolResult.js";
 export { useWebSocket } from "./useWebSocket.js";
+export { useViews } from "./useViews.js";
 export { CreatureIcon } from "./CreatureIcon.js";
 
 // Host Provider for context-based hooks
@@ -31,13 +32,17 @@ export type {
   ToolCallTuple,
 } from "./types.js";
 
+// Views types
+export type { Views, UseViewsReturn } from "./useViews.js";
+
 // Core exports
 export {
   createHost,
   createHostAsync,
   // Host clients (for advanced usage)
-  McpAppsHostClient,
-  ChatGptHostClient,
+  CreatureDesktopHostClient,
+  ClaudeDesktopHostClient,
+  ChatGptWebHostClient,
   StandaloneHostClient,
   // Style utilities
   applyDocumentTheme,

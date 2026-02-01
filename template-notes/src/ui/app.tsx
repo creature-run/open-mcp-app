@@ -38,7 +38,7 @@ const environment = detectEnvironment();
 initDefaultStyles({ environment });
 
 import { HostProvider } from "open-mcp-app/react";
-import { useNotes } from "./useNotes";
+import { NotesProvider, useNotesContext } from "./useNotes";
 import { ListView } from "./ListView";
 import { EditorView } from "./EditorView";
 import "./styles.css";
@@ -46,14 +46,16 @@ import "./styles.css";
 /**
  * Main notes app entry point.
  *
- * Wraps NotesApp with HostProvider to provide host client via context.
- * The HostProvider handles connection to the MCP Apps host and provides
- * the useHost hook for child components.
+ * Wraps NotesApp with HostProvider and NotesProvider to provide
+ * host client and notes state via context. This eliminates prop
+ * drilling - child components access state via useNotesContext().
  */
 export default function App() {
   return (
     <HostProvider name="mcp-template-notes" version="0.1.0">
-      <NotesApp />
+      <NotesProvider>
+        <NotesApp />
+      </NotesProvider>
     </HostProvider>
   );
 }
@@ -61,43 +63,29 @@ export default function App() {
 /**
  * Notes app component.
  *
- * Thin rendering layer that delegates all state management to useNotes hook.
- * Simply decides which view to render based on the current state.
+ * Thin rendering layer that decides which view to render based on context.
+ * All state and actions are accessed via useNotesContext().
+ *
+ * Shows a loading spinner until the host connection is ready.
+ * This prevents flickering between views during initialization.
  */
 function NotesApp() {
-  const {
-    view,
-    note,
-    notes,
-    isSaving,
-    lastSaved,
-    editorRef,
-    saveNote,
-    openNote,
-    createNote,
-    refreshList,
-  } = useNotes();
+  const { isReady, view, note } = useNotesContext();
 
-  // Render editor view if editing a note
-  if (view === "editor" && note) {
+  // Show loading spinner until host is ready
+  if (!isReady) {
     return (
-      <EditorView
-        note={note}
-        onSave={saveNote}
-        isSaving={isSaving}
-        lastSaved={lastSaved}
-        editorRef={editorRef}
-      />
+      <div className="loading-container">
+        <div className="loading-spinner" />
+      </div>
     );
   }
 
+  // Render editor view if editing a note
+  if (view === "editor" && note) {
+    return <EditorView />;
+  }
+
   // Default: list view (handles empty state gracefully)
-  return (
-    <ListView
-      notes={notes}
-      onOpenNote={openNote}
-      onCreateNote={createNote}
-      onRefresh={refreshList}
-    />
-  );
+  return <ListView />;
 }

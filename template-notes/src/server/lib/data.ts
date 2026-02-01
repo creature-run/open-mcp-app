@@ -1,9 +1,14 @@
 /**
  * Data Layer
  *
- * Provides a simple DataStore abstraction with an in-memory implementation.
+ * Provides a simple DataStore abstraction with two implementations:
+ * - KV-backed store for persistence (when running in Creature)
+ * - In-memory store as fallback (for other hosts like ChatGPT, Claude, etc.)
+ *
  * Data is scoped by localId for isolation.
  */
+
+import { exp } from "open-mcp-app/server";
 
 // =============================================================================
 // DataStore Interface
@@ -23,7 +28,77 @@ export interface DataStore<T> {
 }
 
 // =============================================================================
-// In-Memory Implementation
+// KV-Backed Implementation (Persistent)
+// =============================================================================
+
+/**
+ * KV-backed data store using Creature's experimental storage APIs.
+ * Data persists across app restarts when running in Creature.
+ * Scoped by collection and localId to isolate data.
+ */
+class KvStore<T> implements DataStore<T> {
+  private collection: string;
+  private localId: string;
+
+  constructor(collection: string, localId: string) {
+    this.collection = collection;
+    this.localId = localId;
+  }
+
+  /**
+   * Build a composite key that includes collection and localId.
+   */
+  private scopedKey(id: string): string {
+    return `${this.collection}:${this.localId}:${id}`;
+  }
+
+  /**
+   * Get the prefix for listing items in this collection+localId.
+   */
+  private scopePrefix(): string {
+    return `${this.collection}:${this.localId}:`;
+  }
+
+  async get(id: string): Promise<T | null> {
+    const value = await exp.kvGet(this.scopedKey(id));
+    if (!value) return null;
+    try {
+      return JSON.parse(value) as T;
+    } catch {
+      return null;
+    }
+  }
+
+  async set(id: string, value: T): Promise<void> {
+    await exp.kvSet(this.scopedKey(id), JSON.stringify(value));
+  }
+
+  async delete(id: string): Promise<boolean> {
+    return exp.kvDelete(this.scopedKey(id));
+  }
+
+  async list(): Promise<T[]> {
+    const prefix = this.scopePrefix();
+    const keys = await exp.kvList(prefix);
+    if (!keys) return [];
+
+    const results: T[] = [];
+    for (const key of keys) {
+      const value = await exp.kvGet(key);
+      if (value) {
+        try {
+          results.push(JSON.parse(value) as T);
+        } catch {
+          // Skip invalid entries
+        }
+      }
+    }
+    return results;
+  }
+}
+
+// =============================================================================
+// In-Memory Implementation (Fallback)
 // =============================================================================
 
 /**
@@ -38,7 +113,8 @@ const sharedInMemoryData = new Map<string, unknown>();
 
 /**
  * In-memory data store using a shared Map.
- * Data persists for the lifetime of the process.
+ * Data persists for the lifetime of the process only.
+ * Used as fallback when KV storage is not available.
  * Scoped by collection and localId to isolate data.
  */
 class InMemoryStore<T> implements DataStore<T> {
@@ -92,8 +168,15 @@ class InMemoryStore<T> implements DataStore<T> {
 // Factory
 // =============================================================================
 
+/** Track whether we've logged the storage mode */
+let storageLoggedOnce = false;
+
 /**
  * Create a data store for the given collection and localId.
+ *
+ * Automatically selects the best available storage:
+ * - KV store (persistent) when running in Creature
+ * - In-memory store (volatile) as fallback for other hosts
  *
  * @param collection - The collection/namespace name
  * @param localId - The local ID for data isolation
@@ -105,5 +188,19 @@ export const createDataStore = <T>({
   collection: string;
   localId: string;
 }): DataStore<T> => {
+  // Check if KV storage is available (Creature host)
+  if (exp.kvIsAvailable()) {
+    if (!storageLoggedOnce) {
+      console.log("[Data] Using persistent KV storage");
+      storageLoggedOnce = true;
+    }
+    return new KvStore<T>(collection, localId);
+  }
+
+  // Fall back to in-memory storage
+  if (!storageLoggedOnce) {
+    console.log("[Data] Using in-memory storage (no persistent storage available)");
+    storageLoggedOnce = true;
+  }
   return new InMemoryStore<T>(collection, localId);
 };

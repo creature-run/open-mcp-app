@@ -272,6 +272,7 @@ export function useHost(config?: UseHostConfig): UseHostReturn {
       sendNotification: client.exp.sendNotification.bind(client.exp),
       getInstanceId: client.exp.getInstanceId.bind(client.exp),
       supportsMultiInstance: client.exp.supportsMultiInstance.bind(client.exp),
+      getInitialToolResult: client.exp.getInitialToolResult.bind(client.exp),
       sendFollowUpMessage: client.exp.sendFollowUpMessage.bind(client.exp),
       requestModal: client.exp.requestModal.bind(client.exp),
       requestClose: client.exp.requestClose.bind(client.exp),

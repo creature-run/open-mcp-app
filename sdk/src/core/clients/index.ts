@@ -4,7 +4,8 @@
  * Exports all host client implementations.
  */
 
-export { McpAppsHostClient } from "./McpAppsHostClient.js";
-export { ChatGptHostClient } from "./ChatGptHostClient.js";
+export { CreatureDesktopHostClient } from "./CreatureDesktopHostClient.js";
+export { ClaudeDesktopHostClient } from "./ClaudeDesktopHostClient.js";
+export { ChatGptWebHostClient } from "./ChatGptWebHostClient.js";
 export { StandaloneHostClient } from "./StandaloneHostClient.js";
 export { Subscribable } from "../subscribable.js";

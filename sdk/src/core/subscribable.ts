@@ -54,6 +54,16 @@ export abstract class Subscribable {
   }
 
   /**
+   * Get the number of subscribers for an event.
+   *
+   * @param event - The event name
+   * @returns Number of subscribers
+   */
+  protected getSubscriberCount(event: keyof HostClientEvents): number {
+    return this.eventHandlers.get(event)?.size ?? 0;
+  }
+
+  /**
    * Register a handler for MCP-specific events (theme-change, teardown).
    *
    * @param event - The event name

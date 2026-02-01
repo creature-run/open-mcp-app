@@ -83,16 +83,14 @@ function createTestApp() {
     },
   });
 
-  // Resource with experimental multiInstance
+  // Resource with instanceMode multiple (views-based routing)
   app.resource({
     name: "Multi-Instance Panel",
     uri: RESOURCE_URI_MULTI_INSTANCE,
     description: "A test UI panel with multi-instance support",
     displayModes: ["pip"],
     html: FIXTURE_HTML,
-    experimental: {
-      multiInstance: true,
-    },
+    instanceMode: "multiple",
   });
 
   // Tool with UI linkage (default visibility)
@@ -508,13 +506,13 @@ describe("Experimental Namespace (Non-Standard Extensions)", () => {
     });
   });
 
-  describe("resources/list - experimental.multiInstance", () => {
-    it("includes experimental.multiInstance in _meta.ui for multi-instance resources", async () => {
+  describe("resources/list - instanceMode", () => {
+    it("includes instanceMode in _meta.ui for multi-instance resources", async () => {
       const response = await jsonRpcRequest(app, "resources/list");
       const result = response.result as {
         resources: Array<{
           uri: string;
-          _meta?: { ui?: { experimental?: { multiInstance?: boolean } } };
+          _meta?: { ui?: { instanceMode?: string } };
         }>;
       };
 
@@ -523,16 +521,15 @@ describe("Experimental Namespace (Non-Standard Extensions)", () => {
       );
       expect(multiInstanceResource).toBeDefined();
 
-      // Non-standard: multiInstance is under experimental namespace
-      expect(multiInstanceResource?._meta?.ui?.experimental?.multiInstance).toBe(true);
+      expect(multiInstanceResource?._meta?.ui?.instanceMode).toBe("multiple");
     });
 
-    it("does not include experimental for resources without experimental config", async () => {
+    it("does not include instanceMode for resources without it", async () => {
       const response = await jsonRpcRequest(app, "resources/list");
       const result = response.result as {
         resources: Array<{
           uri: string;
-          _meta?: { ui?: { experimental?: { multiInstance?: boolean } } };
+          _meta?: { ui?: { instanceMode?: string } };
         }>;
       };
 
@@ -541,8 +538,7 @@ describe("Experimental Namespace (Non-Standard Extensions)", () => {
       );
       expect(basicResource).toBeDefined();
 
-      // Resources without experimental config should not have experimental field
-      expect(basicResource?._meta?.ui?.experimental).toBeUndefined();
+      expect(basicResource?._meta?.ui?.instanceMode).toBeUndefined();
     });
   });
 

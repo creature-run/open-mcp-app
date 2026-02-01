@@ -64,11 +64,28 @@ export interface ToolResult<T = Record<string, unknown>> {
   structuredContent?: T;
   isError?: boolean;
   source?: "agent" | "ui";
+  /** Tool name that produced this result (for view routing) */
+  toolName?: string;
 }
 
 // ============================================================================
 // Host Context
 // ============================================================================
+
+/**
+ * Context about how the view was opened.
+ * SDK uses this to determine initialization behavior.
+ */
+export interface OpenContext {
+  /**
+   * How the view was opened:
+   * - "tool": Opened by an agent tool call (expect tool-input/tool-result)
+   * - "user": Opened directly by user (no tool notifications coming)
+   * - "restore": Restoring previous state (popout, pop-back-in, refresh).
+   *              Uses widgetState.modelContent.view for initial view.
+   */
+  triggeredBy: "tool" | "user" | "restore";
+}
 
 /**
  * Host context sent from MCP Apps host.
@@ -93,6 +110,11 @@ export interface HostContext {
    * Widget state restored from previous widget instance.
    */
   widgetState?: WidgetState;
+  /**
+   * Context about how the view was opened.
+   * Per MCP Apps spec extensibility, sent in hostContext.
+   */
+  openContext?: OpenContext;
   /**
    * Experimental (non-standard) extensions.
    * Follows the SDK's `experimental` namespace paradigm.
@@ -254,6 +276,31 @@ export interface ExpHostApi {
    * - Generic MCP Apps hosts: false
    */
   supportsMultiInstance(): boolean;
+
+  /**
+   * Get the initial tool result if view was opened by an agent tool call.
+   *
+   * Returns the first tool result received, or null if:
+   * - View was opened directly by user (no tool call)
+   * - Tool result hasn't arrived yet (shouldn't happen after isReady=true)
+   *
+   * This enables clean initialization:
+   * ```typescript
+   * const { isReady, getInitialToolResult } = useHost();
+   * useEffect(() => {
+   *   if (!isReady) return;
+   *   const initial = getInitialToolResult();
+   *   if (initial) {
+   *     // View opened by agent - use the tool result data
+   *     processData(initial.structuredContent);
+   *   } else {
+   *     // View opened by user - fetch initial data
+   *     fetchData();
+   *   }
+   * }, [isReady]);
+   * ```
+   */
+  getInitialToolResult(): ToolResult | null;
 
   // ============================================================================
   // ChatGPT-specific APIs (no-op on MCP Apps hosts)

@@ -5,8 +5,9 @@
  * This is the main entry point for client-side SDK usage.
  */
 
-import { ChatGptHostClient } from "./clients/ChatGptHostClient.js";
-import { McpAppsHostClient } from "./clients/McpAppsHostClient.js";
+import { ChatGptWebHostClient } from "./clients/ChatGptWebHostClient.js";
+import { CreatureDesktopHostClient } from "./clients/CreatureDesktopHostClient.js";
+import { ClaudeDesktopHostClient } from "./clients/ClaudeDesktopHostClient.js";
 import { StandaloneHostClient } from "./clients/StandaloneHostClient.js";
 import type { UnifiedHostClient, Environment, HostClientConfig } from "./types.js";
 
@@ -40,6 +41,14 @@ export const detectEnvironment = (): Environment => {
   return "standalone";
 };
 
+/**
+ * Check if running in an MCP Apps environment (iframe with parent, no window.openai).
+ */
+const isMcpAppsEnvironment = (): boolean => {
+  if (typeof window === "undefined") return false;
+  return window.parent !== window && !("openai" in window && (window as { openai?: unknown }).openai);
+};
+
 // ============================================================================
 // Host Client Factory
 // ============================================================================
@@ -48,9 +57,12 @@ export const detectEnvironment = (): Environment => {
  * Create a host client for the detected environment.
  *
  * Automatically selects the appropriate client based on runtime detection:
- * - ChatGPT: Uses ChatGptHostClient (detects window.openai)
- * - MCP Apps: Uses McpAppsHostClient (detects iframe with parent)
+ * - ChatGPT Web: Uses ChatGptWebHostClient (detects window.openai)
+ * - MCP Apps: Uses CreatureDesktopHostClient (detects iframe with parent)
  * - Standalone: Uses StandaloneHostClient for development/testing
+ *
+ * Note: For MCP Apps environments, this returns CreatureDesktopHostClient by default.
+ * Use createHostAsync() for proper host detection via userAgent after connection.
  *
  * @param config - Configuration for the host client
  * @returns The appropriate host client for the environment
@@ -68,14 +80,14 @@ export const detectEnvironment = (): Environment => {
  * ```
  */
 export const createHost = (config: HostClientConfig): UnifiedHostClient => {
-  // 1. ChatGPT (most specific - has window.openai)
-  if (ChatGptHostClient.detect()) {
-    return ChatGptHostClient.create(config);
+  // 1. ChatGPT Web (most specific - has window.openai)
+  if (ChatGptWebHostClient.detect()) {
+    return ChatGptWebHostClient.create(config);
   }
 
-  // 2. MCP Apps (iframe-based host)
-  if (McpAppsHostClient.detect()) {
-    return McpAppsHostClient.create(config);
+  // 2. MCP Apps (iframe-based host) - default to Creature
+  if (isMcpAppsEnvironment()) {
+    return CreatureDesktopHostClient.create(config);
   }
 
   // 3. Standalone fallback
@@ -83,10 +95,15 @@ export const createHost = (config: HostClientConfig): UnifiedHostClient => {
 };
 
 /**
- * Create a host client asynchronously, waiting for connection.
+ * Create a host client asynchronously with proper host detection.
  *
- * Unlike createHost(), this function waits for the connection to establish
- * and hostContext to be received before returning.
+ * Unlike createHost(), this function:
+ * 1. Connects to the host
+ * 2. Detects the specific host type via userAgent
+ * 3. Returns the appropriate client (CreatureDesktop, ClaudeDesktop, etc.)
+ *
+ * For MCP Apps environments, this performs deferred detection by connecting
+ * first, then checking the userAgent to select the correct client.
  *
  * @param config - Configuration for the host client
  * @returns Promise that resolves to the configured host client after connection
@@ -94,28 +111,61 @@ export const createHost = (config: HostClientConfig): UnifiedHostClient => {
  * @example
  * ```typescript
  * const host = await createHostAsync({ name: "my-app", version: "1.0.0" });
- * // host is now ready to use
+ * // host is now ready to use with correct host-specific behavior
  * ```
  */
 export const createHostAsync = async (config: HostClientConfig): Promise<UnifiedHostClient> => {
-  const host = createHost(config);
-
-  // For ChatGPT and Standalone, connection is immediate
-  if (host.environment !== "mcp-apps") {
+  // 1. ChatGPT Web (detected synchronously via window.openai)
+  if (ChatGptWebHostClient.detect()) {
+    const host = ChatGptWebHostClient.create(config);
     host.connect();
     return host;
   }
 
-  // For MCP Apps, wait for hostContext to be available
-  return new Promise((resolve) => {
-    const unsubscribe = host.subscribe((state) => {
-      if (state.isReady) {
-        unsubscribe();
-        resolve(host);
-      }
+  // 2. MCP Apps - requires connection to detect specific host
+  if (isMcpAppsEnvironment()) {
+    // Connect with Creature client first to get hostContext
+    const probeHost = CreatureDesktopHostClient.create(config);
+
+    await new Promise<void>((resolve) => {
+      const unsub = probeHost.subscribe((state) => {
+        if (state.isReady) {
+          unsub();
+          resolve();
+        }
+      });
+      probeHost.connect();
     });
-    host.connect();
-  });
+
+    const userAgent = probeHost.getHostContext()?.userAgent?.toLowerCase() ?? "";
+
+    // If connected to Claude Desktop, switch to Claude client
+    if (userAgent.startsWith("claude")) {
+      probeHost.disconnect();
+
+      const claudeHost = ClaudeDesktopHostClient.create(config);
+
+      await new Promise<void>((resolve) => {
+        const unsub = claudeHost.subscribe((state) => {
+          if (state.isReady) {
+            unsub();
+            resolve();
+          }
+        });
+        claudeHost.connect();
+      });
+
+      return claudeHost;
+    }
+
+    // Already connected to Creature (or unknown MCP Apps host)
+    return probeHost;
+  }
+
+  // 3. Standalone fallback
+  const host = StandaloneHostClient.create(config);
+  host.connect();
+  return host;
 };
 
 // ============================================================================
@@ -134,6 +184,7 @@ export type {
   ToolResult,
   // Host Context
   HostContext,
+  OpenContext,
   // Content Blocks
   ContentBlock,
   TextContentBlock,
@@ -156,8 +207,9 @@ export type {
 // ============================================================================
 
 export {
-  McpAppsHostClient,
-  ChatGptHostClient,
+  CreatureDesktopHostClient,
+  ClaudeDesktopHostClient,
+  ChatGptWebHostClient,
   StandaloneHostClient,
 } from "./clients/index.js";
 

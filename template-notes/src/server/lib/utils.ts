@@ -4,7 +4,7 @@
  * Shared helper functions used by note tools.
  * Handles ID generation and store creation.
  *
- * Data is scoped by a shared localId for all instances.
+ * Notes are stored globally within a project and persist across sessions.
  */
 
 import { createDataStore, type DataStore } from "./data.js";
