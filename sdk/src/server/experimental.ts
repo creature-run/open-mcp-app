@@ -419,6 +419,7 @@ import {
   rpcKvSet,
   rpcKvDelete,
   rpcKvList,
+  rpcKvListWithValues,
   rpcKvSearch,
   rpcBlobPut,
   rpcBlobGet,
@@ -656,6 +657,44 @@ export async function experimental_kvList(prefix?: string): Promise<string[] | n
       return await rpcKvList(sanitizedPrefix);
     } catch (error) {
       console.error("[KV] RPC error in kvList:", error);
+      return null;
+    }
+  }
+  
+  // Fallback: not in Creature or no server connection
+  return null;
+}
+
+/**
+ * List key-value pairs from the KV store.
+ *
+ * This is more efficient than calling kvList + kvGet for each key,
+ * as it fetches all data in a single RPC call.
+ *
+ * @param prefix - Optional prefix to filter keys
+ * @returns Array of key-value pairs, or null if storage unavailable
+ *
+ * @example
+ * ```typescript
+ * import { experimental_kvListWithValues } from "open-mcp-app/server";
+ *
+ * const entries = await experimental_kvListWithValues("todos:");
+ * for (const { key, value } of entries ?? []) {
+ *   console.log(key, JSON.parse(value));
+ * }
+ * ```
+ */
+export async function experimental_kvListWithValues(
+  prefix?: string
+): Promise<Array<{ key: string; value: string }> | null> {
+  const sanitizedPrefix = prefix ? sanitizeKey(prefix) : undefined;
+  
+  // Use RPC when available (preferred path for both local and hosted MCPs)
+  if (isStorageRpcAvailable()) {
+    try {
+      return await rpcKvListWithValues(sanitizedPrefix);
+    } catch (error) {
+      console.error("[KV] RPC error in kvListWithValues:", error);
       return null;
     }
   }

@@ -19,6 +19,7 @@ export const STORAGE_METHODS = {
   KV_SET: "creature/storage/kv/set",
   KV_DELETE: "creature/storage/kv/delete",
   KV_LIST: "creature/storage/kv/list",
+  KV_LIST_WITH_VALUES: "creature/storage/kv/listWithValues",
   KV_SEARCH: "creature/storage/kv/search",
   BLOB_PUT: "creature/storage/blob/put",
   BLOB_GET: "creature/storage/blob/get",
@@ -157,6 +158,20 @@ export const rpcKvList = async (prefix?: string): Promise<string[]> => {
     { prefix }
   );
   return result.keys;
+};
+
+/**
+ * List key-value pairs in the KV store via RPC.
+ * Returns both keys and values in a single request to avoid N+1 lookups.
+ */
+export const rpcKvListWithValues = async (
+  prefix?: string
+): Promise<Array<{ key: string; value: string }>> => {
+  const result = await sendStorageRequest<{ entries: Array<{ key: string; value: string }> }>(
+    STORAGE_METHODS.KV_LIST_WITH_VALUES,
+    { prefix }
+  );
+  return result.entries;
 };
 
 /**

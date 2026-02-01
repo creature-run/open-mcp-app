@@ -48,6 +48,10 @@ export interface DataStore<T> {
    * Returns items that match the query, with optional snippets and relevance scores.
    */
   search(query: string, limit?: number): Promise<SearchResult<T>[]>;
+  /**
+   * Clear all items in this store.
+   */
+  clear(): Promise<void>;
 }
 
 // =============================================================================
@@ -141,6 +145,16 @@ class KvStore<T> implements DataStore<T> {
     }
     return results;
   }
+
+  async clear(): Promise<void> {
+    const prefix = this.scopePrefix();
+    const keys = await experimental_kvList(prefix);
+    if (!keys) return;
+
+    for (const key of keys) {
+      await experimental_kvDelete(key);
+    }
+  }
 }
 
 // =============================================================================
@@ -231,6 +245,19 @@ class InMemoryStore<T> implements DataStore<T> {
     }
 
     return results;
+  }
+
+  async clear(): Promise<void> {
+    const prefix = this.scopePrefix();
+    const keysToDelete: string[] = [];
+    for (const key of sharedInMemoryData.keys()) {
+      if (key.startsWith(prefix)) {
+        keysToDelete.push(key);
+      }
+    }
+    for (const key of keysToDelete) {
+      sharedInMemoryData.delete(key);
+    }
   }
 
   /**
