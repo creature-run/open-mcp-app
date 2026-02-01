@@ -243,7 +243,7 @@ function SearchBar({
   isSearching: boolean;
 }) {
   const [query, setQuery] = useState("");
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const handleChange = useCallback(
     (value: string) => {
@@ -580,7 +580,7 @@ function TodoApp() {
       <SearchBar
         onSearch={handleSearch}
         onClear={handleClearSearch}
-        isSearching={searchState.isLoading}
+        isSearching={searchState.status === "loading"}
       />
 
       {isSearchMode && searchResults && searchResults.matches.length === 0 ? (
