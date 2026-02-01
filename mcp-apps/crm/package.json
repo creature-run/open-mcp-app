@@ -1,7 +1,7 @@
 {
-  "name": "mcp-app-template-notes",
+  "name": "mcp-app-template-crm",
   "version": "0.0.1",
-  "description": "An MCP App for adding notes to your Creature projects, with a full-featured Markdown editor.",
+  "description": "An MCP App demonstrating data tables, sorting, filtering, and relational data with a CRM/orders explorer.",
   "type": "module",
   "scripts": {
     "dev": "concurrently -k \"vite build --watch\" \"nodemon -q --ext ts --watch src/server --exec 'npx tsx src/server/index.ts'\"",
@@ -12,10 +12,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "open-mcp-app": "file:../sdk",
-    "@milkdown/kit": "^7.8.0",
-    "@milkdown/plugin-listener": "^7.8.0",
-    "@milkdown/react": "^7.8.0",
+    "open-mcp-app": "^0.0.2",
+    "@phosphor-icons/react": "^2.1.10",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "zod": "^3.24.4"
@@ -23,7 +21,7 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/creature-run/creature.git",
-    "directory": "template-notes"
+    "directory": "template-crm"
   },
   "homepage": "https://creature.run/docs",
   "devDependencies": {

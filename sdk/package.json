@@ -1,7 +1,7 @@
 {
   "name": "open-mcp-app",
-  "version": "0.1.6",
-  "description": "SDK for building MCP Apps that work on both Creature and ChatGPT",
+  "version": "0.0.2",
+  "description": "SDK for building MCP Apps that work on any MCP App host",
   "type": "module",
   "exports": {
     "./server": {
@@ -79,11 +79,10 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/creature-run/creature.git",
+    "url": "https://github.com/creature-run/open-mcp-app.git",
     "directory": "sdk"
   },
-  "homepage": "https://creature.run/docs",
   "bugs": {
-    "url": "https://github.com/creature-run/creature/issues"
+    "url": "https://github.com/creature-run/open-mcp-app/issues"
   }
 }
