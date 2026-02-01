@@ -40,8 +40,9 @@ export {
   createHost,
   createHostAsync,
   // Host clients (for advanced usage)
-  McpAppsHostClient,
-  ChatGptHostClient,
+  CreatureDesktopHostClient,
+  ClaudeDesktopHostClient,
+  ChatGptWebHostClient,
   StandaloneHostClient,
   // Style utilities
   applyDocumentTheme,

@@ -1,7 +1,7 @@
 /**
- * ChatGPT Host Client
+ * ChatGPT Web Host Client
  *
- * Unified host client for ChatGPT Apps environment.
+ * Host client for the ChatGPT web environment.
  * Bridges the ChatGPT Apps SDK (`window.openai`) to the unified interface.
  */
 
@@ -49,12 +49,12 @@ declare global {
 }
 
 /**
- * ChatGPT host client implementation.
+ * ChatGPT Web host client implementation.
  *
  * Bridges the ChatGPT Apps SDK to provide a unified interface.
  * MCP-specific features are no-ops.
  */
-export class ChatGptHostClient extends Subscribable implements UnifiedHostClient {
+export class ChatGptWebHostClient extends Subscribable implements UnifiedHostClient {
   readonly environment = "chatgpt" as const;
 
   private state: HostClientState = {
@@ -79,10 +79,10 @@ export class ChatGptHostClient extends Subscribable implements UnifiedHostClient
   // ============================================================================
 
   /**
-   * Create a ChatGPT host client instance.
+   * Create a ChatGPT Web host client instance.
    */
-  static create(config: HostClientConfig): ChatGptHostClient {
-    return new ChatGptHostClient(config);
+  static create(config: HostClientConfig): ChatGptWebHostClient {
+    return new ChatGptWebHostClient(config);
   }
 
   /**
@@ -209,7 +209,8 @@ export class ChatGptHostClient extends Subscribable implements UnifiedHostClient
   // ============================================================================
 
   /**
-   * Experimental APIs for non-standard features.
+   * Experimental APIs (shared across all hosts).
+   * Behavior varies by host - see ExpHostApi for details.
    */
   get exp(): ExpHostApi {
     return {
@@ -224,17 +225,14 @@ export class ChatGptHostClient extends Subscribable implements UnifiedHostClient
         this.emit("widget-state-change", state);
       },
 
-      setTitle: (_title: string) => {
-        // No-op on ChatGPT
-      },
+      // MCP Apps-only (no-op on ChatGPT)
+      setTitle: (_title: string) => {},
 
-      updateModelContext: async (_content: ContentBlock[]) => {
-        // No-op on ChatGPT
-      },
+      // MCP Apps-only (no-op on ChatGPT)
+      updateModelContext: async (_content: ContentBlock[]) => {},
 
-      sendNotification: (_method: string, _params: unknown) => {
-        // No-op on ChatGPT
-      },
+      // MCP Apps-only (no-op on ChatGPT)
+      sendNotification: (_method: string, _params: unknown) => {},
 
       getInstanceId: () => {
         // ChatGPT may have widgetSessionId, but we don't expose it

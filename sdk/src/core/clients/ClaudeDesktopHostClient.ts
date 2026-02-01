@@ -1,8 +1,8 @@
 /**
- * MCP Apps Host Client
+ * Claude Desktop Host Client
  *
- * Unified host client for MCP Apps environments (Creature, Claude, etc.).
- * Handles iframe postMessage communication with the host application.
+ * Host client for the Claude Desktop environment.
+ * Handles iframe postMessage communication with the Claude Desktop host application.
  */
 
 import {
@@ -29,17 +29,19 @@ import type {
 } from "../types.js";
 
 /**
- * MCP Apps host client implementation.
+ * Claude Desktop host client implementation.
  *
- * Provides a unified interface for MCP Apps hosts. Automatically handles
- * Creature-specific extensions when connected to Creature host.
- * 
+ * Provides MCP Apps support for Claude Desktop:
+ * - Single-instance only (no multi-instance support)
+ * - No dynamic title changes
+ * - Inline display mode only
+ *
  * Event Buffering:
  * Tool-input and tool-result events may arrive before React components
  * have subscribed (due to useEffect timing). We buffer these events and
  * replay them when the first subscriber is added, ensuring no data is lost.
  */
-export class McpAppsHostClient extends Subscribable implements UnifiedHostClient {
+export class ClaudeDesktopHostClient extends Subscribable implements UnifiedHostClient {
   readonly environment = "mcp-apps" as const;
 
   private state: HostClientState = {
@@ -51,7 +53,6 @@ export class McpAppsHostClient extends Subscribable implements UnifiedHostClient
   private app: App | null = null;
   private connected = false;
   private hostContext: HostContext | null = null;
-  private instanceId: string | null = null;
 
   /**
    * Whether this view was triggered by a tool call.
@@ -90,18 +91,10 @@ export class McpAppsHostClient extends Subscribable implements UnifiedHostClient
   // ============================================================================
 
   /**
-   * Create an MCP Apps host client instance.
+   * Create a Claude Desktop host client instance.
    */
-  static create(config: HostClientConfig): McpAppsHostClient {
-    return new McpAppsHostClient(config);
-  }
-
-  /**
-   * Check if the current environment is MCP Apps (iframe with parent).
-   */
-  static detect(): boolean {
-    if (typeof window === "undefined") return false;
-    return window.parent !== window && !("openai" in window && (window as { openai?: unknown }).openai);
+  static create(config: HostClientConfig): ClaudeDesktopHostClient {
+    return new ClaudeDesktopHostClient(config);
   }
 
   // ============================================================================
@@ -121,7 +114,7 @@ export class McpAppsHostClient extends Subscribable implements UnifiedHostClient
   }
 
   /**
-   * Connect to the MCP Apps host.
+   * Connect to the Claude Desktop host.
    *
    * Creates the App instance, registers notification handlers, and initiates
    * the protocol handshake. The host responds with hostContext including
@@ -186,20 +179,13 @@ export class McpAppsHostClient extends Subscribable implements UnifiedHostClient
       source: "ui",
     };
 
-    // Extract instanceId from structuredContent if present
-    if (sdkResult.structuredContent && typeof sdkResult.structuredContent === "object") {
-      const sc = sdkResult.structuredContent as Record<string, unknown>;
-      if (typeof sc.instanceId === "string") {
-        this.instanceId = sc.instanceId;
-      }
-    }
-
     this.emit("tool-result", result as ToolResult);
     return result;
   }
 
   /**
    * Request a display mode change from the host.
+   * Claude Desktop only supports inline mode.
    */
   async requestDisplayMode(params: { mode: DisplayMode }): Promise<{ mode: DisplayMode }> {
     if (!this.app) {
@@ -237,13 +223,13 @@ export class McpAppsHostClient extends Subscribable implements UnifiedHostClient
         handler as (theme: "light" | "dark") => void | (() => Promise<void> | void)
       );
     }
-    
+
     // Register the handler
     const unsubscribe = this.onEvent(
       event as "tool-input" | "tool-result" | "widget-state-change",
       handler as HostClientEvents["tool-input" | "tool-result" | "widget-state-change"]
     );
-    
+
     // Replay buffered events to the new subscriber.
     // Events may have arrived before React's useEffect set up subscriptions.
     if (event === "tool-input" && this.bufferedToolInput) {
@@ -255,7 +241,7 @@ export class McpAppsHostClient extends Subscribable implements UnifiedHostClient
       this.bufferedToolResult = null;
       (handler as HostClientEvents["tool-result"])(buffered);
     }
-    
+
     return unsubscribe;
   }
 
@@ -264,7 +250,8 @@ export class McpAppsHostClient extends Subscribable implements UnifiedHostClient
   // ============================================================================
 
   /**
-   * Experimental APIs for non-standard features.
+   * Experimental APIs (shared across all hosts).
+   * Behavior varies by host - see ExpHostApi for details.
    */
   get exp(): ExpHostApi {
     return {
@@ -276,12 +263,8 @@ export class McpAppsHostClient extends Subscribable implements UnifiedHostClient
         });
       },
 
-      setTitle: (title: string) => {
-        // Only send if connected to Creature (detected via userAgent)
-        if (this.isCreatureHost()) {
-          this.sendNotification("ui/notifications/title-changed", { title });
-        }
-      },
+      // Not supported on Claude Desktop
+      setTitle: (_title: string) => {},
 
       updateModelContext: async (content: ContentBlock[]) => {
         if (!this.app) return;
@@ -298,30 +281,26 @@ export class McpAppsHostClient extends Subscribable implements UnifiedHostClient
       },
 
       getInstanceId: () => {
-        return this.instanceId;
+        // Claude Desktop doesn't support multi-instance
+        return null;
       },
 
       supportsMultiInstance: () => {
-        return this.isCreatureHost();
+        return false;
       },
 
       getInitialToolResult: () => {
         return this.initialToolResult;
       },
 
-      // ChatGPT-only APIs - no-ops on MCP Apps
-      sendFollowUpMessage: async (_prompt: string) => {
-        // No-op on MCP Apps
-      },
+      // ChatGPT-only APIs (no-op on MCP Apps hosts)
+      sendFollowUpMessage: async (_prompt: string) => {},
 
       requestModal: async (_options: { title?: string; params?: Record<string, unknown> }) => {
-        // No-op on MCP Apps
         return null;
       },
 
-      requestClose: async () => {
-        // No-op on MCP Apps
-      },
+      requestClose: async () => {},
     };
   }
 
@@ -340,14 +319,6 @@ export class McpAppsHostClient extends Subscribable implements UnifiedHostClient
     // Type assertion needed for notifications not in the official MCP Apps spec
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     this.app.notification({ method, params } as any);
-  }
-
-  /**
-   * Check if connected to a Creature host via userAgent.
-   */
-  private isCreatureHost(): boolean {
-    if (!this.hostContext?.userAgent) return false;
-    return this.hostContext.userAgent.toLowerCase().startsWith("creature");
   }
 
   /**
@@ -400,14 +371,6 @@ export class McpAppsHostClient extends Subscribable implements UnifiedHostClient
         source: params.source as "agent" | "ui",
         toolName: params.toolName as string | undefined,
       };
-
-      // Extract instanceId from structuredContent if present
-      if (params.structuredContent && typeof params.structuredContent === "object") {
-        const sc = params.structuredContent as Record<string, unknown>;
-        if (typeof sc.instanceId === "string") {
-          this.instanceId = sc.instanceId;
-        }
-      }
 
       // Store initial tool result and set isReady for tool-triggered views
       if (this.initialToolResult === null && params.source === "agent") {

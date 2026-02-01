@@ -8,9 +8,12 @@
  * All experimental APIs are subject to change and should be used with
  * appropriate fallbacks.
  *
- * Import directly with the experimental_ prefix:
+ * Recommended usage via `exp` namespace:
  * ```typescript
- * import { experimental_getWritableDirectory } from "open-mcp-app/server";
+ * import { exp } from "open-mcp-app/server";
+ *
+ * const dir = exp.getWritableDirectory();
+ * await exp.kvSet("key", "value");
  * ```
  */
 
@@ -972,3 +975,88 @@ export function experimental_blobListSync(prefix?: string): string[] | null {
   console.warn("[Blob] experimental_blobListSync is deprecated. Use experimental_blobList for cross-platform support.");
   return null;
 }
+
+// ============================================================================
+// Unified `exp` Namespace
+// ============================================================================
+
+/**
+ * Experimental APIs namespace.
+ *
+ * Provides a consistent interface matching the core SDK pattern (`host.exp.*`).
+ * All methods are subject to change.
+ *
+ * @example
+ * ```typescript
+ * import { exp } from "open-mcp-app/server";
+ *
+ * // Environment
+ * if (exp.isCreatureHost()) {
+ *   const dir = exp.getWritableDirectory();
+ * }
+ *
+ * // KV Store
+ * await exp.kvSet("user:prefs", JSON.stringify(prefs));
+ * const value = await exp.kvGet("user:prefs");
+ *
+ * // File I/O
+ * await exp.writeFile("config.json", JSON.stringify(config));
+ * const data = await exp.readFile("config.json");
+ * ```
+ */
+export const exp = {
+  // Directory & environment
+  getWritableDirectory: experimental_getWritableDirectory,
+  getProjectId: experimental_getProjectId,
+  getServerName: experimental_getServerName,
+  isCreatureHost: experimental_isCreatureHost,
+
+  // File I/O (async)
+  readFile: experimental_readFile,
+  writeFile: experimental_writeFile,
+  deleteFile: experimental_deleteFile,
+  exists: experimental_exists,
+  mkdir: experimental_mkdir,
+  readdir: experimental_readdir,
+  rmdir: experimental_rmdir,
+
+  // File I/O (sync)
+  readFileSync: experimental_readFileSync,
+  writeFileSync: experimental_writeFileSync,
+  deleteFileSync: experimental_deleteFileSync,
+  existsSync: experimental_existsSync,
+  mkdirSync: experimental_mkdirSync,
+  readdirSync: experimental_readdirSync,
+  rmdirSync: experimental_rmdirSync,
+
+  // KV Store
+  kvIsAvailable: experimental_kvIsAvailable,
+  kvGet: experimental_kvGet,
+  kvSet: experimental_kvSet,
+  kvDelete: experimental_kvDelete,
+  kvList: experimental_kvList,
+  kvSearch: experimental_kvSearch,
+  /** @deprecated Use kvGet instead */
+  kvGetSync: experimental_kvGetSync,
+  /** @deprecated Use kvSet instead */
+  kvSetSync: experimental_kvSetSync,
+  /** @deprecated Use kvDelete instead */
+  kvDeleteSync: experimental_kvDeleteSync,
+  /** @deprecated Use kvList instead */
+  kvListSync: experimental_kvListSync,
+
+  // Blob Store
+  blobIsAvailable: experimental_blobIsAvailable,
+  blobPut: experimental_blobPut,
+  blobGet: experimental_blobGet,
+  blobDelete: experimental_blobDelete,
+  blobList: experimental_blobList,
+  /** @deprecated Use blobPut instead */
+  blobPutSync: experimental_blobPutSync,
+  /** @deprecated Use blobGet instead */
+  blobGetSync: experimental_blobGetSync,
+  /** @deprecated Use blobDelete instead */
+  blobDeleteSync: experimental_blobDeleteSync,
+  /** @deprecated Use blobList instead */
+  blobListSync: experimental_blobListSync,
+};

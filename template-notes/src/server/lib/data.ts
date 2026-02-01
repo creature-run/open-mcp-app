@@ -8,13 +8,7 @@
  * Data is scoped by localId for isolation.
  */
 
-import {
-  experimental_kvIsAvailable,
-  experimental_kvGet,
-  experimental_kvSet,
-  experimental_kvDelete,
-  experimental_kvList,
-} from "open-mcp-app/server";
+import { exp } from "open-mcp-app/server";
 
 // =============================================================================
 // DataStore Interface
@@ -66,7 +60,7 @@ class KvStore<T> implements DataStore<T> {
   }
 
   async get(id: string): Promise<T | null> {
-    const value = await experimental_kvGet(this.scopedKey(id));
+    const value = await exp.kvGet(this.scopedKey(id));
     if (!value) return null;
     try {
       return JSON.parse(value) as T;
@@ -76,21 +70,21 @@ class KvStore<T> implements DataStore<T> {
   }
 
   async set(id: string, value: T): Promise<void> {
-    await experimental_kvSet(this.scopedKey(id), JSON.stringify(value));
+    await exp.kvSet(this.scopedKey(id), JSON.stringify(value));
   }
 
   async delete(id: string): Promise<boolean> {
-    return experimental_kvDelete(this.scopedKey(id));
+    return exp.kvDelete(this.scopedKey(id));
   }
 
   async list(): Promise<T[]> {
     const prefix = this.scopePrefix();
-    const keys = await experimental_kvList(prefix);
+    const keys = await exp.kvList(prefix);
     if (!keys) return [];
 
     const results: T[] = [];
     for (const key of keys) {
-      const value = await experimental_kvGet(key);
+      const value = await exp.kvGet(key);
       if (value) {
         try {
           results.push(JSON.parse(value) as T);
@@ -195,7 +189,7 @@ export const createDataStore = <T>({
   localId: string;
 }): DataStore<T> => {
   // Check if KV storage is available (Creature host)
-  if (experimental_kvIsAvailable()) {
+  if (exp.kvIsAvailable()) {
     if (!storageLoggedOnce) {
       console.log("[Data] Using persistent KV storage");
       storageLoggedOnce = true;

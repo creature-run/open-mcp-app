@@ -1,0 +1,11 @@
+{
+  "$version": 1,
+  "name": "Notes",
+  "profile": "dev-mcp",
+  "context": {
+    "custom_instructions": "# MCP App Development Project\n\nThis project is for building an MCP App—an MCP server with a rich UI widget that displays in Creature.\n\n## What are MCP Apps?\n\nMCP Apps combine:\n- An **MCP Server** that provides tools the AI can call\n- A **UI Resource** (HTML) that renders tool results visually\n- **Communication** between the UI and the server via the host (Creature)\n\nWhen you call a tool linked to a UI resource, Creature displays that UI in a pip. The UI receives the tool's input and output, and can itself call tools to update its display.\n\n## Connecting to Creature as an MCP App Host\n\nCreature implements the MCP Apps specification (SEP-1865) and acts as the Host for the MCP App.\n\nIf the Project type is \"dev-mcp\", Creature will automatically (attempt) to connect to the MCP App when the project is opened.\n\nFurther, it will enable hot module reloading (HMR) for the MCP App.\n\nCRITICAL: NEVER rebuild the MCP App server during development. This will break the HMR connection and require the user to reconnect your MCP App.\n\n## Dev Console\n\nCreature includes a **Dev Console** (View → Dev Console) where you can:\n- View MCP server logs (use `console.error()` in server code—stdout is reserved for MCP protocol)\n- See the current system prompt and agent context\n- Monitor tool calls and results\n- Debug communication between the UI and server\n\nUse the Dev Console to troubleshoot issues with your MCP App during development."
+  },
+  "mcps": [],
+  "created_at": "2026-01-31T23:59:23.880Z",
+  "updated_at": "2026-01-31T23:59:23.880Z"
+}
