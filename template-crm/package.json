@@ -12,7 +12,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "open-mcp-app": "file:/Users/m/projects/n/creature/desktop/artifacts/sdk",
+    "open-mcp-app": "file:../sdk",
     "@phosphor-icons/react": "^2.1.10",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
