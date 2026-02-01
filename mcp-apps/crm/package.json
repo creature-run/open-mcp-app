@@ -1,5 +1,5 @@
 {
-  "name": "mcp-app-template-crm",
+  "name": "crm",
   "version": "0.0.1",
   "description": "An MCP App demonstrating data tables, sorting, filtering, and relational data with a CRM/orders explorer.",
   "type": "module",

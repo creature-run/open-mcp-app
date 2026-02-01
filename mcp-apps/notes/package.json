@@ -1,5 +1,5 @@
 {
-  "name": "mcp-app-template-notes",
+  "name": "notes",
   "version": "0.0.1",
   "description": "An MCP App for adding notes to your Creature projects, with a full-featured Markdown editor.",
   "type": "module",

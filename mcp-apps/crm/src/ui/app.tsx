@@ -518,7 +518,7 @@ function Toolbar({
 
 export default function App() {
   return (
-    <HostProvider name="mcp-template-crm" version="0.1.0">
+    <HostProvider name="crm" version="0.1.0">
       <CrmApp />
     </HostProvider>
   );

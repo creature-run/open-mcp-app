@@ -8,7 +8,7 @@
 // Constants
 // =============================================================================
 
-export const MCP_NAME = "mcp-template-todos";
+export const MCP_NAME = "todos";
 export const TODOS_UI_URI = `ui://${MCP_NAME}/todos`;
 
 // =============================================================================

@@ -52,7 +52,7 @@ import "./styles.css";
  */
 export default function App() {
   return (
-    <HostProvider name="mcp-template-notes" version="0.1.0">
+    <HostProvider name="notes" version="0.1.0">
       <NotesProvider>
         <NotesApp />
       </NotesProvider>

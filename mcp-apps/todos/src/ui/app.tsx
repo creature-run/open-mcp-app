@@ -352,7 +352,7 @@ function getEnvironmentLabel(env: Environment): string {
  */
 export default function App() {
   return (
-    <HostProvider name="mcp-template-todos" version="0.1.0">
+    <HostProvider name="todos" version="0.1.0">
       <TodoApp />
     </HostProvider>
   );
