@@ -8,7 +8,7 @@
 // Constants
 // =============================================================================
 
-export const MCP_NAME = "mcp-template-crm";
+export const MCP_NAME = "crm";
 export const CRM_UI_URI = `ui://${MCP_NAME}/crm`;
 
 // =============================================================================

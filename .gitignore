@@ -1,4 +1,8 @@
+# Creature
+.creature/
+
 # Dependencies
+package-lock.json
 node_modules/
 template-notes/package-lock.json
 template-todos/package-lock.json

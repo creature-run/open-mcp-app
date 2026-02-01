@@ -8,7 +8,7 @@
 // Constants
 // =============================================================================
 
-export const MCP_NAME = "mcp-template-notes";
+export const MCP_NAME = "notes";
 
 /**
  * URI for the notes UI resource.
