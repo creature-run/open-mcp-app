@@ -960,7 +960,6 @@ export class App {
         },
         async (args: Record<string, unknown>) => {
           try {
-            console.log(`[DEBUG SDK] Tool ${name} received args._instanceId:`, args._instanceId, `type:`, typeof args._instanceId);
             const input = config.input ? config.input.parse(args) : args;
 
             // Determine instanceId for tools with UI
@@ -969,7 +968,6 @@ export class App {
             let instanceId: string | undefined;
             if (hasUi && config.ui) {
               instanceId = this.resolveInstanceId(args._instanceId);
-              console.log(`[DEBUG SDK] Resolved instanceId: input=${args._instanceId} → output=${instanceId}`);
             }
 
             // Get resource config for WebSocket setup

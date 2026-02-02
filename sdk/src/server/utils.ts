@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
-import { generateHmrClientScriptTag, HMR_PORT_OFFSET, type HmrConfig } from "../vite/index.js";
+// Import directly from hmr-client to avoid pulling in heavy Node.js deps from vite/index
+import { generateHmrClientScriptTag, HMR_PORT_OFFSET, type HmrConfig } from "../vite/hmr-client.js";
 
 export { HMR_PORT_OFFSET };
 

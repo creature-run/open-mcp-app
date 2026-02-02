@@ -25,16 +25,10 @@ export interface CreaturePluginOptions {
   generateBundle?: boolean;
 }
 
-export interface HmrConfig {
-  port: number;
-}
-
-/**
- * Offset added to MCP_PORT to derive the HMR port.
- * When MCP_PORT is set (by Creature), both Vite and the SDK server
- * can independently calculate the same HMR port without coordination.
- */
-export const HMR_PORT_OFFSET = 1000;
+// Re-export HMR constants/types from hmr-client (lightweight module)
+// This maintains backward compatibility for imports from vite/index
+export { HMR_PORT_OFFSET, type HmrConfig } from "./hmr-client.js";
+import { HMR_PORT_OFFSET } from "./hmr-client.js";
 
 function findAvailablePort(startPort: number): Promise<number> {
   return new Promise((resolve) => {
@@ -393,6 +387,6 @@ ${exports.join("\n\n")}
   };
 }
 
-export { generateHmrClientScript, generateHmrClientScriptTag } from "./hmr-client.js";
+export { generateHmrClientScript, generateHmrClientScriptTag, HMR_RELOAD_NOTIFICATION } from "./hmr-client.js";
 
 export default creature;
