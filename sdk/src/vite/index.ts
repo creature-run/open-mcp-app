@@ -28,7 +28,7 @@ export interface CreaturePluginOptions {
 // Re-export HMR constants/types from hmr-client (lightweight module)
 // This maintains backward compatibility for imports from vite/index
 export { HMR_PORT_OFFSET, type HmrConfig } from "./hmr-client.js";
-import { HMR_PORT_OFFSET } from "./hmr-client.js";
+import { HMR_PORT_OFFSET, type HmrConfig } from "./hmr-client.js";
 
 function findAvailablePort(startPort: number): Promise<number> {
   return new Promise((resolve) => {
