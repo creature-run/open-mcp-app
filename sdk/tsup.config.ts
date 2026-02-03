@@ -1,8 +1,10 @@
 import { defineConfig } from "tsup";
+import { copyFileSync, mkdirSync } from "fs";
+import { dirname, join } from "path";
 
 /**
  * Build configuration for open-mcp-app.
- * 
+ *
  * Single config to avoid parallel build race conditions.
  * Each subpath has specific bundling requirements handled via esbuild plugins.
  */
@@ -31,5 +33,19 @@ export default defineConfig({
         "ws",
       ];
     }
+  },
+  async onSuccess() {
+    // Copy CSS files to dist
+    const cssFiles = [
+      { src: "src/styles/base.css", dest: "dist/styles/base.css" },
+    ];
+
+    for (const { src, dest } of cssFiles) {
+      const destDir = dirname(dest);
+      mkdirSync(destDir, { recursive: true });
+      copyFileSync(src, dest);
+    }
+
+    console.log("CSS files copied to dist/styles/");
   },
 });

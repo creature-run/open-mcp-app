@@ -26,13 +26,20 @@ export const generateTodoId = () =>
 // =============================================================================
 
 /**
- * Get all todos from a store, sorted by creation date (newest first).
+ * Get all todos from a store, sorted by:
+ * 1. Completion status (incomplete first)
+ * 2. Creation date within each group (newest first)
  */
 export const getAllTodos = async (store: DataStore<Todo>): Promise<Todo[]> => {
   const all = await store.list();
-  return all.sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
+  return all.sort((a, b) => {
+    // First: sort by completion status (incomplete first)
+    if (a.completed !== b.completed) {
+      return a.completed ? 1 : -1;
+    }
+    // Then: sort by creation date (newest first)
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
 };
 
 /**

@@ -1,6 +1,6 @@
 {
   "name": "open-mcp-app",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "SDK for building MCP Apps that work on any MCP App host",
   "type": "module",
   "exports": {
@@ -27,10 +27,12 @@
       "import": "./dist/vite/index.js",
       "require": "./dist/vite/index.js",
       "default": "./dist/vite/index.js"
-    }
+    },
+    "./styles/base.css": "./dist/styles/base.css"
   },
   "files": [
     "dist",
+    "dist/styles",
     "README.md"
   ],
   "scripts": {

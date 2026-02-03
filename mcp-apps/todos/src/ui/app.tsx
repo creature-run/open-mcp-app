@@ -1,132 +1,94 @@
 /**
  * MCP Todos UI
  *
- * A clean, interactive todo list demonstrating cross-platform MCP Apps.
+ * A clean, interactive todo list with detail view for editing notes.
  *
  * Cross-Platform Compatibility:
  * - Works in Creature (MCP Apps host)
  * - Works in ChatGPT Apps
  * - Works in any generic MCP Apps host
  *
+ * Views:
+ * - List view: Shows all todos with add, toggle, and delete
+ * - Detail view: WYSIWYG markdown editor for todo notes
+ *
  * Features:
  * - Add, toggle, and delete todos
+ * - Click a todo to edit its notes (markdown supported)
  * - Full-text search with SQLite FTS5 (in Creature)
  * - Persists via tool calls to the server
- * - Widget state for restoration on refresh/popout
- *
- * Tools (separate tools for each action):
- * - todos_list: List all todos
- * - todos_add: Add a new todo
- * - todos_toggle: Toggle completion status
- * - todos_remove: Delete a todo
- * - todos_search: Full-text search across todos
  *
  * SDK hooks used:
  * - HostProvider: Provides host client to child components via context
  * - useHost: Access callTool, isReady, log, etc. from context
- * - exp_widgetState: Persist UI state across sessions
- * - initDefaultStyles: Inject environment-specific CSS variable defaults
- *
- * The SDK automatically detects the host environment and provides a unified
- * API that works across all platforms. Environment-specific features like
- * logging to DevConsole (Creature) gracefully degrade on other hosts.
  */
-
-// MUST be first - injects environment-specific CSS variable defaults before CSS loads
-import { detectEnvironment, initDefaultStyles } from "open-mcp-app/core";
-const environment = detectEnvironment();
-initDefaultStyles({ environment });
 
 import { useEffect, useCallback, useState, useRef, type FormEvent } from "react";
 import { HostProvider, useHost, type Environment } from "open-mcp-app/react";
+import { DetailView } from "./DetailView";
+import type { Todo, TodoData, SearchResultData, TodoWidgetState, View } from "./types";
+// Base styles provide SDK layout variables (spacing, containers, controls)
+// Host-provided spec variables (colors, typography) are applied during initialization
+import "open-mcp-app/styles/base.css";
 import "./styles.css";
 
 // =============================================================================
-// Types
-// =============================================================================
-
-interface Todo {
-  id: string;
-  text: string;
-  completed: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
-/**
- * Tool result data structure.
- * Tools return this shape with the current todos list.
- * All batch operations include the full todos array for UI sync.
- */
-interface TodoData {
-  todos: Todo[];
-  success?: boolean;
-  error?: string;
-  added?: Todo[];
-  toggled?: Todo[];
-  deleted?: { id: string; text: string }[];
-  notFound?: string[];
-}
-
-/**
- * Search result data structure.
- * Returned by todos_search with matches and snippets.
- */
-interface SearchResultData {
-  query: string;
-  matches: Array<{
-    id: string;
-    text: string;
-    completed: boolean;
-    snippet?: string;
-    score?: number;
-  }>;
-  todos?: Todo[];
-}
-
-/**
- * Widget state structure following MCP Apps spec.
- * - modelContent: Concise summary for the agent (not the full list)
- * - privateContent: UI-only data for restoration (not sent to AI)
- */
-interface TodoWidgetState {
-  modelContent: {
-    countTotal: number;
-    countIncomplete: number;
-  };
-  privateContent: {
-    todos: Todo[];
-    lastViewedAt: string | null;
-  };
-}
-
-// =============================================================================
-// Components
+// List View Components
 // =============================================================================
 
 /**
  * Single todo item component with checkbox and delete button.
+ * Clicking the item (not checkbox) opens detail view.
  */
 function TodoItem({
   todo,
   onToggle,
   onDelete,
+  onOpen,
 }: {
   todo: Todo;
-  onToggle: ({ id }: { id: string }) => void;
-  onDelete: ({ id }: { id: string }) => void;
+  onToggle: (id: string) => void;
+  onDelete: (id: string) => void;
+  onOpen: (id: string) => void;
 }) {
+  const handleClick = useCallback(
+    (e: React.MouseEvent) => {
+      // Don't open if clicking checkbox or delete button
+      const target = e.target as HTMLElement;
+      if (target.closest(".todo-checkbox") || target.closest(".todo-delete")) {
+        return;
+      }
+      onOpen(todo.id);
+    },
+    [todo.id, onOpen]
+  );
+
   return (
-    <div className={`todo-item ${todo.completed ? "completed" : ""}`}>
-      <div className="todo-checkbox" onClick={() => onToggle({ id: todo.id })}>
+    <div
+      className={`todo-item ${todo.completed ? "completed" : ""}`}
+      onClick={handleClick}
+    >
+      <div
+        className="todo-checkbox"
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggle(todo.id);
+        }}
+      >
         <svg viewBox="0 0 24 24">
           <polyline points="20 6 9 17 4 12" />
         </svg>
       </div>
-      <span className="todo-text">{todo.text}</span>
+      <div className="todo-content">
+        <span className="todo-text">{todo.text}</span>
+        {todo.notes && <span className="todo-has-notes">Has notes</span>}
+      </div>
       <button
         className="todo-delete"
-        onClick={() => onDelete({ id: todo.id })}
+        onClick={(e) => {
+          e.stopPropagation();
+          onDelete(todo.id);
+        }}
         title="Delete"
         type="button"
       >
@@ -153,10 +115,12 @@ function TodoList({
   todos,
   onToggle,
   onDelete,
+  onOpen,
 }: {
   todos: Todo[];
-  onToggle: ({ id }: { id: string }) => void;
-  onDelete: ({ id }: { id: string }) => void;
+  onToggle: (id: string) => void;
+  onDelete: (id: string) => void;
+  onOpen: (id: string) => void;
 }) {
   if (todos.length === 0) {
     return (
@@ -184,6 +148,7 @@ function TodoList({
           todo={todo}
           onToggle={onToggle}
           onDelete={onDelete}
+          onOpen={onOpen}
         />
       ))}
     </div>
@@ -193,7 +158,7 @@ function TodoList({
 /**
  * Form component for adding new todos.
  */
-function AddTodoForm({ onAdd }: { onAdd: ({ text }: { text: string }) => Promise<void> }) {
+function AddTodoForm({ onAdd }: { onAdd: (text: string) => Promise<void> }) {
   const [text, setText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -204,7 +169,7 @@ function AddTodoForm({ onAdd }: { onAdd: ({ text }: { text: string }) => Promise
 
       setIsSubmitting(true);
       try {
-        await onAdd({ text: text.trim() });
+        await onAdd(text.trim());
         setText("");
       } finally {
         setIsSubmitting(false);
@@ -222,6 +187,7 @@ function AddTodoForm({ onAdd }: { onAdd: ({ text }: { text: string }) => Promise
         placeholder="Add a new todo..."
         autoComplete="off"
         disabled={isSubmitting}
+        maxLength={250}
       />
       <button type="submit" disabled={isSubmitting || !text.trim()}>
         Add
@@ -249,7 +215,6 @@ function SearchBar({
     (value: string) => {
       setQuery(value);
 
-      // Clear any pending debounce
       if (debounceRef.current) {
         clearTimeout(debounceRef.current);
       }
@@ -259,7 +224,6 @@ function SearchBar({
         return;
       }
 
-      // Debounce search by 300ms
       debounceRef.current = setTimeout(() => {
         onSearch(value.trim());
       }, 300);
@@ -273,8 +237,8 @@ function SearchBar({
   }, [onClear]);
 
   return (
-    <div className="search-bar">
-      <div className="search-input-wrapper">
+    <div className="search-container">
+      <div className="search-field">
         <svg
           className="search-icon"
           width="12"
@@ -289,6 +253,7 @@ function SearchBar({
         </svg>
         <input
           type="text"
+          className="search-input"
           value={query}
           onChange={(e) => handleChange(e.target.value)}
           placeholder="Search todos..."
@@ -302,8 +267,8 @@ function SearchBar({
             title="Clear search"
           >
             <svg
-              width="14"
-              height="14"
+              width="12"
+              height="12"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -324,9 +289,6 @@ function SearchBar({
 // Main Component
 // =============================================================================
 
-/**
- * Get a human-readable label for the environment.
- */
 function getEnvironmentLabel(env: Environment): string {
   switch (env) {
     case "chatgpt":
@@ -338,18 +300,6 @@ function getEnvironmentLabel(env: Environment): string {
   }
 }
 
-/**
- * Main todo list app entry point.
- *
- * Uses the MCP Apps SDK with HostProvider pattern:
- * - HostProvider: Wraps the app to provide host client via context
- * - useHost: Access callTool, isReady, log, exp_widgetState from context
- *
- * The component works identically across all supported hosts:
- * - Creature (MCP Apps): Full feature support including DevConsole logging
- * - ChatGPT Apps: Core features work, logging falls back to console
- * - Standalone: For development/testing outside a host
- */
 export default function App() {
   return (
     <HostProvider name="todos" version="0.1.0">
@@ -359,32 +309,34 @@ export default function App() {
 }
 
 /**
- * Inner todo app component that uses useHost() with HostProvider.
+ * Inner todo app component that handles both list and detail views.
  */
 function TodoApp() {
   const [todos, setTodos] = useState<Todo[]>([]);
-  const hasInitialized = useRef(false);
-  const hasRestoredState = useRef(false);
+  const [view, setView] = useState<View>("list");
+  const [selectedTodo, setSelectedTodo] = useState<Todo | null>(null);
   const [searchResults, setSearchResults] = useState<SearchResultData | null>(null);
   const [isSearchMode, setIsSearchMode] = useState(false);
-  const hasLoggedReady = useRef(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const hasInitialized = useRef(false);
+  const hasRestoredState = useRef(false);
 
-  // Get host from context (HostProvider)
   const { callTool, isReady, log, exp, exp_widgetState, onToolResult, environment: hostEnvironment } = useHost();
 
-  // Get widget state tuple for reading and updating
   const [widgetState, setWidgetState] = exp_widgetState<TodoWidgetState>();
 
-  // Separate tool callers for each action
+  // Tool callers
   const [listTodos, listState] = callTool<TodoData>("todos_list");
   const [addTodo, addState] = callTool<TodoData>("todos_add");
   const [toggleTodo, toggleState] = callTool<TodoData>("todos_toggle");
   const [removeTodo, removeState] = callTool<TodoData>("todos_remove");
   const [searchTodos, searchState] = callTool<SearchResultData>("todos_search");
+  const [updateTodo, updateState] = callTool<TodoData>("todos_update");
+  const [getTodo] = callTool<TodoData>("todos_get");
 
   /**
-   * Restore todos from widget state on mount (before initialization completes).
-   * Shows previous state immediately while fresh data loads.
+   * Restore todos from widget state on mount.
    */
   useEffect(() => {
     if (hasRestoredState.current || !widgetState?.privateContent?.todos) {
@@ -399,7 +351,7 @@ function TodoApp() {
   }, [widgetState, log]);
 
   /**
-   * Helper to update todos from any tool result data.
+   * Update todos from tool result data.
    */
   const updateTodosFromData = useCallback(
     (data: TodoData | null) => {
@@ -407,9 +359,6 @@ function TodoApp() {
         setTodos(data.todos);
         log.debug("Todos updated", { count: data.todos.length });
 
-        // Persist to widget state
-        // modelContent: concise summary for the agent
-        // privateContent: full todos list for UI restoration
         const incompleteCount = data.todos.filter((t: Todo) => !t.completed).length;
         setWidgetState({
           modelContent: {
@@ -422,21 +371,42 @@ function TodoApp() {
           },
         });
       }
+
+      // Handle detail view data
+      if (data?.todo && data?.view === "detail") {
+        setSelectedTodo(data.todo);
+        setView("detail");
+      }
     },
     [log, setWidgetState]
   );
 
-  // Update todos when UI-initiated tool calls return data
+  // Update todos when tool calls return
   useEffect(() => updateTodosFromData(listState.data), [listState.data, updateTodosFromData]);
   useEffect(() => updateTodosFromData(addState.data), [addState.data, updateTodosFromData]);
   useEffect(() => updateTodosFromData(toggleState.data), [toggleState.data, updateTodosFromData]);
   useEffect(() => updateTodosFromData(removeState.data), [removeState.data, updateTodosFromData]);
 
-  // Update search results when search returns
+  // Handle update result - also update selected todo if in detail view
+  useEffect(() => {
+    if (updateState.data) {
+      updateTodosFromData(updateState.data);
+      if (updateState.data.updated && selectedTodo?.id === updateState.data.updated.id) {
+        // Find full todo from list
+        const updatedTodo = updateState.data.todos?.find(t => t.id === selectedTodo.id);
+        if (updatedTodo) {
+          setSelectedTodo(updatedTodo);
+        }
+      }
+      setIsSaving(false);
+      setLastSaved(new Date());
+    }
+  }, [updateState.data, updateTodosFromData, selectedTodo?.id]);
+
+  // Update search results
   useEffect(() => {
     if (searchState.data) {
       setSearchResults(searchState.data);
-      // Also update the main todos list if included
       if (searchState.data.todos) {
         setTodos(searchState.data.todos);
       }
@@ -445,8 +415,6 @@ function TodoApp() {
 
   /**
    * Subscribe to agent-initiated tool calls.
-   * When the agent calls a tool (not the UI), we receive a tool-result notification.
-   * Filter by source === "agent" to avoid duplicate updates from UI calls.
    */
   useEffect(() => {
     return onToolResult((result) => {
@@ -458,10 +426,6 @@ function TodoApp() {
 
   /**
    * Initialize app when host is ready.
-   *
-   * Uses getInitialToolResult() to determine how the view was opened:
-   * - If it returns data: Agent opened this view with a tool call - use that data
-   * - If it returns null: User opened this view directly - fetch the list
    */
   useEffect(() => {
     if (!isReady || hasInitialized.current) return;
@@ -471,24 +435,23 @@ function TodoApp() {
 
     const initialResult = exp.getInitialToolResult();
     if (initialResult) {
-      // View was opened by agent tool call - use the result data
       log.debug("Initialized from agent tool result");
-      updateTodosFromData(initialResult.structuredContent as unknown as TodoData);
+      const data = initialResult.structuredContent as unknown as TodoData;
+      updateTodosFromData(data);
     } else {
-      // View was opened by user - fetch initial list
       log.debug("Initialized by user - fetching list");
       listTodos();
     }
   }, [isReady, exp, log, hostEnvironment, updateTodosFromData, listTodos]);
 
   /**
-   * Add a new todo item.
+   * Add a new todo.
    */
   const handleAdd = useCallback(
-    async ({ text }: { text: string }) => {
+    async (text: string) => {
       log.info("Adding todo", { text });
       try {
-        await addTodo({ items: [text] });
+        await addTodo({ items: [{ text }] });
       } catch (err) {
         log.error("Failed to add todo", { error: String(err) });
       }
@@ -500,7 +463,7 @@ function TodoApp() {
    * Toggle a todo's completed status.
    */
   const handleToggle = useCallback(
-    async ({ id }: { id: string }) => {
+    async (id: string) => {
       try {
         await toggleTodo({ ids: [id] });
       } catch (err) {
@@ -511,10 +474,10 @@ function TodoApp() {
   );
 
   /**
-   * Delete a todo item.
+   * Delete a todo.
    */
   const handleDelete = useCallback(
-    async ({ id }: { id: string }) => {
+    async (id: string) => {
       log.info("Deleting todo", { id });
       try {
         await removeTodo({ ids: [id] });
@@ -526,7 +489,59 @@ function TodoApp() {
   );
 
   /**
-   * Search todos using full-text search.
+   * Open a todo in detail view.
+   */
+  const handleOpen = useCallback(
+    async (id: string) => {
+      log.info("Opening todo", { id });
+      // First try to find in local state for instant feedback
+      const localTodo = todos.find(t => t.id === id);
+      if (localTodo) {
+        setSelectedTodo(localTodo);
+        setView("detail");
+      }
+      // Then fetch full data (with notes)
+      try {
+        const result = await getTodo({ id });
+        if (result?.todo) {
+          setSelectedTodo(result.todo);
+        }
+      } catch (err) {
+        log.error("Failed to get todo", { id, error: String(err) });
+      }
+    },
+    [todos, getTodo, log]
+  );
+
+  /**
+   * Save todo changes from detail view.
+   */
+  const handleSave = useCallback(
+    async (id: string, text: string, notes: string) => {
+      setIsSaving(true);
+      try {
+        await updateTodo({ id, text, notes: notes || "" });
+      } catch (err) {
+        log.error("Failed to save todo", { id, error: String(err) });
+        setIsSaving(false);
+      }
+    },
+    [updateTodo, log]
+  );
+
+  /**
+   * Go back to list view.
+   */
+  const handleBack = useCallback(() => {
+    setView("list");
+    setSelectedTodo(null);
+    setLastSaved(null);
+    // Refresh list
+    listTodos();
+  }, [listTodos]);
+
+  /**
+   * Search todos.
    */
   const handleSearch = useCallback(
     async (query: string) => {
@@ -542,16 +557,38 @@ function TodoApp() {
   );
 
   /**
-   * Clear search and show all todos.
+   * Clear search.
    */
   const handleClearSearch = useCallback(() => {
     setIsSearchMode(false);
     setSearchResults(null);
   }, []);
 
-  const completedCount = todos.filter((t) => t.completed).length;
+  // Show loading until ready
+  if (!isReady) {
+    return (
+      <div className="loading-container">
+        <div className="loading-spinner" />
+      </div>
+    );
+  }
 
-  // Determine which todos to display (search results or all)
+  // Detail view
+  if (view === "detail" && selectedTodo) {
+    return (
+      <DetailView
+        todo={selectedTodo}
+        onSave={handleSave}
+        onToggle={handleToggle}
+        onBack={handleBack}
+        isSaving={isSaving}
+        lastSaved={lastSaved}
+      />
+    );
+  }
+
+  // List view
+  const completedCount = todos.filter((t) => t.completed).length;
   const displayTodos = isSearchMode && searchResults
     ? searchResults.matches.map((m) => ({
         id: m.id,
@@ -603,10 +640,10 @@ function TodoApp() {
           todos={displayTodos}
           onToggle={handleToggle}
           onDelete={handleDelete}
+          onOpen={handleOpen}
         />
       )}
 
-      {/* Environment indicator - useful for development/debugging */}
       {hostEnvironment === "standalone" && (
         <div className="environment-badge" title="Running outside a host environment">
           {getEnvironmentLabel(hostEnvironment)}

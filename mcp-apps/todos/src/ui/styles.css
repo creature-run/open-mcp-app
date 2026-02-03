@@ -1,39 +1,13 @@
 /**
  * MCP Todos Styles
  *
- * Uses ONLY MCP Apps spec CSS variables provided by the host.
- * No fallback values - the host provides all variables.
+ * Uses MCP Apps spec CSS variables (colors, typography, borders, shadows)
+ * provided by the host, plus SDK layout variables (spacing, controls)
+ * from base.css.
  *
- * @see https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/draft/apps.mdx#theming
+ * Spec variables: --color-*, --font-*, --border-*, --shadow-*
+ * SDK variables: --spacing-*, --control-*, --container-*, --transition-*
  */
-
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-input,
-button,
-textarea,
-select {
-  font-family: inherit;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  appearance: none;
-}
-
-/**
- * Form controls styling using MCP Apps spec variables.
- * Uses spec-compliant variables for cross-host compatibility.
- */
-select {
-  background: var(--color-background-secondary);
-  color: var(--color-text-primary);
-  border: var(--border-width-regular) solid var(--color-border-primary);
-  border-radius: var(--border-radius-sm);
-  padding: 4px 8px;
-}
 
 html,
 body,
@@ -41,11 +15,6 @@ body,
   height: 100%;
   width: 100%;
   overflow: hidden;
-  background: var(--color-background-primary);
-  color: var(--color-text-primary);
-  font-family: var(--font-sans);
-  font-size: var(--font-text-md-size);
-  line-height: var(--font-text-md-line-height);
 }
 
 /* =============================================================================
@@ -56,8 +25,8 @@ body,
   display: flex;
   flex-direction: column;
   height: 100%;
-  padding: 16px;
-  gap: 16px;
+  padding: var(--spacing-3) var(--spacing-4);
+  gap: var(--spacing-3);
 }
 
 /* =============================================================================
@@ -66,14 +35,16 @@ body,
 
 .header {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
+  flex-shrink: 0;
 }
 
 .header h1 {
-  font-size: var(--font-heading-sm-size);
-  line-height: var(--font-heading-sm-line-height);
+  font-size: var(--font-text-lg-size);
+  line-height: var(--font-text-lg-line-height);
   font-weight: var(--font-weight-medium);
+  margin: 0;
 }
 
 .count {
@@ -87,13 +58,13 @@ body,
 
 .add-form {
   display: flex;
-  gap: 8px;
+  gap: var(--spacing-2);
   align-items: stretch;
 }
 
 .add-form input {
   flex: 1;
-  padding: 8px 12px;
+  padding: var(--spacing-2) var(--spacing-3);
   background: var(--color-background-secondary);
   border: var(--border-width-regular) solid var(--color-border-primary);
   border-radius: var(--border-radius-md);
@@ -112,7 +83,7 @@ body,
 }
 
 .add-form button {
-  padding: 0 16px;
+  padding: 0 var(--spacing-4);
   background: var(--color-background-inverse);
   border: var(--border-width-regular) solid transparent;
   border-radius: var(--border-radius-md);
@@ -121,7 +92,7 @@ body,
   font-size: var(--font-text-md-size);
   font-weight: var(--font-weight-medium);
   cursor: pointer;
-  transition: opacity 0.15s;
+  transition: opacity var(--transition-normal);
 }
 
 .add-form button:hover {
@@ -134,67 +105,69 @@ body,
 }
 
 /* =============================================================================
-   Search Bar
+  Search Bar
 ============================================================================= */
 
-.search-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.search-container {
+  padding: 0;
+  border-bottom: var(--border-width-regular) solid var(--color-border-secondary);
+  flex-shrink: 0;
 }
 
-.search-input-wrapper {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  background: transparent;
-  border: var(--border-width-regular) solid var(--color-border-primary);
-  border-radius: var(--border-radius-md);
-  padding: 0 12px;
-  transition: border-color 0.15s;
-}
-
-.search-input-wrapper:focus-within {
-  border-color: var(--color-ring-primary);
+.search-field {
+  position: relative;
+  width: 100%;
 }
 
 .search-icon {
-  color: var(--color-text-secondary);
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  position: absolute;
+  left: var(--spacing-3);
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-text-tertiary);
+  width: 12px;
+  height: 12px;
+  pointer-events: none;
 }
 
-.search-input-wrapper input {
-  flex: 1;
-  padding: 8px;
-  background: transparent;
-  border: none;
+.search-input {
+  width: 100%;
+  padding: var(--spacing-2) var(--spacing-3);
+  padding-left: calc(var(--spacing-3) + var(--spacing-2) + var(--spacing-2) + 12px);
+  padding-right: calc(var(--spacing-3) + var(--spacing-2) + 12px);
+  background: var(--color-background-secondary);
+  border: var(--border-width-regular) solid var(--color-border-secondary);
+  border-radius: var(--border-radius-md);
+  font-size: var(--font-text-sm-size);
   color: var(--color-text-primary);
-  font-family: inherit;
-  font-size: var(--font-text-md-size);
   outline: none;
 }
 
-.search-input-wrapper input::placeholder {
-  color: var(--color-text-secondary);
+.search-input:focus {
+  border-color: var(--color-border-primary);
+}
+
+.search-input::placeholder {
+  color: var(--color-text-tertiary);
 }
 
 .search-clear {
+  position: absolute;
+  right: var(--spacing-2);
+  top: 50%;
+  transform: translateY(-50%);
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: var(--icon-size-lg);
+  height: var(--icon-size-lg);
   padding: 0;
   background: transparent;
   border: none;
-  color: var(--color-text-secondary);
+  color: var(--color-text-tertiary);
   cursor: pointer;
   border-radius: var(--border-radius-sm);
-  transition: all 0.15s;
-  flex-shrink: 0;
+  transition: all var(--transition-normal);
 }
 
 .search-clear:hover {
@@ -217,17 +190,23 @@ body,
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--spacing-1);
 }
 
 .todo-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
+  gap: var(--spacing-2-5);
+  padding: var(--spacing-2) var(--spacing-2-5);
   background: var(--color-background-secondary);
   border: var(--border-width-regular) solid var(--color-border-secondary);
   border-radius: var(--border-radius-md);
+  cursor: pointer;
+  transition: background var(--transition-normal);
+}
+
+.todo-item:hover {
+  background: var(--color-background-tertiary);
 }
 
 .todo-item.completed .todo-text {
@@ -235,13 +214,26 @@ body,
   color: var(--color-text-secondary);
 }
 
+.todo-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-0-5);
+  min-width: 0;
+}
+
+.todo-has-notes {
+  font-size: var(--font-text-xs-size);
+  color: var(--color-text-tertiary);
+}
+
 /* =============================================================================
    Checkbox
 ============================================================================= */
 
 .todo-checkbox {
-  width: 16px;
-  height: 16px;
+  width: var(--icon-size-md);
+  height: var(--icon-size-md);
   border: 1.5px solid var(--color-border-primary);
   border-radius: var(--border-radius-sm);
   cursor: pointer;
@@ -249,7 +241,7 @@ body,
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  transition: all 0.15s;
+  transition: all var(--transition-normal);
 }
 
 .todo-checkbox:hover {
@@ -262,8 +254,8 @@ body,
 }
 
 .todo-checkbox svg {
-  width: 10px;
-  height: 10px;
+  width: var(--icon-size-sm);
+  height: var(--icon-size-sm);
   stroke: var(--color-text-inverse);
   stroke-width: 3;
   fill: none;
@@ -288,8 +280,8 @@ body,
 ============================================================================= */
 
 .todo-delete {
-  width: 24px;
-  height: 24px;
+  width: var(--icon-size-2xl);
+  height: var(--icon-size-2xl);
   border: none;
   background: transparent;
   color: var(--color-text-secondary);
@@ -298,7 +290,7 @@ body,
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.15s;
+  transition: all var(--transition-normal);
   flex-shrink: 0;
 }
 
@@ -318,12 +310,12 @@ body,
   align-items: center;
   justify-content: center;
   color: var(--color-text-secondary);
-  gap: 8px;
+  gap: var(--spacing-2);
 }
 
 .empty-state svg {
-  width: 48px;
-  height: 48px;
+  width: var(--spacing-12);
+  height: var(--spacing-12);
   opacity: 0.5;
 }
 
@@ -332,7 +324,7 @@ body,
 ============================================================================= */
 
 .todo-list::-webkit-scrollbar {
-  width: 8px;
+  width: var(--spacing-2);
 }
 
 .todo-list::-webkit-scrollbar-track {
@@ -341,7 +333,7 @@ body,
 
 .todo-list::-webkit-scrollbar-thumb {
   background: var(--color-border-primary);
-  border-radius: 4px;
+  border-radius: var(--border-radius-sm);
 }
 
 .todo-list::-webkit-scrollbar-thumb:hover {
@@ -354,9 +346,9 @@ body,
 
 .environment-badge {
   position: fixed;
-  bottom: 8px;
-  right: 8px;
-  padding: 4px 8px;
+  bottom: var(--spacing-2);
+  right: var(--spacing-2);
+  padding: var(--spacing-1) var(--spacing-2);
   background: var(--color-background-tertiary);
   color: var(--color-text-secondary);
   font-size: var(--font-text-xs-size);
@@ -377,8 +369,8 @@ body,
 }
 
 .loading-spinner {
-  width: 24px;
-  height: 24px;
+  width: var(--icon-size-2xl);
+  height: var(--icon-size-2xl);
   border: 2px solid var(--color-border-secondary);
   border-top-color: var(--color-text-primary);
   border-radius: 50%;
@@ -390,3 +382,376 @@ body,
     transform: rotate(360deg);
   }
 }
+
+/* =============================================================================
+   Detail View
+============================================================================= */
+
+.detail-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.detail-header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+  padding: var(--spacing-3) var(--spacing-4);
+  border-bottom: var(--border-width-regular) solid var(--color-border-secondary);
+  flex-shrink: 0;
+}
+
+.back-button {
+  background: transparent;
+  border: none;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  padding: var(--spacing-1) var(--spacing-2);
+  border-radius: var(--border-radius-sm);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.back-button:hover {
+  background: var(--color-background-secondary);
+}
+
+.detail-checkbox {
+  width: var(--icon-size-lg);
+  height: var(--icon-size-lg);
+  border: 1.5px solid var(--color-border-primary);
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all var(--transition-normal);
+}
+
+.detail-checkbox:hover {
+  border-color: var(--color-ring-primary);
+}
+
+.detail-checkbox.completed {
+  background: var(--color-background-inverse);
+  border-color: var(--color-background-inverse);
+}
+
+.detail-checkbox svg {
+  width: var(--icon-size-md);
+  height: var(--icon-size-md);
+  stroke: var(--color-text-inverse);
+  stroke-width: 3;
+  fill: none;
+  opacity: 0;
+}
+
+.detail-checkbox.completed svg {
+  opacity: 1;
+}
+
+.detail-title {
+  flex: 1;
+  font-size: var(--font-text-md-size);
+  font-weight: var(--font-weight-medium);
+  background: transparent;
+  border: var(--border-width-regular) solid var(--color-border-primary);
+  border-radius: var(--border-radius-md);
+  padding: var(--spacing-1-5) var(--spacing-2-5);
+  color: var(--color-text-primary);
+  outline: none;
+}
+
+.detail-title:focus {
+  border-color: var(--color-ring-primary);
+}
+
+.detail-status {
+  font-size: var(--font-text-sm-size);
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+}
+
+.detail-status .saving {
+  color: var(--color-text-secondary);
+}
+
+.detail-status .saved {
+  color: var(--color-text-tertiary);
+}
+
+.detail-editor-container {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* =============================================================================
+  Milkdown Editor Wrapper
+============================================================================= */
+
+.detail-editor-container .milkdown-wrapper {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--spacing-4);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  cursor: text;
+}
+
+.detail-editor-container .milkdown-wrapper > .milkdown {
+  max-width: var(--container-prose);
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* =============================================================================
+  Milkdown Editor Theme
+============================================================================= */
+
+.detail-editor-container .milkdown {
+  outline: none;
+  font-size: var(--font-text-md-size);
+  line-height: var(--font-text-md-line-height);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.detail-editor-container .milkdown .editor {
+  outline: none;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.detail-editor-container .milkdown .editor > .paragraph:only-child,
+.detail-editor-container .milkdown .editor > p:only-child {
+  flex: 1;
+}
+
+/* Placeholder */
+.detail-editor-container .milkdown .editor.ProseMirror-empty::before {
+  content: attr(data-placeholder);
+  color: var(--color-text-tertiary);
+  font-style: italic;
+  position: absolute;
+  pointer-events: none;
+}
+
+.detail-editor-container .milkdown-wrapper[data-placeholder] .milkdown .editor:empty::before {
+  content: attr(data-placeholder);
+  color: var(--color-text-tertiary);
+  font-style: italic;
+}
+
+/* Typography - Headers */
+.detail-editor-container .milkdown h1 {
+  font-size: var(--font-heading-lg-size);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--font-heading-lg-line-height);
+  margin-bottom: var(--spacing-4);
+  margin-top: var(--spacing-6);
+  color: var(--color-text-primary);
+}
+
+.detail-editor-container .milkdown h1:first-child {
+  margin-top: 0;
+}
+
+.detail-editor-container .milkdown h2 {
+  font-size: var(--font-heading-md-size);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--font-heading-md-line-height);
+  margin-top: var(--spacing-6);
+  margin-bottom: var(--spacing-3);
+  color: var(--color-text-primary);
+}
+
+.detail-editor-container .milkdown h3 {
+  font-size: var(--font-heading-sm-size);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--font-heading-sm-line-height);
+  margin-top: var(--spacing-5);
+  margin-bottom: var(--spacing-2);
+  color: var(--color-text-primary);
+}
+
+/* Typography - Body */
+.detail-editor-container .milkdown p {
+  margin-bottom: var(--spacing-3);
+  font-size: var(--font-text-md-size);
+  line-height: var(--font-text-md-line-height);
+}
+
+.detail-editor-container .milkdown p:last-child {
+  margin-bottom: 0;
+}
+
+.detail-editor-container .milkdown strong {
+  font-weight: var(--font-weight-semibold);
+}
+
+.detail-editor-container .milkdown em {
+  font-style: italic;
+}
+
+.detail-editor-container .milkdown del,
+.detail-editor-container .milkdown s {
+  text-decoration: line-through;
+  color: var(--color-text-secondary);
+}
+
+/* Links */
+.detail-editor-container .milkdown a {
+  color: var(--color-text-primary);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.detail-editor-container .milkdown a:hover {
+  opacity: 0.8;
+}
+
+/* Code */
+.detail-editor-container .milkdown code {
+  font-family: var(--font-mono);
+  font-size: var(--font-text-sm-size);
+  background: var(--color-background-secondary);
+  padding: var(--spacing-0-5) var(--spacing-1-5);
+  border-radius: var(--border-radius-sm);
+}
+
+.detail-editor-container .milkdown pre {
+  background: var(--color-background-secondary);
+  border: var(--border-width-regular) solid var(--color-border-secondary);
+  border-radius: var(--border-radius-md);
+  padding: var(--spacing-3) var(--spacing-4);
+  margin-bottom: var(--spacing-3);
+  overflow-x: auto;
+}
+
+.detail-editor-container .milkdown pre code {
+  background: transparent;
+  padding: 0;
+  font-size: var(--font-text-sm-size);
+  line-height: var(--font-text-sm-line-height);
+}
+
+/* Lists */
+.detail-editor-container .milkdown ul,
+.detail-editor-container .milkdown ol {
+  margin-bottom: var(--spacing-3);
+  padding-left: var(--spacing-6);
+}
+
+.detail-editor-container .milkdown li {
+  margin-bottom: var(--spacing-1);
+  font-size: var(--font-text-md-size);
+  line-height: var(--font-text-md-line-height);
+}
+
+.detail-editor-container .milkdown li p {
+  margin-bottom: var(--spacing-1);
+}
+
+.detail-editor-container .milkdown li:last-child {
+  margin-bottom: 0;
+}
+
+/* Task lists */
+.detail-editor-container .milkdown li[data-item-type="task"] {
+  list-style: none;
+  position: relative;
+  padding-left: 24px;
+  margin-left: -4px;
+  cursor: pointer;
+}
+
+.detail-editor-container .milkdown li[data-item-type="task"]::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 2px;
+  width: 12px;
+  height: 12px;
+  border: 1px solid var(--color-border-primary);
+  border-radius: 2px;
+  background: var(--color-background-primary);
+  pointer-events: none;
+}
+
+.detail-editor-container .milkdown li[data-item-type="task"][data-checked="true"]::before {
+  background: var(--color-text-primary);
+  border-color: var(--color-text-primary);
+}
+
+.detail-editor-container .milkdown li[data-item-type="task"][data-checked="true"]::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 3px;
+  width: 4px;
+  height: 8px;
+  border: solid var(--color-background-primary);
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+
+/* Blockquotes */
+.detail-editor-container .milkdown blockquote {
+  border-left: 3px solid var(--color-border-primary);
+  padding-left: var(--spacing-4);
+  margin-bottom: var(--spacing-3);
+  color: var(--color-text-secondary);
+  font-style: italic;
+}
+
+.detail-editor-container .milkdown blockquote p {
+  margin-bottom: var(--spacing-2);
+}
+
+.detail-editor-container .milkdown blockquote p:last-child {
+  margin-bottom: 0;
+}
+
+/* Horizontal Rule */
+.detail-editor-container .milkdown hr {
+  border: none;
+  border-top: var(--border-width-regular) solid var(--color-border-primary);
+  margin: var(--spacing-6) 0;
+}
+
+/* Selection */
+.detail-editor-container .milkdown ::selection {
+  background: var(--color-text-primary);
+  color: var(--color-background-primary);
+}
+
+/* Scrollbar */
+.detail-editor-container .milkdown-wrapper::-webkit-scrollbar {
+  width: var(--spacing-2);
+}
+
+.detail-editor-container .milkdown-wrapper::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.detail-editor-container .milkdown-wrapper::-webkit-scrollbar-thumb {
+  background: var(--color-border-primary);
+  border-radius: var(--border-radius-sm);
+}
+
+.detail-editor-container .milkdown-wrapper::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-secondary);
+}
+

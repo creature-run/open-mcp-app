@@ -22,7 +22,6 @@
  * SDK hooks used:
  * - HostProvider: Provides host client to child components via context
  * - useHost: Access callTool, isReady, log, exp_widgetState from context
- * - initDefaultStyles: Inject environment-specific CSS variable defaults
  *
  * File Structure:
  * - app.tsx: Entry point with HostProvider and NotesApp
@@ -32,15 +31,13 @@
  * - types.ts: Type definitions
  */
 
-// MUST be first - injects environment-specific CSS variable defaults before CSS loads
-import { detectEnvironment, initDefaultStyles } from "open-mcp-app/core";
-const environment = detectEnvironment();
-initDefaultStyles({ environment });
-
 import { HostProvider } from "open-mcp-app/react";
 import { NotesProvider, useNotesContext } from "./useNotes";
 import { ListView } from "./ListView";
 import { EditorView } from "./EditorView";
+// Base styles provide SDK layout variables (spacing, containers, controls)
+// Host-provided spec variables (colors, typography) are applied during initialization
+import "open-mcp-app/styles/base.css";
 import "./styles.css";
 
 /**

@@ -235,20 +235,10 @@ export {
 // ============================================================================
 
 export {
-  getMcpAppDefaultStyles,
-  getChatGptDefaultStyles,
-  detectTheme,
+  LAYOUT_DEFAULTS,
   applyStyles,
-  initDefaultStyles,
-  MCP_APPS_LIGHT_DEFAULTS,
-  MCP_APPS_DARK_DEFAULTS,
-  MCP_APPS_SHARED_DEFAULTS,
-  CHATGPT_LIGHT_DEFAULTS,
-  CHATGPT_DARK_DEFAULTS,
-  CHATGPT_SHARED_DEFAULTS,
+  applyLayoutDefaults,
 } from "./styles.js";
-
-export type { Theme, InitStylesOptions } from "./styles.js";
 
 // ============================================================================
 // Re-exports: WebSocket
