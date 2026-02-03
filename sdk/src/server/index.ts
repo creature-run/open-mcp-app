@@ -29,7 +29,6 @@ export {
   experimental_getWritableDirectory,
   experimental_getProjectId,
   experimental_getServerName,
-  experimental_isCreatureHost,
   experimental_readFile,
   experimental_writeFile,
   experimental_deleteFile,

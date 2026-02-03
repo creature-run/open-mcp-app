@@ -132,16 +132,6 @@ export function experimental_getServerName(): string | null {
   return name && name.length > 0 ? name : null;
 }
 
-/**
- * Check if running inside a Creature host environment.
- *
- * Returns true if the MCP is running inside Creature with a project open.
- *
- * @returns true if running in Creature with a project, false otherwise
- */
-export function experimental_isCreatureHost(): boolean {
-  return experimental_getProjectId() !== null;
-}
 
 // ============================================================================
 // Sandboxed File I/O APIs
@@ -1048,7 +1038,6 @@ export const exp = {
   getWritableDirectory: experimental_getWritableDirectory,
   getProjectId: experimental_getProjectId,
   getServerName: experimental_getServerName,
-  isCreatureHost: experimental_isCreatureHost,
 
   // File I/O (async)
   readFile: experimental_readFile,
