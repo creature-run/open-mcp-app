@@ -12,7 +12,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "open-mcp-app": "^0.0.3",
+    "open-mcp-app": "^0.0.4",
     "@milkdown/kit": "^7.8.0",
     "@milkdown/plugin-listener": "^7.8.0",
     "@milkdown/react": "^7.8.0",
