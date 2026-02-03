@@ -2,12 +2,14 @@
  * Todos Tools
  *
  * Separate tools for each todo operation. All tools route to the same UI.
- * Each tool supports batch operations (multiple items per call).
+ * Batch tools support multiple items per call.
  *
  * Tools:
- * - todos_list: Show all todos in interactive list
- * - todos_add: Create one or more todo items
- * - todos_toggle: Toggle one or more todos' completed status
+ * - todos_list: Show all todos in interactive list (returns summaries without notes)
+ * - todos_get: Get a single todo with full details including notes
+ * - todos_add: Create one or more todo items (text max 250 chars, optional notes)
+ * - todos_toggle: Toggle completed status (sets/clears completedAt timestamp)
+ * - todos_update: Edit a todo's text and/or notes
  * - todos_remove: Delete one or more todo items
  * - todos_search: Full-text search across todos (uses SQLite FTS5)
  *
@@ -20,6 +22,7 @@ import type { DataStore } from "../lib/data.js";
 import {
   TODOS_UI_URI,
   type Todo,
+  type TodoSummary,
   type ToolContext,
   type ToolResult,
 } from "../lib/types.js";
@@ -33,17 +36,42 @@ import {
 import type { SearchResult } from "../lib/data.js";
 
 // =============================================================================
+// Constants
+// =============================================================================
+
+const MAX_TEXT_LENGTH = 250;
+
+// =============================================================================
 // Input Schemas
 // =============================================================================
 
 const TodosListSchema = z.object({});
 
+const TodosGetSchema = z.object({
+  id: z.string().describe("The ID of the todo to retrieve"),
+});
+
+const TodosOpenSchema = z.object({
+  id: z.string().describe("The ID of the todo to open in detail view"),
+});
+
+const TodoItemSchema = z.object({
+  text: z.string().max(MAX_TEXT_LENGTH).describe(`Short task description (max ${MAX_TEXT_LENGTH} characters)`),
+  notes: z.string().optional().describe("Optional longer description or notes"),
+});
+
 const TodosAddSchema = z.object({
-  items: z.array(z.string()).describe("Array of todo texts to add"),
+  items: z.array(TodoItemSchema).describe("Array of todo items to add, each with text (max 250 chars) and optional notes"),
 });
 
 const TodosToggleSchema = z.object({
   ids: z.array(z.string()).describe("Array of todo IDs to toggle"),
+});
+
+const TodosUpdateSchema = z.object({
+  id: z.string().describe("The ID of the todo to update"),
+  text: z.string().max(MAX_TEXT_LENGTH).optional().describe(`New task description (max ${MAX_TEXT_LENGTH} characters)`),
+  notes: z.string().optional().describe("New notes content (set to empty string to clear)"),
 });
 
 const TodosRemoveSchema = z.object({
@@ -56,11 +84,27 @@ const TodosSearchSchema = z.object({
 });
 
 // =============================================================================
+// Helpers
+// =============================================================================
+
+/**
+ * Convert a full Todo to a TodoSummary (excludes notes field).
+ */
+const toSummary = (todo: Todo): TodoSummary => ({
+  id: todo.id,
+  text: todo.text,
+  completed: todo.completed,
+  createdAt: todo.createdAt,
+  updatedAt: todo.updatedAt,
+  ...(todo.completedAt && { completedAt: todo.completedAt }),
+});
+
+// =============================================================================
 // Tool Handlers
 // =============================================================================
 
 /**
- * List all todos.
+ * List all todos (returns summaries without notes to minimize payload).
  */
 const handleList = async (store: DataStore<Todo>): Promise<ToolResult> => {
   const todos = await getAllTodos(store);
@@ -74,10 +118,62 @@ const handleList = async (store: DataStore<Todo>): Promise<ToolResult> => {
     };
   }
 
+  // Return summaries only (no notes field) to minimize payload
+  const summaries = todos.map(toSummary);
+
   return {
-    data: { todos },
+    data: { todos: summaries },
     title: `Todos (${open})`,
     text: `${total} todo(s), ${open} remaining`,
+  };
+};
+
+/**
+ * Get a single todo with full details (including notes).
+ * Does NOT open UI - just returns data.
+ */
+const handleGet = async (
+  id: string,
+  store: DataStore<Todo>
+): Promise<ToolResult> => {
+  const todo = await store.get(id);
+
+  if (!todo) {
+    return {
+      data: { error: "Todo not found" },
+      text: `Todo not found: ${id}`,
+      isError: true,
+    };
+  }
+
+  return {
+    data: { todo, view: "detail" },
+    text: `Todo: ${todo.text}${todo.notes ? " (has notes)" : ""}`,
+  };
+};
+
+/**
+ * Open a todo in detail view for editing notes.
+ * Opens the detail view UI.
+ */
+const handleOpen = async (
+  id: string,
+  store: DataStore<Todo>
+): Promise<ToolResult> => {
+  const todo = await store.get(id);
+
+  if (!todo) {
+    return {
+      data: { error: "Todo not found" },
+      text: `Todo not found: ${id}`,
+      isError: true,
+    };
+  }
+
+  return {
+    data: { todo, view: "detail" },
+    title: todo.text,
+    text: `Opened todo: ${todo.text}`,
   };
 };
 
@@ -85,25 +181,28 @@ const handleList = async (store: DataStore<Todo>): Promise<ToolResult> => {
  * Add one or more todo items.
  */
 const handleAdd = async (
-  items: string[],
+  items: z.infer<typeof TodoItemSchema>[],
   store: DataStore<Todo>
 ): Promise<ToolResult> => {
   const now = new Date().toISOString();
-  const addedTodos: Todo[] = [];
+  const addedTodos: TodoSummary[] = [];
 
-  for (const text of items) {
+  for (const item of items) {
     const todo: Todo = {
       id: generateTodoId(),
-      text,
+      text: item.text,
+      ...(item.notes && { notes: item.notes }),
       completed: false,
       createdAt: now,
       updatedAt: now,
     };
     await store.set(todo.id, todo);
-    addedTodos.push(todo);
+    // Return summary only (no notes) for payload efficiency
+    addedTodos.push(toSummary(todo));
   }
 
   const todos = await getAllTodos(store);
+  const summaries = todos.map(toSummary);
   const { open } = getTodoCounts(todos);
 
   const itemCount = addedTodos.length;
@@ -112,7 +211,7 @@ const handleAdd = async (
     : `Added ${itemCount} todos`;
 
   return {
-    data: { success: true, added: addedTodos, todos },
+    data: { success: true, added: addedTodos, todos: summaries },
     text: textSummary,
     title: `Todos (${open})`,
   };
@@ -120,13 +219,14 @@ const handleAdd = async (
 
 /**
  * Toggle one or more todos' completed status.
+ * Sets completedAt when completing, clears it when uncompleting.
  */
 const handleToggle = async (
   ids: string[],
   store: DataStore<Todo>
 ): Promise<ToolResult> => {
   const now = new Date().toISOString();
-  const toggled: Todo[] = [];
+  const toggled: TodoSummary[] = [];
   const notFound: string[] = [];
 
   for (const id of ids) {
@@ -138,8 +238,16 @@ const handleToggle = async (
 
     todo.completed = !todo.completed;
     todo.updatedAt = now;
+
+    // Set or clear completedAt based on new status
+    if (todo.completed) {
+      todo.completedAt = now;
+    } else {
+      delete todo.completedAt;
+    }
+
     await store.set(id, todo);
-    toggled.push(todo);
+    toggled.push(toSummary(todo));
   }
 
   if (toggled.length === 0 && notFound.length > 0) {
@@ -151,6 +259,7 @@ const handleToggle = async (
   }
 
   const todos = await getAllTodos(store);
+  const summaries = todos.map(toSummary);
   const { open } = getTodoCounts(todos);
 
   let textSummary: string;
@@ -166,8 +275,52 @@ const handleToggle = async (
   }
 
   return {
-    data: { success: true, toggled, notFound, todos },
+    data: { success: true, toggled, notFound, todos: summaries },
     text: textSummary,
+    title: `Todos (${open})`,
+  };
+};
+
+/**
+ * Update a todo's text and/or notes.
+ */
+const handleUpdate = async (
+  { id, text, notes }: z.infer<typeof TodosUpdateSchema>,
+  store: DataStore<Todo>
+): Promise<ToolResult> => {
+  const todo = await store.get(id);
+  if (!todo) {
+    return {
+      data: { error: "Todo not found" },
+      text: `Todo not found: ${id}`,
+      isError: true,
+    };
+  }
+
+  const now = new Date().toISOString();
+
+  if (text !== undefined) {
+    todo.text = text;
+  }
+
+  if (notes !== undefined) {
+    if (notes === "") {
+      delete todo.notes;
+    } else {
+      todo.notes = notes;
+    }
+  }
+
+  todo.updatedAt = now;
+  await store.set(id, todo);
+
+  const todos = await getAllTodos(store);
+  const summaries = todos.map(toSummary);
+  const { open } = getTodoCounts(todos);
+
+  return {
+    data: { success: true, updated: toSummary(todo), todos: summaries },
+    text: `Updated todo: ${todo.text}`,
     title: `Todos (${open})`,
   };
 };
@@ -202,6 +355,7 @@ const handleRemove = async (
   }
 
   const todos = await getAllTodos(store);
+  const summaries = todos.map(toSummary);
   const { open } = getTodoCounts(todos);
 
   let textSummary: string;
@@ -216,7 +370,7 @@ const handleRemove = async (
   }
 
   return {
-    data: { success: true, deleted, notFound, todos },
+    data: { success: true, deleted, notFound, todos: summaries },
     text: textSummary,
     title: `Todos (${open})`,
   };
@@ -239,7 +393,7 @@ const handleSearch = async (
     };
   }
 
-  // Format results with snippets
+  // Format results with snippets (no notes field for payload efficiency)
   const matches = results.map((r: SearchResult<Todo>) => ({
     id: r.item.id,
     text: r.item.text,
@@ -248,12 +402,13 @@ const handleSearch = async (
     score: r.score,
   }));
 
-  // Get full todo list for display
+  // Get full todo list for display (summaries only)
   const todos = await getAllTodos(store);
+  const summaries = todos.map(toSummary);
   const { open } = getTodoCounts(todos);
 
   return {
-    data: { query, matches, todos },
+    data: { query, matches, todos: summaries },
     text: `Found ${results.length} todo(s) matching "${query}"`,
     title: `Todos (${open})`,
   };
@@ -274,7 +429,7 @@ export const registerTodosTools = (app: App) => {
   app.tool(
     "todos_list",
     {
-      description: "List all todos and display them in the interactive todo list UI",
+      description: "List all todos and display them in the interactive todo list UI. Returns summaries without notes field for efficiency.",
       input: TodosListSchema,
       ui: TODOS_UI_URI,
       visibility: ["model", "app"],
@@ -288,11 +443,42 @@ export const registerTodosTools = (app: App) => {
     }
   );
 
+  // Get a single todo with full details (no UI)
+  app.tool(
+    "todos_get",
+    {
+      description: "Get a single todo with full details including notes. Does not open UI.",
+      input: TodosGetSchema,
+      visibility: ["model", "app"],
+    },
+    async (input: z.infer<typeof TodosGetSchema>, context: ToolContext) => {
+      return withStore(context, async (store) => handleGet(input.id, store));
+    }
+  );
+
+  // Open a todo in detail view
+  app.tool(
+    "todos_open",
+    {
+      description: "Open a todo in detail view for viewing and editing notes. Opens the detail UI.",
+      input: TodosOpenSchema,
+      ui: TODOS_UI_URI,
+      visibility: ["model", "app"],
+      displayModes: ["pip", "inline"],
+      experimental: {
+        defaultDisplayMode: "pip",
+      },
+    },
+    async (input: z.infer<typeof TodosOpenSchema>, context: ToolContext) => {
+      return withStore(context, async (store) => handleOpen(input.id, store));
+    }
+  );
+
   // Add todos
   app.tool(
     "todos_add",
     {
-      description: "Add one or more todo items to the list",
+      description: `Add one or more todo items. Each item has a text field (max ${MAX_TEXT_LENGTH} chars) and an optional notes field for longer descriptions.`,
       input: TodosAddSchema,
       ui: TODOS_UI_URI,
       visibility: ["model", "app"],
@@ -310,7 +496,7 @@ export const registerTodosTools = (app: App) => {
   app.tool(
     "todos_toggle",
     {
-      description: "Toggle one or more todos' completed status",
+      description: "Toggle one or more todos' completed status. Sets completedAt timestamp when completing, clears it when uncompleting.",
       input: TodosToggleSchema,
       ui: TODOS_UI_URI,
       visibility: ["model", "app"],
@@ -321,6 +507,24 @@ export const registerTodosTools = (app: App) => {
     },
     async (input: z.infer<typeof TodosToggleSchema>, context: ToolContext) => {
       return withStore(context, async (store) => handleToggle(input.ids, store));
+    }
+  );
+
+  // Update todo
+  app.tool(
+    "todos_update",
+    {
+      description: `Update a todo's text (max ${MAX_TEXT_LENGTH} chars) and/or notes. Set notes to empty string to clear it.`,
+      input: TodosUpdateSchema,
+      ui: TODOS_UI_URI,
+      visibility: ["model", "app"],
+      displayModes: ["pip", "inline"],
+      experimental: {
+        defaultDisplayMode: "pip",
+      },
+    },
+    async (input: z.infer<typeof TodosUpdateSchema>, context: ToolContext) => {
+      return withStore(context, async (store) => handleUpdate(input, store));
     }
   );
 

@@ -30,13 +30,18 @@ const app = createApp({
   port: PORT,
   instructions: `This MCP manages notes with separate tools:
 
-- notes_list - Display all notes in a searchable list (opens UI)
-- notes_create - Create a new note and open it in an editor (opens UI)
-- notes_open { noteId } - Open an existing note for editing (opens UI)
-- notes_save { noteId, title, content } - Save changes to a note (updates existing UI)
+- notes_list - Display all notes in a list (opens UI). Returns summaries without content for efficiency.
+- notes_create { title?, content? } - Create a new note and open it in an editor (opens UI)
+- notes_open { noteId } - Open an existing note for editing (opens UI). Returns full note with content.
+- notes_save { noteId, title, content } - Save changes to a note (updates existing UI). Returns minimal data.
 - notes_delete { noteId } - Delete a note (no UI)
+- notes_search { query, limit? } - Full-text search across notes. Returns matching titles and snippets.
 
-Each note opens in its own editor window. The list view shows all notes.`,
+Each note opens in its own editor window. The list view shows all notes.
+
+Use notes_open to retrieve full content when you need to read or display a note's content. The list and save operations return minimal data to stay within payload limits.
+
+IMPORTANT: The title and content are stored separately. Do NOT include the title as a heading in the content - it is already displayed in the title field above the editor.`,
 });
 
 // =============================================================================

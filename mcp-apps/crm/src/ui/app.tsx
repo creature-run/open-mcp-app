@@ -15,13 +15,7 @@
  * SDK hooks used:
  * - HostProvider: Provides host client to child components via context
  * - useHost: Access callTool, isReady, log, exp_widgetState from context
- * - initDefaultStyles: Inject environment-specific CSS variable defaults
  */
-
-// MUST be first - injects environment-specific CSS variable defaults before CSS loads
-import { detectEnvironment, initDefaultStyles } from "open-mcp-app/core";
-const environment = detectEnvironment();
-initDefaultStyles({ environment });
 
 import { useEffect, useCallback, useState, useRef, useMemo } from "react";
 import { HostProvider, useHost, type Environment } from "open-mcp-app/react";
@@ -38,6 +32,9 @@ import {
   Package,
   X,
 } from "@phosphor-icons/react";
+// Base styles provide SDK layout variables (spacing, containers, controls)
+// Host-provided spec variables (colors, typography) are applied during initialization
+import "open-mcp-app/styles/base.css";
 import "./styles.css";
 
 // =============================================================================
