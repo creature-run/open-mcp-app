@@ -7,7 +7,7 @@
  * Notes are stored globally within a project and persist across sessions.
  */
 
-import { createDataStore, type DataStore } from "./data.js";
+import { createDataStore, type DataStore, type SearchResult } from "./data.js";
 import type { Note, ToolContext, ToolResult } from "./types.js";
 
 // =============================================================================
@@ -33,6 +33,18 @@ export const getAllNotes = async (store: DataStore<Note>): Promise<Note[]> => {
   return all.sort(
     (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
   );
+};
+
+/**
+ * Search notes using full-text search.
+ * Returns matching notes with optional snippets showing matched context.
+ */
+export const searchNotes = async (
+  store: DataStore<Note>,
+  query: string,
+  limit?: number
+): Promise<SearchResult<Note>[]> => {
+  return store.search(query, limit);
 };
 
 // =============================================================================

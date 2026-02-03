@@ -2,11 +2,12 @@
  * Notes Tools
  *
  * Separate tools for each note operation:
- * - notes_list: Show searchable list of all notes (has UI)
+ * - notes_list: Show list of all notes (has UI, returns summaries without content)
  * - notes_create: Create new note and open editor (has UI, always new pip)
- * - notes_open: Open existing note in editor (has UI)
- * - notes_save: Update existing note (routes to existing pip)
+ * - notes_open: Open existing note in editor (has UI, returns full note with content)
+ * - notes_save: Update existing note (routes to existing pip, returns minimal data)
  * - notes_delete: Remove a note (no UI)
+ * - notes_search: Full-text search across notes (no UI, returns snippets)
  *
  * View Routing (via views on resource):
  * - "/" → notes_list (single instance for root)
@@ -25,7 +26,8 @@ import {
   type ToolContext,
   type ToolResult,
 } from "../lib/types.js";
-import { generateNoteId, getAllNotes, withStore } from "../lib/utils.js";
+import { generateNoteId, getAllNotes, searchNotes, withStore } from "../lib/utils.js";
+import type { SearchResult } from "../lib/data.js";
 
 // =============================================================================
 // Input Schemas
@@ -35,7 +37,7 @@ const NotesListSchema = z.object({});
 
 const NotesCreateSchema = z.object({
   title: z.string().optional().describe("Initial title for the note"),
-  content: z.string().optional().describe("Initial content (markdown)"),
+  content: z.string().optional().describe("Initial content (markdown). Do NOT include the title in the content - it is stored and displayed separately."),
 });
 
 const NotesOpenSchema = z.object({
@@ -45,11 +47,16 @@ const NotesOpenSchema = z.object({
 const NotesSaveSchema = z.object({
   noteId: z.string().describe("The ID of the note to save"),
   title: z.string().describe("The note title"),
-  content: z.string().describe("The note content (markdown)"),
+  content: z.string().describe("The note content (markdown). Do NOT include the title in the content - it is stored and displayed separately."),
 });
 
 const NotesDeleteSchema = z.object({
   noteId: z.string().describe("The ID of the note to delete"),
+});
+
+const NotesSearchSchema = z.object({
+  query: z.string().describe("Search query to find matching notes"),
+  limit: z.number().optional().describe("Maximum number of results (default 20)"),
 });
 
 // =============================================================================
@@ -58,7 +65,7 @@ const NotesDeleteSchema = z.object({
 
 /**
  * List all notes.
- * Returns summary data for the list view.
+ * Returns summaries without content to minimize payload.
  */
 const handleList = async (
   store: DataStore<Note>,
@@ -68,9 +75,11 @@ const handleList = async (
 
   setState<NoteInstanceState>({ view: "list" });
 
+  // Return summaries only (no content field) to minimize payload
   const summaries: NoteSummary[] = allNotes.map((n) => ({
     id: n.id,
     title: n.title,
+    createdAt: n.createdAt,
     updatedAt: n.updatedAt,
   }));
 
@@ -94,6 +103,7 @@ const handleList = async (
 /**
  * Create a new note.
  * Opens a new editor pip with the created note.
+ * Returns minimal data (no content in response to minimize payload).
  */
 const handleCreate = async (
   { title, content }: z.infer<typeof NotesCreateSchema>,
@@ -112,10 +122,11 @@ const handleCreate = async (
 
   setState<NoteInstanceState>({ noteId: note.id, view: "editor" });
 
+  // Return full note for UI (needed to populate editor), but text response is minimal
   return {
     data: { note, view: "editor" },
     title: note.title,
-    text: `Created note: ${note.title}`,
+    text: `Created note: ${note.title} (${note.id})`,
   };
 };
 
@@ -149,6 +160,7 @@ const handleOpen = async (
 /**
  * Save changes to a note.
  * Routes result to existing editor pip for that noteId.
+ * Returns minimal data in text response to minimize payload.
  */
 const handleSave = async (
   { noteId, title, content }: z.infer<typeof NotesSaveSchema>,
@@ -168,10 +180,14 @@ const handleSave = async (
   note.updatedAt = new Date().toISOString();
   await store.set(noteId, note);
 
+  // Return only summary info in data to minimize payload
   return {
-    data: { note, view: "editor" },
+    data: {
+      note: { id: note.id, title: note.title, updatedAt: note.updatedAt },
+      view: "editor"
+    },
     title: note.title,
-    text: `Saved note: ${note.title}`,
+    text: `Saved note: ${note.title} (${note.id})`,
   };
 };
 
@@ -196,8 +212,40 @@ const handleDelete = async (
   await store.delete(noteId);
 
   return {
-    data: { success: true, deletedId: noteId },
+    data: { success: true, deletedId: noteId, title },
     text: `Deleted note: ${title}`,
+  };
+};
+
+/**
+ * Search notes using full-text search.
+ * Returns matching notes with snippets (no full content to minimize payload).
+ */
+const handleSearch = async (
+  query: string,
+  limit: number | undefined,
+  store: DataStore<Note>
+): Promise<ToolResult> => {
+  const results = await searchNotes(store, query, limit ?? 20);
+
+  if (results.length === 0) {
+    return {
+      data: { query, matches: [] },
+      text: `No notes found matching "${query}"`,
+    };
+  }
+
+  // Format results with snippets (no content field for payload efficiency)
+  const matches = results.map((r: SearchResult<Note>) => ({
+    id: r.item.id,
+    title: r.item.title,
+    snippet: r.snippet,
+    score: r.score,
+  }));
+
+  return {
+    data: { query, matches },
+    text: `Found ${results.length} note(s) matching "${query}":\n${matches.map(m => `- ${m.title} (${m.id})`).join("\n")}`,
   };
 };
 
@@ -305,6 +353,21 @@ export const registerNotesTools = (app: App) => {
     },
     async (input: z.infer<typeof NotesDeleteSchema>, context: ToolContext) => {
       return withStore(context, async (store) => handleDelete(input, store));
+    }
+  );
+
+  /**
+   * Search notes using full-text search.
+   */
+  app.tool(
+    "notes_search",
+    {
+      description: "Search notes using full-text search. Finds notes containing the search query and returns matching snippets with relevance scores.",
+      input: NotesSearchSchema,
+      visibility: ["model", "app"],
+    },
+    async (input: z.infer<typeof NotesSearchSchema>, context: ToolContext) => {
+      return withStore(context, async (store) => handleSearch(input.query, input.limit, store));
     }
   );
 };

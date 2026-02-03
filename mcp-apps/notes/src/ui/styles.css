@@ -1,41 +1,13 @@
 /**
  * MCP Notes Styles
  *
- * Uses MCP Apps CSS variables for theming consistency with the host.
- * Variables are injected by initDefaultStyles() from open-mcp-app/core
- * and overridden by host at runtime via hostContext.styles.variables.
+ * Uses MCP Apps spec CSS variables (colors, typography, borders, shadows)
+ * provided by the host, plus SDK layout variables (spacing, controls)
+ * from base.css.
  *
- * @see https://github.com/modelcontextprotocol/ext-apps specification
+ * Spec variables: --color-*, --font-*, --border-*, --shadow-*
+ * SDK variables: --spacing-*, --control-*, --container-*, --transition-*
  */
-
-/* =============================================================================
-   CSS Reset & Base Styles
-============================================================================= */
-
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-/**
- * Form controls inherit font from parent.
- */
-input,
-button,
-textarea,
-select {
-  font-family: inherit;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  appearance: none;
-}
-
-input {
-  background: transparent;
-  border: none;
-  outline: none;
-}
 
 /* =============================================================================
    Root & Document Styles
@@ -47,11 +19,6 @@ body,
   height: 100%;
   width: 100%;
   overflow: hidden;
-  background: var(--color-background-primary);
-  color: var(--color-text-primary);
-  font-family: var(--font-sans);
-  font-size: var(--font-text-md-size);
-  line-height: var(--font-text-md-line-height);
 }
 
 /* =============================================================================
@@ -73,7 +40,8 @@ body,
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
+  gap: var(--spacing-4);
+  padding: var(--spacing-2) var(--spacing-4);
   border: none;
   border-bottom: var(--border-width-regular) solid var(--color-border-secondary);
   flex-shrink: 0;
@@ -81,24 +49,8 @@ body,
 
 .note-title {
   flex: 1;
-  font-size: var(--font-heading-sm-size);
+  font-size: var(--font-text-md-size);
   font-weight: var(--font-weight-medium);
-  background: transparent;
-  border: none;
-  border-bottom: none;
-  color: var(--color-text-primary);
-  outline: none;
-  box-shadow: none;
-}
-
-.note-title:focus {
-  outline: none;
-  border: none;
-  box-shadow: none;
-}
-
-.note-title::placeholder {
-  color: var(--color-text-secondary);
 }
 
 .note-status {
@@ -126,14 +78,21 @@ body,
   flex-direction: column;
 }
 
-.milkdown-wrapper {
+.note-editor-container .milkdown-wrapper {
   flex: 1;
   overflow-y: auto;
-  padding: 16px;
+  padding: var(--spacing-4);
   display: flex;
   flex-direction: column;
   min-height: 0;
   cursor: text;
+}
+
+/* Constrain content width for readability */
+.note-editor-container .milkdown-wrapper > .milkdown {
+  max-width: var(--container-prose);
+  margin: 0 auto;
+  width: 100%;
 }
 
 /* =============================================================================
@@ -144,7 +103,7 @@ body,
 ============================================================================= */
 
 /* Editor root container */
-.milkdown {
+.note-editor-container .milkdown {
   outline: none;
   font-size: var(--font-text-md-size);
   line-height: var(--font-text-md-line-height);
@@ -159,7 +118,7 @@ body,
  * Uses flex: 1 to fill available space, allowing clicks anywhere
  * in the content area to focus the editor, even when empty.
  */
-.milkdown .editor {
+.note-editor-container .milkdown .editor {
   outline: none;
   flex: 1;
   display: flex;
@@ -170,13 +129,13 @@ body,
  * ProseMirror paragraph - when editor is empty, this single paragraph
  * fills the available space so the entire area is clickable.
  */
-.milkdown .editor > .paragraph:only-child,
-.milkdown .editor > p:only-child {
+.note-editor-container .milkdown .editor > .paragraph:only-child,
+.note-editor-container .milkdown .editor > p:only-child {
   flex: 1;
 }
 
 /* Placeholder text when editor is empty */
-.milkdown .editor.ProseMirror-empty::before {
+.note-editor-container .milkdown .editor.ProseMirror-empty::before {
   content: attr(data-placeholder);
   color: var(--color-text-tertiary);
   font-style: italic;
@@ -184,7 +143,7 @@ body,
   pointer-events: none;
 }
 
-.milkdown-wrapper[data-placeholder] .milkdown .editor:empty::before {
+.note-editor-container .milkdown-wrapper[data-placeholder] .milkdown .editor:empty::before {
   content: attr(data-placeholder);
   color: var(--color-text-tertiary);
   font-style: italic;
@@ -194,44 +153,44 @@ body,
    Typography - Headers
 ============================================================================= */
 
-.milkdown h1 {
+.note-editor-container .milkdown h1 {
   font-size: var(--font-heading-lg-size);
   font-weight: var(--font-weight-semibold);
   line-height: var(--font-heading-lg-line-height);
-  margin-bottom: 16px;
-  margin-top: 24px;
+  margin-bottom: var(--spacing-4);
+  margin-top: var(--spacing-6);
   color: var(--color-text-primary);
 }
 
-.milkdown h1:first-child {
+.note-editor-container .milkdown h1:first-child {
   margin-top: 0;
 }
 
-.milkdown h2 {
+.note-editor-container .milkdown h2 {
   font-size: var(--font-heading-md-size);
   font-weight: var(--font-weight-medium);
   line-height: var(--font-heading-md-line-height);
-  margin-top: 24px;
-  margin-bottom: 12px;
+  margin-top: var(--spacing-6);
+  margin-bottom: var(--spacing-3);
   color: var(--color-text-primary);
 }
 
-.milkdown h3 {
+.note-editor-container .milkdown h3 {
   font-size: var(--font-heading-sm-size);
   font-weight: var(--font-weight-medium);
   line-height: var(--font-heading-sm-line-height);
-  margin-top: 20px;
-  margin-bottom: 8px;
+  margin-top: var(--spacing-5);
+  margin-bottom: var(--spacing-2);
   color: var(--color-text-primary);
 }
 
-.milkdown h4,
-.milkdown h5,
-.milkdown h6 {
+.note-editor-container .milkdown h4,
+.note-editor-container .milkdown h5,
+.note-editor-container .milkdown h6 {
   font-size: var(--font-text-md-size);
   font-weight: var(--font-weight-medium);
-  margin-top: 16px;
-  margin-bottom: 8px;
+  margin-top: var(--spacing-4);
+  margin-bottom: var(--spacing-2);
   color: var(--color-text-primary);
 }
 
@@ -239,26 +198,26 @@ body,
    Typography - Body
 ============================================================================= */
 
-.milkdown p {
-  margin-bottom: 12px;
+.note-editor-container .milkdown p {
+  margin-bottom: var(--spacing-3);
   font-size: var(--font-text-md-size);
   line-height: var(--font-text-md-line-height);
 }
 
-.milkdown p:last-child {
+.note-editor-container .milkdown p:last-child {
   margin-bottom: 0;
 }
 
-.milkdown strong {
+.note-editor-container .milkdown strong {
   font-weight: var(--font-weight-semibold);
 }
 
-.milkdown em {
+.note-editor-container .milkdown em {
   font-style: italic;
 }
 
-.milkdown del,
-.milkdown s {
+.note-editor-container .milkdown del,
+.note-editor-container .milkdown s {
   text-decoration: line-through;
   color: var(--color-text-secondary);
 }
@@ -267,13 +226,13 @@ body,
    Links
 ============================================================================= */
 
-.milkdown a {
+.note-editor-container .milkdown a {
   color: var(--color-text-primary);
   text-decoration: underline;
   cursor: pointer;
 }
 
-.milkdown a:hover {
+.note-editor-container .milkdown a:hover {
   opacity: 0.8;
 }
 
@@ -281,24 +240,24 @@ body,
    Code - Inline and Block
 ============================================================================= */
 
-.milkdown code {
+.note-editor-container .milkdown code {
   font-family: var(--font-mono);
   font-size: var(--font-text-sm-size);
   background: var(--color-background-secondary);
-  padding: 2px 6px;
+  padding: var(--spacing-0-5) var(--spacing-1-5);
   border-radius: var(--border-radius-sm);
 }
 
-.milkdown pre {
+.note-editor-container .milkdown pre {
   background: var(--color-background-secondary);
   border: var(--border-width-regular) solid var(--color-border-secondary);
   border-radius: var(--border-radius-md);
-  padding: 12px 16px;
-  margin-bottom: 12px;
+  padding: var(--spacing-3) var(--spacing-4);
+  margin-bottom: var(--spacing-3);
   overflow-x: auto;
 }
 
-.milkdown pre code {
+.note-editor-container .milkdown pre code {
   background: transparent;
   padding: 0;
   font-size: var(--font-text-sm-size);
@@ -306,11 +265,11 @@ body,
 }
 
 /* Code block with language label */
-.milkdown .code-fence {
+.note-editor-container .milkdown .code-fence {
   position: relative;
 }
 
-.milkdown .code-fence::before {
+.note-editor-container .milkdown .code-fence::before {
   content: attr(data-language);
   position: absolute;
   top: 8px;
@@ -325,31 +284,31 @@ body,
    Lists
 ============================================================================= */
 
-.milkdown ul,
-.milkdown ol {
-  margin-bottom: 12px;
-  padding-left: 24px;
+.note-editor-container .milkdown ul,
+.note-editor-container .milkdown ol {
+  margin-bottom: var(--spacing-3);
+  padding-left: var(--spacing-6);
 }
 
-.milkdown li {
-  margin-bottom: 4px;
+.note-editor-container .milkdown li {
+  margin-bottom: var(--spacing-1);
   font-size: var(--font-text-md-size);
   line-height: var(--font-text-md-line-height);
 }
 
-.milkdown li p {
-  margin-bottom: 4px;
+.note-editor-container .milkdown li p {
+  margin-bottom: var(--spacing-1);
 }
 
-.milkdown li:last-child {
+.note-editor-container .milkdown li:last-child {
   margin-bottom: 0;
 }
 
 /* Nested lists */
-.milkdown li ul,
-.milkdown li ol {
-  margin-top: 4px;
-  margin-bottom: 4px;
+.note-editor-container .milkdown li ul,
+.note-editor-container .milkdown li ol {
+  margin-top: var(--spacing-1);
+  margin-bottom: var(--spacing-1);
 }
 
 /* Task lists (GFM)
@@ -358,7 +317,7 @@ body,
  * pointer-events: none on pseudo-elements allows clicks to pass through to Milkdown's
  * underlying task list handler.
  */
-.milkdown li[data-item-type="task"] {
+.note-editor-container .milkdown li[data-item-type="task"] {
   list-style: none;
   position: relative;
   padding-left: 24px;
@@ -366,7 +325,7 @@ body,
   cursor: pointer;
 }
 
-.milkdown li[data-item-type="task"]::before {
+.note-editor-container .milkdown li[data-item-type="task"]::before {
   content: "";
   position: absolute;
   left: 0;
@@ -379,12 +338,12 @@ body,
   pointer-events: none;
 }
 
-.milkdown li[data-item-type="task"][data-checked="true"]::before {
+.note-editor-container .milkdown li[data-item-type="task"][data-checked="true"]::before {
   background: var(--color-text-primary);
   border-color: var(--color-text-primary);
 }
 
-.milkdown li[data-item-type="task"][data-checked="true"]::after {
+.note-editor-container .milkdown li[data-item-type="task"][data-checked="true"]::after {
   content: "";
   position: absolute;
   left: 4px;
@@ -401,61 +360,61 @@ body,
    Blockquotes
 ============================================================================= */
 
-.milkdown blockquote {
+.note-editor-container .milkdown blockquote {
   border-left: 3px solid var(--color-border-primary);
-  padding-left: 16px;
-  margin-bottom: 12px;
+  padding-left: var(--spacing-4);
+  margin-bottom: var(--spacing-3);
   color: var(--color-text-secondary);
   font-style: italic;
 }
 
-.milkdown blockquote p {
-  margin-bottom: 8px;
+.note-editor-container .milkdown blockquote p {
+  margin-bottom: var(--spacing-2);
 }
 
-.milkdown blockquote p:last-child {
+.note-editor-container .milkdown blockquote p:last-child {
   margin-bottom: 0;
 }
 
 /* Nested blockquotes */
-.milkdown blockquote blockquote {
-  margin-top: 8px;
+.note-editor-container .milkdown blockquote blockquote {
+  margin-top: var(--spacing-2);
 }
 
 /* =============================================================================
    Horizontal Rule
 ============================================================================= */
 
-.milkdown hr {
+.note-editor-container .milkdown hr {
   border: none;
   border-top: var(--border-width-regular) solid var(--color-border-primary);
-  margin: 24px 0;
+  margin: var(--spacing-6) 0;
 }
 
 /* =============================================================================
    Tables (GFM)
 ============================================================================= */
 
-.milkdown table {
+.note-editor-container .milkdown table {
   width: 100%;
   border-collapse: collapse;
-  margin-bottom: 12px;
+  margin-bottom: var(--spacing-3);
   font-size: var(--font-text-sm-size);
 }
 
-.milkdown th,
-.milkdown td {
+.note-editor-container .milkdown th,
+.note-editor-container .milkdown td {
   border: var(--border-width-regular) solid var(--color-border-secondary);
-  padding: 8px 12px;
+  padding: var(--spacing-2) var(--spacing-3);
   text-align: left;
 }
 
-.milkdown th {
+.note-editor-container .milkdown th {
   background: var(--color-background-secondary);
   font-weight: var(--font-weight-medium);
 }
 
-.milkdown tr:hover {
+.note-editor-container .milkdown tr:hover {
   background: var(--color-background-secondary);
 }
 
@@ -463,18 +422,18 @@ body,
    Images
 ============================================================================= */
 
-.milkdown img {
+.note-editor-container .milkdown img {
   max-width: 100%;
   height: auto;
   border-radius: var(--border-radius-md);
-  margin: 8px 0;
+  margin: var(--spacing-2) 0;
 }
 
 /* =============================================================================
    Selection
 ============================================================================= */
 
-.milkdown ::selection {
+.note-editor-container .milkdown ::selection {
   background: var(--color-text-primary);
   color: var(--color-background-primary);
 }
@@ -484,24 +443,24 @@ body,
 ============================================================================= */
 
 /* Cursor styles */
-.milkdown .ProseMirror-cursor {
+.note-editor-container .milkdown .ProseMirror-cursor {
   border-left: 2px solid var(--color-text-primary);
 }
 
 /* Selection highlight */
-.milkdown .ProseMirror-selectednode {
+.note-editor-container .milkdown .ProseMirror-selectednode {
   outline: 2px solid var(--color-text-primary);
   outline-offset: 2px;
 }
 
 /* Gap cursor (for navigating between blocks) */
-.milkdown .ProseMirror-gapcursor {
+.note-editor-container .milkdown .ProseMirror-gapcursor {
   display: none;
   pointer-events: none;
   position: absolute;
 }
 
-.milkdown .ProseMirror-gapcursor::after {
+.note-editor-container .milkdown .ProseMirror-gapcursor::after {
   content: "";
   display: block;
   position: absolute;
@@ -510,7 +469,7 @@ body,
   border-top: 2px solid var(--color-text-primary);
 }
 
-.milkdown .ProseMirror-focused .ProseMirror-gapcursor {
+.note-editor-container .milkdown .ProseMirror-focused .ProseMirror-gapcursor {
   display: block;
 }
 
@@ -518,20 +477,20 @@ body,
    Scrollbar
 ============================================================================= */
 
-.milkdown-wrapper::-webkit-scrollbar {
-  width: 8px;
+.note-editor-container .milkdown-wrapper::-webkit-scrollbar {
+  width: var(--spacing-2);
 }
 
-.milkdown-wrapper::-webkit-scrollbar-track {
+.note-editor-container .milkdown-wrapper::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.milkdown-wrapper::-webkit-scrollbar-thumb {
+.note-editor-container .milkdown-wrapper::-webkit-scrollbar-thumb {
   background: var(--color-border-primary);
-  border-radius: 4px;
+  border-radius: var(--border-radius-sm);
 }
 
-.milkdown-wrapper::-webkit-scrollbar-thumb:hover {
+.note-editor-container .milkdown-wrapper::-webkit-scrollbar-thumb:hover {
   background: var(--color-border-secondary);
 }
 
@@ -545,8 +504,8 @@ body,
   color: var(--color-text-primary);
   font-size: var(--font-text-md-size);
   cursor: pointer;
-  padding: 4px 8px;
-  margin-right: 8px;
+  padding: var(--spacing-1) var(--spacing-2);
+  margin-right: var(--spacing-2);
   border-radius: var(--border-radius-sm);
   flex-shrink: 0;
 }
@@ -570,7 +529,7 @@ body,
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
+  padding: var(--spacing-3) var(--spacing-4);
   border-bottom: var(--border-width-regular) solid var(--color-border-secondary);
   flex-shrink: 0;
 }
@@ -586,7 +545,7 @@ body,
   background: var(--color-text-primary);
   color: var(--color-text-inverse);
   border: none;
-  padding: 6px 12px;
+  padding: var(--spacing-1-5) var(--spacing-3);
   border-radius: var(--border-radius-md);
   font-size: var(--font-text-sm-size);
   font-weight: var(--font-weight-medium);
@@ -598,24 +557,37 @@ body,
 }
 
 .search-container {
-  padding: 12px 16px;
+  padding: var(--spacing-3) var(--spacing-4);
   border-bottom: var(--border-width-regular) solid var(--color-border-secondary);
   flex-shrink: 0;
 }
 
+.search-field {
+  position: relative;
+  width: 100%;
+}
+
+.search-icon {
+  position: absolute;
+  left: var(--spacing-3);
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-text-tertiary);
+  width: 12px;
+  height: 12px;
+  pointer-events: none;
+}
+
 .search-input {
   width: 100%;
-  padding: 8px 12px;
+  padding: var(--spacing-2) var(--spacing-3);
+  padding-left: calc(var(--spacing-3) + var(--spacing-2) + var(--spacing-2) + 12px);
   background: var(--color-background-secondary);
   border: var(--border-width-regular) solid var(--color-border-secondary);
   border-radius: var(--border-radius-md);
   font-size: var(--font-text-sm-size);
   color: var(--color-text-primary);
   outline: none;
-}
-
-.search-input:focus {
-  border-color: var(--color-border-primary);
 }
 
 .search-input::placeholder {
@@ -634,7 +606,7 @@ body,
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 16px;
+  padding: var(--spacing-3) var(--spacing-4);
   border-bottom: var(--border-width-regular) solid var(--color-border-tertiary);
   cursor: pointer;
 }
@@ -656,7 +628,7 @@ body,
   font-size: var(--font-text-xs-size);
   color: var(--color-text-tertiary);
   flex-shrink: 0;
-  margin-left: 12px;
+  margin-left: var(--spacing-3);
 }
 
 .empty-state {
@@ -666,19 +638,19 @@ body,
   align-items: center;
   justify-content: center;
   color: var(--color-text-secondary);
-  padding: 32px;
+  padding: var(--spacing-8);
   text-align: center;
 }
 
 .empty-state p {
-  margin-bottom: 16px;
+  margin-bottom: var(--spacing-4);
 }
 
 .create-button-large {
   background: var(--color-text-primary);
   color: var(--color-text-inverse);
   border: none;
-  padding: 12px 24px;
+  padding: var(--spacing-3) var(--spacing-6);
   border-radius: var(--border-radius-md);
   font-size: var(--font-text-md-size);
   font-weight: var(--font-weight-medium);
@@ -703,8 +675,8 @@ body,
 }
 
 .loading-spinner {
-  width: 24px;
-  height: 24px;
+  width: var(--icon-size-2xl);
+  height: var(--icon-size-2xl);
   border: 2px solid var(--color-border-secondary);
   border-top-color: var(--color-text-primary);
   border-radius: 50%;
@@ -723,9 +695,9 @@ body,
 
 .environment-badge {
   position: fixed;
-  bottom: 8px;
-  right: 8px;
-  padding: 4px 8px;
+  bottom: var(--spacing-2);
+  right: var(--spacing-2);
+  padding: var(--spacing-1) var(--spacing-2);
   background: var(--color-background-tertiary);
   color: var(--color-text-secondary);
   font-size: var(--font-text-xs-size);

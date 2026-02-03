@@ -35,11 +35,12 @@ export interface Note {
 }
 
 /**
- * Summary of a note for list views.
+ * Summary of a note for list views (excludes content to minimize payload).
  */
 export interface NoteSummary {
   id: string;
   title: string;
+  createdAt: string;
   updatedAt: string;
 }
 
