@@ -25,10 +25,9 @@ export interface CreaturePluginOptions {
   generateBundle?: boolean;
 }
 
-// Re-export HMR constants/types from hmr-client (lightweight module)
-// This maintains backward compatibility for imports from vite/index
-export { HMR_PORT_OFFSET, type HmrConfig } from "./hmr-client.js";
-import { HMR_PORT_OFFSET, type HmrConfig } from "./hmr-client.js";
+// Re-export HMR types from hmr-client (lightweight module)
+export { type HmrConfig } from "./hmr-client.js";
+import { type HmrConfig } from "./hmr-client.js";
 
 function findAvailablePort(startPort: number): Promise<number> {
   return new Promise((resolve) => {
@@ -301,20 +300,17 @@ createRoot(document.getElementById("root")!).render(createElement(Page));
 
     async buildStart() {
       if (!tempDir) return;
-      
+
       isWatchMode = this.meta.watchMode === true;
-      
+
       if (isWatchMode && !hmrServer) {
-        // Derive HMR port from MCP_PORT when available (set by Creature).
-        // This allows the SDK server to know the HMR port immediately without
-        // waiting for hmr.json to be written, eliminating the race condition.
-        const mcpPort = process.env.MCP_PORT ? parseInt(process.env.MCP_PORT, 10) : null;
-        hmrPort = mcpPort ? mcpPort + HMR_PORT_OFFSET : await findAvailablePort(preferredHmrPort);
+        // Use MCP_HMR_PORT if provided by host, otherwise find an available port
+        const hmrPortFromHost = process.env.MCP_HMR_PORT ? parseInt(process.env.MCP_HMR_PORT, 10) : null;
+        hmrPort = hmrPortFromHost || await findAvailablePort(preferredHmrPort);
         await startHmrServer(hmrPort);
-        
-        // Still write hmr.json for non-Creature environments (manual npm run dev)
-        // Only write if HMR server started successfully
-        if (hmrServer) {
+
+        // Write hmr.json for environments without MCP_HMR_PORT (manual npm run dev)
+        if (hmrServer && !hmrPortFromHost) {
           mkdirSync(tempDir, { recursive: true });
           const hmrConfig: HmrConfig = { port: hmrPort };
           writeFileSync(

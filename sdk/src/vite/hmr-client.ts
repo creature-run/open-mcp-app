@@ -22,16 +22,6 @@
  */
 
 /**
- * Offset added to MCP_PORT to derive the HMR port.
- * When MCP_PORT is set (by Creature), both Vite and the SDK server
- * can independently calculate the same HMR port without coordination.
- *
- * Defined here (instead of vite/index.ts) to allow server code to import
- * without pulling in heavy Node.js dependencies used by the Vite plugin.
- */
-export const HMR_PORT_OFFSET = 1000;
-
-/**
  * HMR configuration written to node_modules/.creature/hmr.json
  */
 export interface HmrConfig {

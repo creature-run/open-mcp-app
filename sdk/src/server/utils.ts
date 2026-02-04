@@ -1,9 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 // Import directly from hmr-client to avoid pulling in heavy Node.js deps from vite/index
-import { generateHmrClientScriptTag, HMR_PORT_OFFSET, type HmrConfig } from "../vite/hmr-client.js";
-
-export { HMR_PORT_OFFSET };
+import { generateHmrClientScriptTag, type HmrConfig } from "../vite/hmr-client.js";
 
 export function svgToDataUri(svg: string): string {
   const base64 = Buffer.from(svg).toString("base64");
