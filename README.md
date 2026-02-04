@@ -13,10 +13,6 @@ Maintained by the team behind [Creature](https://creature.run).
 - [SDK Documentation](#sdk-documentation): API reference and examples
 - [MCP Apps Spec](https://github.com/modelcontextprotocol/ext-apps): Official specification
 
-**Examples:**
-- [todos](/mcp-apps/todos): Simple todo list with CRUD operations
-- [notes](/mcp-apps/notes): Markdown notes with editor and list views
-- [crm](/mcp-apps/crm): Customer relationship manager with search
 
 ## Features
 
@@ -25,7 +21,6 @@ Maintained by the team behind [Creature](https://creature.run).
 - **Clean separation of APIs**: Standard spec-compliant APIs vs clearly-marked experimental extensions
 - **Native look and feel**: Default styles for popular hosts so your app looks native on every platform
 - **Experimental capabilities**: APIs for multiple simultaneous apps, persistent state, storage, view routing, and more
-- **Robust examples**: Full working apps in `/mcp-apps` to learn from and build on
 
 ## SDK Documentation
 
