@@ -35,9 +35,8 @@ import { HostProvider } from "open-mcp-app/react";
 import { NotesProvider, useNotesContext } from "./useNotes";
 import { ListView } from "./ListView";
 import { EditorView } from "./EditorView";
-// Base styles provide SDK layout variables (spacing, containers, controls)
-// Host-provided spec variables (colors, typography) are applied during initialization
-import "open-mcp-app/styles/base.css";
+// Tailwind 4 integration - imports SDK theme mapping for host-provided variables
+import "open-mcp-app/styles/tailwind.css";
 import "./styles.css";
 
 /**
@@ -72,8 +71,8 @@ function NotesApp() {
   // Show loading spinner until host is ready
   if (!isReady) {
     return (
-      <div className="loading-container">
-        <div className="loading-spinner" />
+      <div className="flex items-center justify-center h-full w-full bg-bg-primary text-txt-primary">
+        <div className="w-6 h-6 border-2 border-bdr-secondary border-t-txt-primary rounded-full animate-spin" />
       </div>
     );
   }

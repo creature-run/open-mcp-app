@@ -32,9 +32,8 @@ import {
   Package,
   X,
 } from "@phosphor-icons/react";
-// Base styles provide SDK layout variables (spacing, containers, controls)
-// Host-provided spec variables (colors, typography) are applied during initialization
-import "open-mcp-app/styles/base.css";
+// Tailwind 4 integration - imports SDK theme mapping for host-provided variables
+import "open-mcp-app/styles/tailwind.css";
 import "./styles.css";
 
 // =============================================================================
@@ -178,7 +177,7 @@ function SearchInput({
   placeholder?: string;
 }) {
   const [localValue, setLocalValue] = useState(value);
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
     setLocalValue(value);
@@ -194,16 +193,20 @@ function SearchInput({
   );
 
   return (
-    <div className="search-input">
-      <MagnifyingGlass size={16} className="search-icon" />
+    <div className="search-input flex items-center gap-2 bg-bg-secondary border border-bdr-primary rounded-md py-1.5 px-2.5 flex-1 max-w-[280px] focus-within:border-ring-primary">
+      <MagnifyingGlass size={16} className="text-txt-secondary shrink-0" />
       <input
         type="text"
         value={localValue}
         onChange={(e) => handleChange(e.target.value)}
         placeholder={placeholder}
+        className="flex-1 bg-transparent border-none text-txt-primary text-sm outline-none min-w-0 placeholder:text-txt-secondary"
       />
       {localValue && (
-        <button className="search-clear" onClick={() => handleChange("")}>
+        <button
+          className="flex items-center justify-center bg-transparent border-none text-txt-secondary cursor-pointer p-0.5 rounded-sm hover:bg-bg-tertiary hover:text-txt-primary"
+          onClick={() => handleChange("")}
+        >
           <X size={14} />
         </button>
       )}
@@ -222,11 +225,12 @@ function StatusFilter({
   onChange: (value?: CustomerStatus) => void;
 }) {
   return (
-    <div className="status-filter">
+    <div className="flex items-center gap-1.5 text-txt-secondary">
       <Funnel size={16} />
       <select
         value={value || ""}
         onChange={(e) => onChange(e.target.value as CustomerStatus || undefined)}
+        className="bg-bg-secondary border border-bdr-primary rounded-md text-txt-primary text-sm py-1.5 px-2 cursor-pointer focus:border-ring-primary focus:outline-none"
       >
         <option value="">All Status</option>
         <option value="active">Active</option>
@@ -255,9 +259,18 @@ function SortableHeader({
   const Icon = isActive && currentSort.direction === "asc" ? CaretUp : CaretDown;
 
   return (
-    <th className="sortable-header" onClick={() => onSort(field)}>
-      <span>{label}</span>
-      <Icon size={12} weight={isActive ? "bold" : "regular"} className={isActive ? "active" : ""} />
+    <th
+      className="text-left py-2.5 px-3 font-medium text-txt-secondary border-b border-bdr-primary whitespace-nowrap cursor-pointer select-none hover:text-txt-primary"
+      onClick={() => onSort(field)}
+    >
+      <span className="inline-flex items-center gap-1">
+        {label}
+        <Icon
+          size={12}
+          weight={isActive ? "bold" : "regular"}
+          className={isActive ? "opacity-100 text-ring-primary" : "opacity-40"}
+        />
+      </span>
     </th>
   );
 }
@@ -275,25 +288,27 @@ function PaginationControls({
   const { page, totalPages, total } = pagination;
 
   return (
-    <div className="pagination">
-      <span className="pagination-info">
+    <div className="flex items-center justify-between py-2.5 px-4 border-t border-bdr-primary bg-bg-secondary shrink-0">
+      <span className="text-txt-secondary text-sm">
         {total} total
       </span>
-      <div className="pagination-controls">
+      <div className="flex items-center gap-2">
         <button
           disabled={page <= 1}
           onClick={() => onPageChange(page - 1)}
           title="Previous page"
+          className="flex items-center justify-center w-7 h-7 bg-bg-primary border border-bdr-primary rounded-sm text-txt-primary cursor-pointer hover:border-ring-primary disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <CaretLeft size={16} />
         </button>
-        <span className="pagination-pages">
+        <span className="text-sm text-txt-secondary min-w-[60px] text-center">
           {page} / {totalPages}
         </span>
         <button
           disabled={page >= totalPages}
           onClick={() => onPageChange(page + 1)}
           title="Next page"
+          className="flex items-center justify-center w-7 h-7 bg-bg-primary border border-bdr-primary rounded-sm text-txt-primary cursor-pointer hover:border-ring-primary disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <CaretRight size={16} />
         </button>
@@ -307,7 +322,7 @@ function PaginationControls({
  */
 function StatusBadge({ status }: { status: CustomerStatus | OrderStatus }) {
   return (
-    <span className="status-badge" style={{ color: getStatusColor(status) }}>
+    <span className="text-xs font-medium capitalize" style={{ color: getStatusColor(status) }}>
       {status}
     </span>
   );
@@ -331,39 +346,39 @@ function CustomerTable({
 }) {
   if (customers.length === 0) {
     return (
-      <div className="empty-state">
-        <User size={48} />
-        <p>No customers found</p>
+      <div className="flex-1 flex flex-col items-center justify-center text-txt-secondary p-8 gap-2">
+        <User size={48} className="opacity-50" />
+        <p className="text-sm">No customers found</p>
       </div>
     );
   }
 
   return (
-    <div className="table-container">
-      <table className="data-table">
-        <thead>
+    <div className="flex-1 overflow-auto">
+      <table className="w-full border-collapse text-sm">
+        <thead className="sticky top-0 bg-bg-secondary z-[1]">
           <tr>
             <SortableHeader label="Name" field="name" currentSort={sort} onSort={onSort} />
             <SortableHeader label="Email" field="email" currentSort={sort} onSort={onSort} />
             <SortableHeader label="Company" field="company" currentSort={sort} onSort={onSort} />
             <SortableHeader label="Status" field="status" currentSort={sort} onSort={onSort} />
-            <th>Orders</th>
-            <th>Total</th>
+            <th className="text-left py-2.5 px-3 font-medium text-txt-secondary border-b border-bdr-primary whitespace-nowrap">Orders</th>
+            <th className="text-left py-2.5 px-3 font-medium text-txt-secondary border-b border-bdr-primary whitespace-nowrap">Total</th>
           </tr>
         </thead>
         <tbody>
           {customers.map((customer) => (
             <tr
               key={customer.id}
-              className={selectedId === customer.id ? "selected" : ""}
+              className={`cursor-pointer transition-colors hover:bg-bg-tertiary ${selectedId === customer.id ? "bg-bg-secondary" : ""}`}
               onClick={() => onSelect(customer)}
             >
-              <td className="name-cell">{customer.name}</td>
-              <td className="email-cell">{customer.email}</td>
-              <td>{customer.company}</td>
-              <td><StatusBadge status={customer.status} /></td>
-              <td>{customer.orderCount ?? 0}</td>
-              <td>{formatCents(customer.totalSpentCents ?? 0)}</td>
+              <td className="py-2.5 px-3 border-b border-bdr-secondary max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap font-medium">{customer.name}</td>
+              <td className="py-2.5 px-3 border-b border-bdr-secondary max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap text-txt-secondary">{customer.email}</td>
+              <td className="py-2.5 px-3 border-b border-bdr-secondary max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap">{customer.company}</td>
+              <td className="py-2.5 px-3 border-b border-bdr-secondary"><StatusBadge status={customer.status} /></td>
+              <td className="py-2.5 px-3 border-b border-bdr-secondary">{customer.orderCount ?? 0}</td>
+              <td className="py-2.5 px-3 border-b border-bdr-secondary">{formatCents(customer.totalSpentCents ?? 0)}</td>
             </tr>
           ))}
         </tbody>
@@ -385,69 +400,72 @@ function CustomerDetail({
   const { customer, orders, stats } = data;
 
   return (
-    <div className="detail-panel">
-      <div className="detail-header">
-        <h2>{customer.name}</h2>
-        <button className="close-button" onClick={onClose}>
+    <div className="w-[40%] min-w-[300px] border-l border-bdr-primary bg-bg-secondary overflow-y-auto flex flex-col">
+      <div className="flex items-center justify-between p-4 border-b border-bdr-primary">
+        <h2 className="text-lg font-medium">{customer.name}</h2>
+        <button
+          className="flex items-center justify-center w-7 h-7 bg-transparent border-none rounded-sm text-txt-secondary cursor-pointer hover:bg-bg-tertiary hover:text-txt-primary"
+          onClick={onClose}
+        >
           <X size={16} />
         </button>
       </div>
 
-      <div className="detail-info">
-        <div className="info-row">
-          <span className="label">Email</span>
-          <span className="value">{customer.email}</span>
+      <div className="p-4 border-b border-bdr-primary">
+        <div className="flex justify-between items-center py-1.5">
+          <span className="text-txt-secondary text-sm">Email</span>
+          <span className="text-sm">{customer.email}</span>
         </div>
-        <div className="info-row">
-          <span className="label">Company</span>
-          <span className="value">{customer.company}</span>
+        <div className="flex justify-between items-center py-1.5">
+          <span className="text-txt-secondary text-sm">Company</span>
+          <span className="text-sm">{customer.company}</span>
         </div>
-        <div className="info-row">
-          <span className="label">Status</span>
+        <div className="flex justify-between items-center py-1.5">
+          <span className="text-txt-secondary text-sm">Status</span>
           <StatusBadge status={customer.status} />
         </div>
-        <div className="info-row">
-          <span className="label">Customer Since</span>
-          <span className="value">{formatDate(customer.createdAt)}</span>
+        <div className="flex justify-between items-center py-1.5">
+          <span className="text-txt-secondary text-sm">Customer Since</span>
+          <span className="text-sm">{formatDate(customer.createdAt)}</span>
         </div>
       </div>
 
-      <div className="detail-stats">
-        <div className="stat">
-          <span className="stat-value">{stats.orderCount}</span>
-          <span className="stat-label">Orders</span>
+      <div className="flex gap-4 p-4 border-b border-bdr-primary">
+        <div className="flex-1 text-center">
+          <span className="block text-lg font-medium mb-1">{stats.orderCount}</span>
+          <span className="text-xs text-txt-secondary">Orders</span>
         </div>
-        <div className="stat">
-          <span className="stat-value">{stats.totalSpent}</span>
-          <span className="stat-label">Total Spent</span>
+        <div className="flex-1 text-center">
+          <span className="block text-lg font-medium mb-1">{stats.totalSpent}</span>
+          <span className="text-xs text-txt-secondary">Total Spent</span>
         </div>
       </div>
 
-      <h3>Order History</h3>
+      <h3 className="py-4 px-4 pb-3 text-base font-medium text-txt-secondary">Order History</h3>
       {orders.length === 0 ? (
-        <div className="empty-state small">
-          <Package size={32} />
-          <p>No orders yet</p>
+        <div className="flex flex-col items-center justify-center text-txt-secondary p-4 gap-2">
+          <Package size={32} className="opacity-50" />
+          <p className="text-sm">No orders yet</p>
         </div>
       ) : (
-        <div className="orders-list">
+        <div className="flex-1 overflow-y-auto px-4 pb-4">
           {orders.map((order) => (
-            <div key={order.id} className="order-card">
-              <div className="order-header">
-                <span className="order-number">{order.number}</span>
+            <div key={order.id} className="bg-bg-primary border border-bdr-primary rounded-md p-3 mb-2">
+              <div className="flex justify-between items-center mb-2">
+                <span className="font-medium text-sm">{order.number}</span>
                 <StatusBadge status={order.status} />
               </div>
-              <div className="order-meta">
+              <div className="flex justify-between text-xs text-txt-secondary">
                 <span>{formatDate(order.createdAt)}</span>
-                <span className="order-total">{formatCents(order.totalCents)}</span>
+                <span className="font-medium text-txt-primary">{formatCents(order.totalCents)}</span>
               </div>
               {order.items && order.items.length > 0 && (
-                <div className="order-items">
+                <div className="mt-2 pt-2 border-t border-bdr-secondary">
                   {order.items.map((item) => (
-                    <div key={item.id} className="line-item">
-                      <span className="item-title">{item.title}</span>
-                      <span className="item-qty">×{item.qty}</span>
-                      <span className="item-price">{formatCents(item.unitPriceCents * item.qty)}</span>
+                    <div key={item.id} className="flex items-center gap-2 text-xs py-1">
+                      <span className="flex-1 text-txt-secondary">{item.title}</span>
+                      <span className="text-txt-secondary">×{item.qty}</span>
+                      <span className="text-txt-primary">{formatCents(item.unitPriceCents * item.qty)}</span>
                     </div>
                   ))}
                 </div>
@@ -479,8 +497,8 @@ function Toolbar({
   hasData: boolean;
 }) {
   return (
-    <div className="toolbar">
-      <div className="toolbar-left">
+    <div className="flex items-center justify-between gap-3 py-3 px-4 border-b border-bdr-primary shrink-0">
+      <div className="flex items-center gap-2 flex-1">
         <SearchInput
           value={filters.query || ""}
           onChange={(query) => onFilterChange({ ...filters, query: query || undefined })}
@@ -491,15 +509,22 @@ function Toolbar({
           onChange={(status) => onFilterChange({ ...filters, status })}
         />
       </div>
-      <div className="toolbar-right">
+      <div className="flex items-center gap-2">
         {!hasData && (
-          <button className="action-button primary" onClick={onSeed} disabled={isSeeding}>
+          <button
+            className="flex items-center gap-1.5 py-1.5 px-3 rounded-md text-sm font-medium cursor-pointer transition-opacity bg-bg-inverse border-none text-txt-inverse hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={onSeed}
+            disabled={isSeeding}
+          >
             <Database size={16} />
             {isSeeding ? "Seeding..." : "Seed Demo Data"}
           </button>
         )}
         {hasData && (
-          <button className="action-button danger" onClick={onReset}>
+          <button
+            className="flex items-center gap-1.5 py-1.5 px-3 rounded-md text-sm font-medium cursor-pointer transition-opacity bg-transparent border border-bdr-primary text-txt-secondary hover:border-bdr-danger hover:text-txt-danger"
+            onClick={onReset}
+          >
             <Trash size={16} />
             Reset
           </button>
@@ -585,7 +610,7 @@ function CrmApp() {
   useEffect(() => {
     if (listState.data) {
       setListData(listState.data);
-      
+
       // Save to widget state
       setWidgetState({
         modelContent: {
@@ -595,7 +620,7 @@ function CrmApp() {
         },
         privateContent: {
           listData: listState.data,
-          customerDetail,
+          customerDetail: customerDetail ?? undefined,
           filters,
           sort,
           page,
@@ -700,11 +725,11 @@ function CrmApp() {
   const hasData = (listData?.summary.totalCustomers ?? 0) > 0;
 
   return (
-    <div className="crm-container">
-      <header className="crm-header">
-        <h1>CRM Explorer</h1>
+    <div className="flex flex-col h-full overflow-hidden bg-bg-primary text-txt-primary">
+      <header className="flex items-center justify-between py-3 px-4 border-b border-bdr-primary shrink-0">
+        <h1 className="text-lg font-medium">CRM Explorer</h1>
         {listData && (
-          <span className="summary">
+          <span className="text-txt-secondary text-sm">
             {listData.summary.totalCustomers} customers · {listData.summary.totalOrders} orders
           </span>
         )}
@@ -719,10 +744,10 @@ function CrmApp() {
         hasData={hasData}
       />
 
-      <div className="crm-content">
-        <div className={`customer-list ${customerDetail ? "with-detail" : ""}`}>
-          {listState.isLoading && !listData ? (
-            <div className="loading">Loading...</div>
+      <div className="flex flex-1 overflow-hidden">
+        <div className={`flex-1 flex flex-col overflow-hidden min-w-0 ${customerDetail ? "max-w-[60%]" : ""}`}>
+          {listState.status === "loading" && !listData ? (
+            <div className="flex-1 flex items-center justify-center text-txt-secondary">Loading...</div>
           ) : listData ? (
             <>
               <CustomerTable
@@ -738,10 +763,10 @@ function CrmApp() {
               />
             </>
           ) : (
-            <div className="empty-state">
-              <Database size={48} />
-              <p>No data yet</p>
-              <p className="hint">Click "Seed Demo Data" to get started</p>
+            <div className="flex-1 flex flex-col items-center justify-center text-txt-secondary p-8 gap-2">
+              <Database size={48} className="opacity-50" />
+              <p className="text-sm">No data yet</p>
+              <p className="text-xs opacity-70">Click "Seed Demo Data" to get started</p>
             </div>
           )}
         </div>

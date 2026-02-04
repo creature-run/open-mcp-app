@@ -20,7 +20,7 @@ import { useNotesContext } from "./useNotes";
  * The parent (NotesApp) only renders EditorView when a note is loaded.
  */
 export function EditorView() {
-  const { note, saveNote, isSaving, lastSaved, editorRef, goToList } = useNotesContext();
+  const { note, saveNote, isSaving, lastSaved, editorRef, goToList, updateDraft } = useNotesContext();
 
   // Initialize with empty strings - will be synced via effect when note is available
   const [title, setTitle] = useState(note?.title ?? "");
@@ -33,9 +33,9 @@ export function EditorView() {
    */
   useEffect(() => {
     if (note) {
-      setTitle(note.title);
-      titleRef.current = note.title;
-      contentRef.current = note.content;
+      setTitle(note.title ?? "");
+      titleRef.current = note.title ?? "";
+      contentRef.current = note.content ?? "";
     }
   }, [note?.id, note?.title, note?.content]);
 
@@ -62,12 +62,14 @@ export function EditorView() {
    */
   const handleTitleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (!note) return;
       const newTitle = e.target.value;
       setTitle(newTitle);
       titleRef.current = newTitle; // Keep ref in sync for content changes
+      updateDraft({ noteId: note.id, title: newTitle });
       debouncedSave(newTitle, contentRef.current);
     },
-    [debouncedSave]
+    [debouncedSave, note, updateDraft]
   );
 
   /**
@@ -77,10 +79,12 @@ export function EditorView() {
    */
   const handleContentChange = useCallback(
     (newContent: string) => {
+      if (!note) return;
       contentRef.current = newContent;
+      updateDraft({ noteId: note.id, content: newContent });
       debouncedSave(titleRef.current, newContent);
     },
-    [debouncedSave]
+    [debouncedSave, note, updateDraft]
   );
 
   /**
@@ -97,39 +101,48 @@ export function EditorView() {
   }
 
   return (
-    <div className="note-container">
-      <header className="note-header">
+    <div className="note-container flex flex-col h-full overflow-hidden bg-bg-primary text-txt-primary">
+      <header className="flex items-center justify-between gap-4 py-2 px-4 border-b border-bdr-secondary shrink-0">
         <button
-          className="back-button"
+          className="bg-transparent border-none text-txt-primary text-base cursor-pointer py-1 px-2 mr-2 rounded-sm shrink-0 hover:bg-bg-secondary"
           onClick={goToList}
           title="Back to notes list"
           aria-label="Back to notes list"
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M19 12H5M12 19l-7-7 7-7"/>
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M19 12H5M12 19l-7-7 7-7" />
           </svg>
         </button>
         <input
           type="text"
-          className="note-title"
+          className="note-title flex-1 text-base font-medium"
           value={title}
           onChange={handleTitleChange}
           placeholder="Untitled"
           autoComplete="off"
         />
-        <div className="note-status">
-          {isSaving && <span className="saving">Saving...</span>}
+        <div className="text-sm text-txt-secondary shrink-0">
+          {isSaving && <span className="text-txt-tertiary">Saving...</span>}
           {!isSaving && lastSavedText && (
-            <span className="saved">{lastSavedText}</span>
+            <span className="text-txt-tertiary">{lastSavedText}</span>
           )}
         </div>
       </header>
 
-      <div className="note-editor-container">
+      <div className="note-editor-container flex-1 overflow-hidden flex flex-col">
         <MilkdownEditor
           ref={editorRef}
           key={note.id}
-          defaultValue={note.content}
+          defaultValue={note.content ?? ""}
           onChange={handleContentChange}
           placeholder="Write your note in markdown..."
         />

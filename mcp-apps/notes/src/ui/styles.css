@@ -1,17 +1,9 @@
 /**
  * MCP Notes Styles
  *
- * Uses MCP Apps spec CSS variables (colors, typography, borders, shadows)
- * provided by the host, plus SDK layout variables (spacing, controls)
- * from base.css.
- *
- * Spec variables: --color-*, --font-*, --border-*, --shadow-*
- * SDK variables: --spacing-*, --control-*, --container-*, --transition-*
+ * Minimal styles for elements that can't be styled with Tailwind classes.
+ * Primarily Milkdown editor theming and animations.
  */
-
-/* =============================================================================
-   Root & Document Styles
-============================================================================= */
 
 html,
 body,
@@ -21,72 +13,29 @@ body,
   overflow: hidden;
 }
 
-/* =============================================================================
-   Note Container
-============================================================================= */
-
-.note-container {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow: hidden;
+/* Spin animation for loading spinner */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* =============================================================================
-   Header
+   Note Title Input (needs custom styling)
 ============================================================================= */
-
-.note-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--spacing-4);
-  padding: var(--spacing-2) var(--spacing-4);
-  border: none;
-  border-bottom: var(--border-width-regular) solid var(--color-border-secondary);
-  flex-shrink: 0;
-}
 
 .note-title {
-  flex: 1;
-  font-size: var(--font-text-md-size);
-  font-weight: var(--font-weight-medium);
-}
-
-.note-status {
-  font-size: var(--font-text-sm-size);
-  color: var(--color-text-secondary);
-  flex-shrink: 0;
-}
-
-.note-status .saving {
-  color: var(--color-text-secondary);
-}
-
-.note-status .saved {
-  color: var(--color-text-tertiary);
+  background: transparent;
+  border: none;
+  color: var(--color-text-primary);
+  outline: none;
 }
 
 /* =============================================================================
    Editor Container
 ============================================================================= */
 
-.note-editor-container {
-  flex: 1;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-.note-editor-container .milkdown-wrapper {
-  flex: 1;
-  overflow-y: auto;
-  padding: var(--spacing-4);
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  cursor: text;
-}
+/* milkdown-wrapper base styles now in Tailwind classes on the component */
 
 /* Constrain content width for readability */
 .note-editor-container .milkdown-wrapper > .milkdown {
@@ -97,7 +46,7 @@ body,
 
 /* =============================================================================
    Milkdown Editor Theme
-   
+
    Styles the Milkdown WYSIWYG editor to match MCP spec design tokens.
    The editor renders formatted markdown inline as you type.
 ============================================================================= */
@@ -311,12 +260,7 @@ body,
   margin-bottom: var(--spacing-1);
 }
 
-/* Task lists (GFM)
- * Milkdown renders task items as <li data-item-type="task" data-checked="true|false">
- * without actual <input> elements. We render checkboxes via CSS ::before pseudo-elements.
- * pointer-events: none on pseudo-elements allows clicks to pass through to Milkdown's
- * underlying task list handler.
- */
+/* Task lists (GFM) */
 .note-editor-container .milkdown li[data-item-type="task"] {
   list-style: none;
   position: relative;
@@ -492,215 +436,4 @@ body,
 
 .note-editor-container .milkdown-wrapper::-webkit-scrollbar-thumb:hover {
   background: var(--color-border-secondary);
-}
-
-/* =============================================================================
-   Back Button (Editor View)
-============================================================================= */
-
-.back-button {
-  background: transparent;
-  border: none;
-  color: var(--color-text-primary);
-  font-size: var(--font-text-md-size);
-  cursor: pointer;
-  padding: var(--spacing-1) var(--spacing-2);
-  margin-right: var(--spacing-2);
-  border-radius: var(--border-radius-sm);
-  flex-shrink: 0;
-}
-
-.back-button:hover {
-  background: var(--color-background-secondary);
-}
-
-/* =============================================================================
-   List View
-============================================================================= */
-
-.list-container {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow: hidden;
-}
-
-.list-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--spacing-3) var(--spacing-4);
-  border-bottom: var(--border-width-regular) solid var(--color-border-secondary);
-  flex-shrink: 0;
-}
-
-.list-title {
-  font-size: var(--font-heading-sm-size);
-  font-weight: var(--font-weight-medium);
-  color: var(--color-text-primary);
-  margin: 0;
-}
-
-.create-button {
-  background: var(--color-text-primary);
-  color: var(--color-text-inverse);
-  border: none;
-  padding: var(--spacing-1-5) var(--spacing-3);
-  border-radius: var(--border-radius-md);
-  font-size: var(--font-text-sm-size);
-  font-weight: var(--font-weight-medium);
-  cursor: pointer;
-}
-
-.create-button:hover {
-  opacity: 0.9;
-}
-
-.search-container {
-  padding: var(--spacing-3) var(--spacing-4);
-  border-bottom: var(--border-width-regular) solid var(--color-border-secondary);
-  flex-shrink: 0;
-}
-
-.search-field {
-  position: relative;
-  width: 100%;
-}
-
-.search-icon {
-  position: absolute;
-  left: var(--spacing-3);
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--color-text-tertiary);
-  width: 12px;
-  height: 12px;
-  pointer-events: none;
-}
-
-.search-input {
-  width: 100%;
-  padding: var(--spacing-2) var(--spacing-3);
-  padding-left: calc(var(--spacing-3) + var(--spacing-2) + var(--spacing-2) + 12px);
-  background: var(--color-background-secondary);
-  border: var(--border-width-regular) solid var(--color-border-secondary);
-  border-radius: var(--border-radius-md);
-  font-size: var(--font-text-sm-size);
-  color: var(--color-text-primary);
-  outline: none;
-}
-
-.search-input::placeholder {
-  color: var(--color-text-tertiary);
-}
-
-.notes-list {
-  flex: 1;
-  overflow-y: auto;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.note-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: var(--spacing-3) var(--spacing-4);
-  border-bottom: var(--border-width-regular) solid var(--color-border-tertiary);
-  cursor: pointer;
-}
-
-.note-item:hover {
-  background: var(--color-background-secondary);
-}
-
-.note-item-title {
-  font-size: var(--font-text-md-size);
-  color: var(--color-text-primary);
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.note-item-time {
-  font-size: var(--font-text-xs-size);
-  color: var(--color-text-tertiary);
-  flex-shrink: 0;
-  margin-left: var(--spacing-3);
-}
-
-.empty-state {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  color: var(--color-text-secondary);
-  padding: var(--spacing-8);
-  text-align: center;
-}
-
-.empty-state p {
-  margin-bottom: var(--spacing-4);
-}
-
-.create-button-large {
-  background: var(--color-text-primary);
-  color: var(--color-text-inverse);
-  border: none;
-  padding: var(--spacing-3) var(--spacing-6);
-  border-radius: var(--border-radius-md);
-  font-size: var(--font-text-md-size);
-  font-weight: var(--font-weight-medium);
-  cursor: pointer;
-}
-
-.create-button-large:hover {
-  opacity: 0.9;
-}
-
-/* =============================================================================
-   Loading State
-============================================================================= */
-
-.loading-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: var(--color-text-secondary);
-  position: relative;
-}
-
-.loading-spinner {
-  width: var(--icon-size-2xl);
-  height: var(--icon-size-2xl);
-  border: 2px solid var(--color-border-secondary);
-  border-top-color: var(--color-text-primary);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-/* =============================================================================
-   Environment Badge (Development)
-============================================================================= */
-
-.environment-badge {
-  position: fixed;
-  bottom: var(--spacing-2);
-  right: var(--spacing-2);
-  padding: var(--spacing-1) var(--spacing-2);
-  background: var(--color-background-tertiary);
-  color: var(--color-text-secondary);
-  font-size: var(--font-text-xs-size);
-  border-radius: var(--border-radius-sm);
-  opacity: 0.7;
 }

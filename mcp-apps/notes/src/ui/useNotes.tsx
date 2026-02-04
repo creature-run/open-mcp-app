@@ -49,6 +49,8 @@ export interface UseNotesReturn {
   lastSaved: Date | null;
   /** Ref to Milkdown editor for imperative updates */
   editorRef: React.RefObject<MilkdownEditorRef | null>;
+  /** Update local draft state for the current note */
+  updateDraft: (args: { noteId: string; title?: string; content?: string }) => void;
   /** Save a note with new title and content */
   saveNote: (noteId: string, title: string, content: string) => Promise<void>;
   /** Open a note by ID */
@@ -90,6 +92,9 @@ export const useNotes = (): UseNotesReturn => {
 
   // Refs
   const lastSavedContentRef = useRef<string | null>(null);
+  const lastDraftContentRef = useRef<string | null>(null);
+  const lastSaveSourceRef = useRef<"local" | null>(null);
+  const lastOpenRefreshKeyRef = useRef<string | null>(null);
   const hasRestoredState = useRef(false);
   const editorRef = useRef<MilkdownEditorRef>(null);
 
@@ -139,22 +144,52 @@ export const useNotes = (): UseNotesReturn => {
       if (isNewNote) {
         setNote(noteData);
         lastSavedContentRef.current = noteData.content;
+        lastDraftContentRef.current = noteData.content;
         log.debug("Note loaded", { id: noteData.id, title: noteData.title });
       } else {
         // Same note - check for external update
-        const isExternalUpdate = noteData.content !== lastSavedContentRef.current;
+        const hasContent = noteData.content !== undefined;
+        const isExternalUpdate = hasContent && noteData.content !== lastSavedContentRef.current;
+
         if (isExternalUpdate) {
+          // External change - update editor
           setNote(noteData);
           editorRef.current?.setContent(noteData.content);
           lastSavedContentRef.current = noteData.content;
+          lastDraftContentRef.current = noteData.content;
           log.debug("Note updated externally", { id: noteData.id });
-        } else {
-          // Our own save result - just update metadata
+        } else if (hasContent) {
+          // Content present - use server data and update editor
           setNote(noteData);
+          editorRef.current?.setContent(noteData.content);
+          lastSavedContentRef.current = noteData.content;
+          lastDraftContentRef.current = noteData.content;
+        } else {
+          // No content in response (e.g., save result) - preserve local content
+          const fallbackContent = lastDraftContentRef.current ?? lastSavedContentRef.current ?? note?.content;
+          setNote((prev) => prev ? { ...prev, ...noteData, content: fallbackContent ?? prev.content } : noteData);
+
+          const refreshKey = noteData.updatedAt ? `${noteData.id}:${noteData.updatedAt}` : null;
+          const shouldRefreshFromOpen = !lastSaveSourceRef.current
+            && refreshKey
+            && lastOpenRefreshKeyRef.current !== refreshKey;
+
+          if (shouldRefreshFromOpen) {
+            lastOpenRefreshKeyRef.current = refreshKey;
+            openTool({ noteId: noteData.id })
+              .then(() => {
+                log.debug("Refreshed note content after external save", { id: noteData.id });
+              })
+              .catch((err) => {
+                log.error("Failed to refresh note after external save", { error: String(err) });
+              });
+          }
+
+          lastSaveSourceRef.current = null;
         }
       }
     }
-  }, [viewData, note?.id, log]);
+  }, [viewData, note?.id, log, openTool]);
 
   // ===========================================================================
   // Action Callbacks
@@ -166,7 +201,9 @@ export const useNotes = (): UseNotesReturn => {
   const saveNote = useCallback(
     async (noteId: string, newTitle: string, newContent: string) => {
       setIsSaving(true);
+      lastSaveSourceRef.current = "local";
       lastSavedContentRef.current = newContent;
+      lastDraftContentRef.current = newContent;
       try {
         await saveTool({
           noteId,
@@ -182,6 +219,27 @@ export const useNotes = (): UseNotesReturn => {
       }
     },
     [saveTool, log]
+  );
+
+  /**
+   * Update local draft state while the user is editing.
+   * Keeps editor state consistent when navigating between views before save.
+   */
+  const updateDraft = useCallback(
+    ({ noteId, title, content }: { noteId: string; title?: string; content?: string }) => {
+      if (content !== undefined) {
+        lastDraftContentRef.current = content;
+      }
+      setNote((prev) => {
+        if (!prev || prev.id !== noteId) return prev;
+        return {
+          ...prev,
+          ...(title !== undefined ? { title } : {}),
+          ...(content !== undefined ? { content } : {}),
+        };
+      });
+    },
+    []
   );
 
   /**
@@ -291,7 +349,7 @@ export const useNotes = (): UseNotesReturn => {
     if (view === "list") {
       setWidgetState({
         modelContent: {
-          view: "/",
+          view: "list",
           noteCount: notes.length,
         },
         privateContent: {
@@ -301,10 +359,10 @@ export const useNotes = (): UseNotesReturn => {
         },
       });
     } else if (view === "editor" && note) {
-      const wordCount = note.content.trim().split(/\s+/).filter(Boolean).length;
+      const wordCount = (note.content ?? "").trim().split(/\s+/).filter(Boolean).length;
       setWidgetState({
         modelContent: {
-          view: viewPath,
+          view: "editor",
           noteId: note.id,
           noteTitle: note.title,
           wordCount,
@@ -326,6 +384,7 @@ export const useNotes = (): UseNotesReturn => {
     isSaving,
     lastSaved,
     editorRef,
+    updateDraft,
     saveNote,
     openNote,
     createNote,

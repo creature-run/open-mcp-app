@@ -2,44 +2,21 @@
  * MCP Todos UI
  *
  * A clean, interactive todo list with detail view for editing notes.
- *
- * Cross-Platform Compatibility:
- * - Works in Creature (MCP Apps host)
- * - Works in ChatGPT Apps
- * - Works in any generic MCP Apps host
- *
- * Views:
- * - List view: Shows all todos with add, toggle, and delete
- * - Detail view: WYSIWYG markdown editor for todo notes
- *
- * Features:
- * - Add, toggle, and delete todos
- * - Click a todo to edit its notes (markdown supported)
- * - Full-text search with SQLite FTS5 (in Creature)
- * - Persists via tool calls to the server
- *
- * SDK hooks used:
- * - HostProvider: Provides host client to child components via context
- * - useHost: Access callTool, isReady, log, etc. from context
+ * Uses Tailwind 4 with SDK theme mapping for host-provided variables.
  */
 
 import { useEffect, useCallback, useState, useRef, type FormEvent } from "react";
 import { HostProvider, useHost, type Environment } from "open-mcp-app/react";
 import { DetailView } from "./DetailView";
 import type { Todo, TodoData, SearchResultData, TodoWidgetState, View } from "./types";
-// Base styles provide SDK layout variables (spacing, containers, controls)
-// Host-provided spec variables (colors, typography) are applied during initialization
-import "open-mcp-app/styles/base.css";
+// Tailwind 4 integration - imports SDK theme mapping for host-provided variables
+import "open-mcp-app/styles/tailwind.css";
 import "./styles.css";
 
 // =============================================================================
 // List View Components
 // =============================================================================
 
-/**
- * Single todo item component with checkbox and delete button.
- * Clicking the item (not checkbox) opens detail view.
- */
 function TodoItem({
   todo,
   onToggle,
@@ -53,7 +30,6 @@ function TodoItem({
 }) {
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
-      // Don't open if clicking checkbox or delete button
       const target = e.target as HTMLElement;
       if (target.closest(".todo-checkbox") || target.closest(".todo-delete")) {
         return;
@@ -65,26 +41,31 @@ function TodoItem({
 
   return (
     <div
-      className={`todo-item ${todo.completed ? "completed" : ""}`}
+      className={`flex items-center gap-2.5 p-2 px-2.5 bg-bg-secondary border border-bdr-secondary rounded-md cursor-pointer transition-colors hover:bg-bg-tertiary ${todo.completed ? "completed" : ""}`}
       onClick={handleClick}
     >
       <div
-        className="todo-checkbox"
+        className={`todo-checkbox w-4 h-4 border-[1.5px] border-bdr-primary rounded-sm cursor-pointer flex items-center justify-center shrink-0 transition-all hover:border-ring-primary ${todo.completed ? "bg-bg-inverse border-bg-inverse" : ""}`}
         onClick={(e) => {
           e.stopPropagation();
           onToggle(todo.id);
         }}
       >
-        <svg viewBox="0 0 24 24">
+        <svg
+          viewBox="0 0 24 24"
+          className={`w-3.5 h-3.5 stroke-txt-inverse stroke-[3] fill-none ${todo.completed ? "opacity-100" : "opacity-0"}`}
+        >
           <polyline points="20 6 9 17 4 12" />
         </svg>
       </div>
-      <div className="todo-content">
-        <span className="todo-text">{todo.text}</span>
-        {todo.notes && <span className="todo-has-notes">Has notes</span>}
+      <div className="flex-1 flex flex-col gap-0.5 min-w-0">
+        <span className={`break-words text-sm ${todo.completed ? "line-through text-txt-secondary" : ""}`}>
+          {todo.text}
+        </span>
+        {todo.notes && <span className="text-xs text-txt-tertiary">Has notes</span>}
       </div>
       <button
-        className="todo-delete"
+        className="todo-delete w-6 h-6 border-none bg-transparent text-txt-secondary cursor-pointer rounded-sm flex items-center justify-center transition-all shrink-0 hover:bg-bg-tertiary hover:text-txt-primary"
         onClick={(e) => {
           e.stopPropagation();
           onDelete(todo.id);
@@ -108,9 +89,6 @@ function TodoItem({
   );
 }
 
-/**
- * Todo list component that renders all todos or an empty state.
- */
 function TodoList({
   todos,
   onToggle,
@@ -124,13 +102,14 @@ function TodoList({
 }) {
   if (todos.length === 0) {
     return (
-      <div className="todo-list">
-        <div className="empty-state">
+      <div className="flex-1 overflow-y-auto flex flex-col gap-1">
+        <div className="flex-1 flex flex-col items-center justify-center text-txt-secondary gap-2">
           <svg
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
             strokeWidth="1"
+            className="w-12 h-12 opacity-50"
           >
             <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
           </svg>
@@ -141,7 +120,7 @@ function TodoList({
   }
 
   return (
-    <div className="todo-list">
+    <div className="flex-1 overflow-y-auto flex flex-col mt-2 gap-2 scrollbar-thin">
       {todos.map((todo) => (
         <TodoItem
           key={todo.id}
@@ -155,9 +134,6 @@ function TodoList({
   );
 }
 
-/**
- * Form component for adding new todos.
- */
 function AddTodoForm({ onAdd }: { onAdd: (text: string) => Promise<void> }) {
   const [text, setText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -179,7 +155,7 @@ function AddTodoForm({ onAdd }: { onAdd: (text: string) => Promise<void> }) {
   );
 
   return (
-    <form className="add-form" onSubmit={handleSubmit}>
+    <form className="flex gap-2 items-stretch" onSubmit={handleSubmit}>
       <input
         type="text"
         value={text}
@@ -188,17 +164,19 @@ function AddTodoForm({ onAdd }: { onAdd: (text: string) => Promise<void> }) {
         autoComplete="off"
         disabled={isSubmitting}
         maxLength={250}
+        className="flex-1 py-2 px-3 bg-transparent border border-bdr-primary rounded-md text-txt-primary font-inherit text-base outline-none focus:border-ring-primary placeholder:text-txt-tertiary"
       />
-      <button type="submit" disabled={isSubmitting || !text.trim()}>
+      <button
+        type="submit"
+        disabled={isSubmitting || !text.trim()}
+        className="px-4 bg-bg-inverse border border-transparent rounded-md text-txt-inverse font-inherit text-sm font-medium cursor-pointer transition-opacity hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
         Add
       </button>
     </form>
   );
 }
 
-/**
- * Search bar component for full-text search.
- */
 function SearchBar({
   onSearch,
   onClear,
@@ -237,10 +215,10 @@ function SearchBar({
   }, [onClear]);
 
   return (
-    <div className="search-container">
-      <div className="search-field">
+    <div className="pt-2 pb-3 mb-2 border-b border-bdr-secondary shrink-0">
+      <div className="relative w-full">
         <svg
-          className="search-icon"
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-txt-tertiary w-3 h-3 pointer-events-none"
           width="12"
           height="12"
           viewBox="0 0 24 24"
@@ -253,34 +231,13 @@ function SearchBar({
         </svg>
         <input
           type="text"
-          className="search-input"
           value={query}
           onChange={(e) => handleChange(e.target.value)}
           placeholder="Search todos..."
           autoComplete="off"
+          className="w-full py-2 pl-8 pr-3 bg-transparent border border-bdr-primary rounded-md text-sm text-txt-primary outline-none focus:border-ring-primary placeholder:text-txt-tertiary"
         />
-        {query && (
-          <button
-            type="button"
-            className="search-clear"
-            onClick={handleClear}
-            title="Clear search"
-          >
-            <svg
-              width="12"
-              height="12"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        )}
       </div>
-      {isSearching && <span className="search-status">Searching...</span>}
     </div>
   );
 }
@@ -308,9 +265,6 @@ export default function App() {
   );
 }
 
-/**
- * Inner todo app component that handles both list and detail views.
- */
 function TodoApp() {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [view, setView] = useState<View>("list");
@@ -326,7 +280,6 @@ function TodoApp() {
 
   const [widgetState, setWidgetState] = exp_widgetState<TodoWidgetState>();
 
-  // Tool callers
   const [listTodos, listState] = callTool<TodoData>("todos_list");
   const [addTodo, addState] = callTool<TodoData>("todos_add");
   const [toggleTodo, toggleState] = callTool<TodoData>("todos_toggle");
@@ -335,9 +288,6 @@ function TodoApp() {
   const [updateTodo, updateState] = callTool<TodoData>("todos_update");
   const [getTodo] = callTool<TodoData>("todos_get");
 
-  /**
-   * Restore todos from widget state on mount.
-   */
   useEffect(() => {
     if (hasRestoredState.current || !widgetState?.privateContent?.todos) {
       return;
@@ -350,9 +300,6 @@ function TodoApp() {
     }
   }, [widgetState, log]);
 
-  /**
-   * Update todos from tool result data.
-   */
   const updateTodosFromData = useCallback(
     (data: TodoData | null) => {
       if (data?.todos) {
@@ -372,7 +319,6 @@ function TodoApp() {
         });
       }
 
-      // Handle detail view data
       if (data?.todo && data?.view === "detail") {
         setSelectedTodo(data.todo);
         setView("detail");
@@ -381,29 +327,23 @@ function TodoApp() {
     [log, setWidgetState]
   );
 
-  // Update todos when tool calls return
   useEffect(() => updateTodosFromData(listState.data), [listState.data, updateTodosFromData]);
   useEffect(() => updateTodosFromData(addState.data), [addState.data, updateTodosFromData]);
   useEffect(() => updateTodosFromData(toggleState.data), [toggleState.data, updateTodosFromData]);
   useEffect(() => updateTodosFromData(removeState.data), [removeState.data, updateTodosFromData]);
 
-  // Handle update result - also update selected todo if in detail view
   useEffect(() => {
     if (updateState.data) {
       updateTodosFromData(updateState.data);
-      if (updateState.data.updated && selectedTodo?.id === updateState.data.updated.id) {
-        // Find full todo from list
-        const updatedTodo = updateState.data.todos?.find(t => t.id === selectedTodo.id);
-        if (updatedTodo) {
-          setSelectedTodo(updatedTodo);
-        }
+      if (updateState.data.todo && selectedTodo?.id === updateState.data.todo.id) {
+        // Update selected todo with full data including notes
+        setSelectedTodo(updateState.data.todo);
       }
       setIsSaving(false);
       setLastSaved(new Date());
     }
   }, [updateState.data, updateTodosFromData, selectedTodo?.id]);
 
-  // Update search results
   useEffect(() => {
     if (searchState.data) {
       setSearchResults(searchState.data);
@@ -413,9 +353,6 @@ function TodoApp() {
     }
   }, [searchState.data]);
 
-  /**
-   * Subscribe to agent-initiated tool calls.
-   */
   useEffect(() => {
     return onToolResult((result) => {
       if (result.source === "agent") {
@@ -424,9 +361,6 @@ function TodoApp() {
     });
   }, [onToolResult, updateTodosFromData]);
 
-  /**
-   * Initialize app when host is ready.
-   */
   useEffect(() => {
     if (!isReady || hasInitialized.current) return;
     hasInitialized.current = true;
@@ -444,9 +378,6 @@ function TodoApp() {
     }
   }, [isReady, exp, log, hostEnvironment, updateTodosFromData, listTodos]);
 
-  /**
-   * Add a new todo.
-   */
   const handleAdd = useCallback(
     async (text: string) => {
       log.info("Adding todo", { text });
@@ -459,9 +390,6 @@ function TodoApp() {
     [addTodo, log]
   );
 
-  /**
-   * Toggle a todo's completed status.
-   */
   const handleToggle = useCallback(
     async (id: string) => {
       try {
@@ -473,9 +401,6 @@ function TodoApp() {
     [toggleTodo, log]
   );
 
-  /**
-   * Delete a todo.
-   */
   const handleDelete = useCallback(
     async (id: string) => {
       log.info("Deleting todo", { id });
@@ -488,23 +413,21 @@ function TodoApp() {
     [removeTodo, log]
   );
 
-  /**
-   * Open a todo in detail view.
-   */
   const handleOpen = useCallback(
     async (id: string) => {
       log.info("Opening todo", { id });
-      // First try to find in local state for instant feedback
+      // Immediately switch to detail view with local data (if available)
       const localTodo = todos.find(t => t.id === id);
       if (localTodo) {
         setSelectedTodo(localTodo);
         setView("detail");
       }
-      // Then fetch full data (with notes)
+      // Always fetch fresh data from server to ensure notes are loaded
       try {
         const result = await getTodo({ id });
-        if (result?.todo) {
-          setSelectedTodo(result.todo);
+        if (result?.structuredContent?.todo) {
+          setSelectedTodo(result.structuredContent.todo);
+          setView("detail");
         }
       } catch (err) {
         log.error("Failed to get todo", { id, error: String(err) });
@@ -513,9 +436,6 @@ function TodoApp() {
     [todos, getTodo, log]
   );
 
-  /**
-   * Save todo changes from detail view.
-   */
   const handleSave = useCallback(
     async (id: string, text: string, notes: string) => {
       setIsSaving(true);
@@ -529,20 +449,13 @@ function TodoApp() {
     [updateTodo, log]
   );
 
-  /**
-   * Go back to list view.
-   */
   const handleBack = useCallback(() => {
     setView("list");
     setSelectedTodo(null);
     setLastSaved(null);
-    // Refresh list
     listTodos();
   }, [listTodos]);
 
-  /**
-   * Search todos.
-   */
   const handleSearch = useCallback(
     async (query: string) => {
       log.info("Searching todos", { query });
@@ -556,24 +469,19 @@ function TodoApp() {
     [searchTodos, log]
   );
 
-  /**
-   * Clear search.
-   */
   const handleClearSearch = useCallback(() => {
     setIsSearchMode(false);
     setSearchResults(null);
   }, []);
 
-  // Show loading until ready
   if (!isReady) {
     return (
-      <div className="loading-container">
-        <div className="loading-spinner" />
+      <div className="flex items-center justify-center h-full w-full bg-bg-primary text-txt-primary">
+        <div className="w-6 h-6 border-2 border-bdr-secondary border-t-txt-primary rounded-full animate-spin" />
       </div>
     );
   }
 
-  // Detail view
   if (view === "detail" && selectedTodo) {
     return (
       <DetailView
@@ -587,7 +495,6 @@ function TodoApp() {
     );
   }
 
-  // List view
   const completedCount = todos.filter((t) => t.completed).length;
   const displayTodos = isSearchMode && searchResults
     ? searchResults.matches.map((m) => ({
@@ -600,10 +507,10 @@ function TodoApp() {
     : todos;
 
   return (
-    <div className="container">
-      <header className="header">
-        <h1>Todo List</h1>
-        <span className="count">
+    <div className="flex flex-col h-full py-3 px-4 gap-1 bg-bg-primary text-txt-primary">
+      <header className="flex items-baseline justify-between shrink-0">
+        <h1 className="text-lg font-medium m-0 pb-2">Todo List</h1>
+        <span className="text-txt-secondary text-xs">
           {isSearchMode && searchResults
             ? `${searchResults.matches.length} found`
             : todos.length === 0
@@ -621,13 +528,14 @@ function TodoApp() {
       />
 
       {isSearchMode && searchResults && searchResults.matches.length === 0 ? (
-        <div className="todo-list">
-          <div className="empty-state">
+        <div className="flex-1 overflow-y-auto flex flex-col gap-1">
+          <div className="flex-1 flex flex-col items-center justify-center text-txt-secondary gap-2">
             <svg
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
               strokeWidth="1"
+              className="w-12 h-12 opacity-50"
             >
               <circle cx="11" cy="11" r="8" />
               <line x1="21" y1="21" x2="16.65" y2="16.65" />
@@ -645,7 +553,7 @@ function TodoApp() {
       )}
 
       {hostEnvironment === "standalone" && (
-        <div className="environment-badge" title="Running outside a host environment">
+        <div className="fixed bottom-2 right-2 py-1 px-2 bg-bg-tertiary text-txt-secondary text-xs rounded-sm opacity-70">
           {getEnvironmentLabel(hostEnvironment)}
         </div>
       )}

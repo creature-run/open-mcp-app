@@ -319,7 +319,13 @@ const handleUpdate = async (
   const { open } = getTodoCounts(todos);
 
   return {
-    data: { success: true, updated: toSummary(todo), todos: summaries },
+    data: { 
+      success: true, 
+      updated: toSummary(todo), 
+      todo: todo, // Return full todo with notes for editor
+      todos: summaries, 
+      view: "detail" 
+    },
     text: `Updated todo: ${todo.text}`,
     title: `Todos (${open})`,
   };

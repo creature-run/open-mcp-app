@@ -234,11 +234,7 @@ export {
 // Re-exports: Styles
 // ============================================================================
 
-export {
-  LAYOUT_DEFAULTS,
-  applyStyles,
-  applyLayoutDefaults,
-} from "./styles.js";
+export { applyStyles } from "./styles.js";
 
 // ============================================================================
 // Re-exports: WebSocket

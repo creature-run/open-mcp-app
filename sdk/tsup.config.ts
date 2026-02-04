@@ -1,12 +1,18 @@
 import { defineConfig } from "tsup";
-import { copyFileSync, mkdirSync } from "fs";
-import { dirname, join } from "path";
+import { mkdirSync, copyFileSync } from "fs";
+import { join } from "path";
 
 /**
  * Build configuration for open-mcp-app.
  *
  * Single config to avoid parallel build race conditions.
  * Each subpath has specific bundling requirements handled via esbuild plugins.
+ *
+ * CSS Strategy:
+ * We export SOURCE CSS files (not compiled). Apps import these and process
+ * them through their own Tailwind build. This allows Tailwind to scan the
+ * app's source files and generate only the utility classes actually used.
+ * The @theme definitions map host CSS variables to Tailwind's namespace.
  */
 export default defineConfig({
   entry: {
@@ -35,17 +41,15 @@ export default defineConfig({
     }
   },
   async onSuccess() {
-    // Copy CSS files to dist
-    const cssFiles = [
-      { src: "src/styles/base.css", dest: "dist/styles/base.css" },
-    ];
+    // Copy CSS source files to dist for apps to process through their Tailwind build
+    const cssFiles = ["index.css", "reset.css", "theme.css", "utilities.css"];
 
-    for (const { src, dest } of cssFiles) {
-      const destDir = dirname(dest);
-      mkdirSync(destDir, { recursive: true });
-      copyFileSync(src, dest);
+    mkdirSync("dist/styles", { recursive: true });
+
+    for (const file of cssFiles) {
+      copyFileSync(join("src/styles", file), join("dist/styles", file));
     }
 
-    console.log("CSS files copied to dist/styles/");
+    console.log("CSS source files copied to dist/styles/");
   },
 });

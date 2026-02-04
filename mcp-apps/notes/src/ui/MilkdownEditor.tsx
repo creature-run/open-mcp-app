@@ -150,9 +150,9 @@ const MilkdownEditorInner = ({
   getContentRef.current = getContent;
 
   return (
-    <div 
+    <div
       ref={wrapperRef}
-      className="milkdown-wrapper" 
+      className="milkdown-wrapper flex-1 overflow-y-auto p-4 flex flex-col min-h-0 cursor-text"
       data-placeholder={placeholder}
       onClick={handleWrapperClick}
     >
