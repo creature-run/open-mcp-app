@@ -13,10 +13,6 @@ Maintained by the team behind [Creature](https://creature.run).
 - [SDK Documentation](#sdk-documentation): API reference and examples
 - [MCP Apps Spec](https://github.com/modelcontextprotocol/ext-apps): Official specification
 
-**Examples:**
-- [todos](/mcp-apps/todos): Simple todo list with CRUD operations
-- [notes](/mcp-apps/notes): Markdown notes with editor and list views
-- [crm](/mcp-apps/crm): Customer relationship manager with search
 
 ## Features
 
@@ -25,7 +21,93 @@ Maintained by the team behind [Creature](https://creature.run).
 - **Clean separation of APIs**: Standard spec-compliant APIs vs clearly-marked experimental extensions
 - **Native look and feel**: Default styles for popular hosts so your app looks native on every platform
 - **Experimental capabilities**: APIs for multiple simultaneous apps, persistent state, storage, view routing, and more
-- **Robust examples**: Full working apps in `/mcp-apps` to learn from and build on
+
+## MCP App Design Principles
+
+MCP Apps are a new software paradigm—interactive UIs that live inside AI conversations and respond to agent tool calls. Traditional web development patterns don't always apply.
+
+These principles reflect what we've learned building MCP Apps. They're baked into the SDK's design, so following them means working *with* the SDK rather than against it. They're not hard rules, but they've helped us avoid common pitfalls.
+
+### 1. Build Once, Run Anywhere
+
+Your MCP App should work on every compliant host—Creature, ChatGPT, Claude, and others.
+
+- **Design for all hosts from day one.** Don't build for one host and hope it works elsewhere.
+- **Use standard MCP Apps CSS variables** for theming. Your app will look native on every host automatically.
+- **Never assume host-specific features.** If a feature is experimental, handle the case where it's not available.
+
+The SDK handles cross-platform concerns:
+- Import `open-mcp-app/styles/tailwind.css` — maps host CSS variables to Tailwind classes
+- `useHost()` returns `hostContext` with theme, display mode, and host capabilities
+- `detectEnvironment()` tells you which host you're running on if you need conditional logic
+
+### 2. Views Are Tool Calls, Not Routes
+
+This is the biggest paradigm shift from traditional web development: **your UI doesn't have routes—it has tools**. The agent calls a tool, and that tool determines what the UI shows.
+
+- **No URL routing.** There's no address bar, no `/items/123` to navigate to. The UI exists inside an iframe controlled by the host.
+- **Tools open and update views.** When the agent calls `items_open({ id: "123" })`, your UI receives that tool's result and shows the detail view.
+- **Views are associated with tools in the server config.** You declare which tools map to which logical "view" so the SDK can route tool results correctly.
+
+```typescript
+// Server: Associate tools with logical views
+app.resource({
+  uri: "ui://items",
+  views: {
+    "/": ["items_list", "items_create"],
+    "/item/:itemId": ["items_get", "items_update"],
+  },
+});
+```
+
+```tsx
+// Client: useViews() automatically switches view based on tool results
+const { view, params, data } = useViews(views);
+
+if (view === "/item/:itemId") {
+  return <DetailView itemId={params.itemId} />;
+}
+return <ListView />;
+```
+
+To "navigate", call a tool:
+
+```tsx
+const [openItem] = callTool("items_get");
+const handleClick = (id: string) => openItem({ itemId: id });
+```
+
+### 3. Widget State is the Agent's Memory
+
+The AI agent can't see your UI, but it can see your widget state. This is how it remembers what's happening in your app.
+
+- **`modelContent` is visible to the AI.** Use explicit, self-documenting property names: `totalItems`, `selectedItemTitle`. The AI references these to understand context.
+- **`privateContent` is for UI restoration.** Cache data, scroll positions, filter states—anything the UI needs to restore. The AI never sees this.
+
+```tsx
+const { exp_widgetState } = useHost();
+const [widgetState, setWidgetState] = exp_widgetState<MyState>();
+
+setWidgetState({
+  modelContent: { totalItems: 5, lastAction: "created 'Buy groceries'" },
+  privateContent: { items: [...], scrollPosition: 100 },
+});
+```
+
+### 4. Don't Make the AI Repeat the UI
+
+The user can see your widget. The AI doesn't need to narrate it.
+
+- **Write MCP instructions that tell the AI to be brief.** "Added to your list" is better than listing every item.
+- **Tool results provide summaries, but the UI is the source of truth.** The AI confirms actions; it doesn't restate data.
+
+```typescript
+// Server: Return rich data for UI, brief text for AI
+return {
+  data: { items: allItems },           // Full data for UI
+  text: `Added "${title}" to list`,    // Brief summary for AI
+};
+```
 
 ## SDK Documentation
 
@@ -242,9 +324,67 @@ await search({ query: "hello" });
 log.info("User clicked button", { buttonId: "submit" });
 ```
 
-### Theming
+### Theming & Styling
 
-The host provides CSS variables for theming (per MCP Apps spec):
+The SDK includes Tailwind 4 pre-configured with host theming. One import gives your app native styling on any host:
+
+```tsx
+// In your app entry point
+import "open-mcp-app/styles/tailwind.css";
+```
+
+**How it works:** Hosts inject CSS variables at runtime (per MCP Apps spec). The SDK maps these to Tailwind utilities, so your app automatically matches the host's look and feel.
+
+#### Tailwind Color Classes
+
+Use these prefixed classes for host-themed colors:
+
+| Category | Classes |
+|----------|---------|
+| Backgrounds | `bg-bg-primary`, `bg-bg-secondary`, `bg-bg-tertiary`, `bg-bg-inverse`, `bg-bg-ghost`, `bg-bg-disabled`, `bg-bg-info`, `bg-bg-danger`, `bg-bg-success`, `bg-bg-warning` |
+| Text | `text-txt-primary`, `text-txt-secondary`, `text-txt-tertiary`, `text-txt-inverse`, `text-txt-ghost`, `text-txt-disabled`, `text-txt-info`, `text-txt-danger`, `text-txt-success`, `text-txt-warning` |
+| Borders | `border-bdr-primary`, `border-bdr-secondary`, `border-bdr-tertiary`, `border-bdr-inverse`, `border-bdr-ghost`, `border-bdr-disabled`, `border-bdr-info`, `border-bdr-danger`, `border-bdr-success`, `border-bdr-warning` |
+| Rings | `ring-ring-primary`, `ring-ring-secondary`, `ring-ring-inverse`, `ring-ring-info`, `ring-ring-danger`, `ring-ring-success`, `ring-ring-warning` |
+
+#### Typography, Radius & Shadows
+
+| Category | Classes |
+|----------|---------|
+| Font families | `font-sans`, `font-mono` |
+| Font weights | `font-normal`, `font-medium`, `font-semibold`, `font-bold` |
+| Text sizes | `text-xs`, `text-sm`, `text-base`, `text-lg` |
+| Border radius | `rounded-xs`, `rounded-sm`, `rounded-md`, `rounded-lg`, `rounded-xl`, `rounded-full` |
+| Shadows | `shadow-hairline`, `shadow-sm`, `shadow-md`, `shadow-lg` |
+
+#### SDK Custom Utilities
+
+The SDK adds convenience utilities:
+
+| Utility | Description |
+|---------|-------------|
+| `heading-xs` through `heading-3xl` | Heading styles (size + weight + line-height combined) |
+| `h-control-xs` through `h-control-xl` | Standard heights for buttons/inputs |
+| `icon-xs` through `icon-xl` | Standard sizes for icons |
+
+#### Example
+
+```tsx
+<div className="flex flex-col h-full bg-bg-primary text-txt-primary">
+  <header className="flex items-center justify-between p-4 border-b border-bdr-secondary">
+    <h1 className="heading-lg">My App</h1>
+    <button className="bg-txt-primary text-txt-inverse px-3 py-1.5 rounded-md text-sm font-medium">
+      + New
+    </button>
+  </header>
+  <main className="flex-1 overflow-y-auto p-4">
+    <p className="text-txt-secondary">Content here</p>
+  </main>
+</div>
+```
+
+#### Raw CSS Variables
+
+You can also use the underlying CSS variables directly (per MCP Apps spec):
 
 ```css
 .container {
@@ -255,7 +395,7 @@ The host provides CSS variables for theming (per MCP Apps spec):
 }
 ```
 
-Access theme info programmatically:
+#### Programmatic Access
 
 ```typescript
 const { hostContext } = useHost();

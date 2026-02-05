@@ -262,13 +262,20 @@ export function useHost(config?: UseHostConfig): UseHostReturn {
   );
 
   /**
+   * Update model context - bound to client for stable reference.
+   */
+  const updateModelContext = useMemo(
+    () => client.updateModelContext.bind(client),
+    [client]
+  );
+
+  /**
    * Wrap exp APIs for stable references.
    */
   const exp = useMemo(
     () => ({
       setWidgetState: client.exp.setWidgetState.bind(client.exp),
       setTitle: client.exp.setTitle.bind(client.exp),
-      updateModelContext: client.exp.updateModelContext.bind(client.exp),
       sendNotification: client.exp.sendNotification.bind(client.exp),
       getInstanceId: client.exp.getInstanceId.bind(client.exp),
       supportsMultiInstance: client.exp.supportsMultiInstance.bind(client.exp),
@@ -397,6 +404,7 @@ export function useHost(config?: UseHostConfig): UseHostReturn {
     callTool,
     requestDisplayMode,
     log,
+    updateModelContext,
     hostContext: client.getHostContext(),
     // Experimental APIs (non-spec extensions)
     exp,

@@ -221,6 +221,23 @@ export class CreatureDesktopHostClient extends Subscribable implements UnifiedHo
     });
   }
 
+  /**
+   * Update the model context for future turns.
+   *
+   * Sends `ui/update-model-context` notification per MCP Apps spec.
+   * Context is available to the model in future turns without
+   * triggering immediate response.
+   */
+  async updateModelContext(content: ContentBlock[]): Promise<void> {
+    if (!this.app) return;
+    // Type assertion needed for MCP Apps SDK
+    this.app.notification({
+      method: "ui/update-model-context",
+      params: { content },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+  }
+
   on<K extends keyof HostClientEvents>(
     event: K,
     handler: HostClientEvents[K]
@@ -273,16 +290,6 @@ export class CreatureDesktopHostClient extends Subscribable implements UnifiedHo
 
       setTitle: (title: string) => {
         this.sendNotification("ui/notifications/title-changed", { title });
-      },
-
-      updateModelContext: async (content: ContentBlock[]) => {
-        if (!this.app) return;
-        // Type assertion needed for MCP Apps SDK
-        this.app.notification({
-          method: "ui/update-model-context",
-          params: { content },
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any);
       },
 
       sendNotification: (method: string, params: unknown) => {

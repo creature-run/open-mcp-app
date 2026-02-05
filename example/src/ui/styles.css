@@ -1,0 +1,53 @@
+/**
+ * UI Styles
+ *
+ * Minimal custom CSS. Most styling is done via Tailwind classes
+ * mapped to MCP Apps CSS variables.
+ */
+
+/* SDK provides Tailwind 4 + MCP Apps variable mapping */
+@import "open-mcp-app/styles/tailwind.css";
+
+/* Root sizing - required for full-height layouts */
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+/* Smooth transitions for theme changes */
+* {
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+/* Scrollbar styling for webkit browsers */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-secondary);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-primary);
+}
+
+/* Animation for loading spinner */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}

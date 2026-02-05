@@ -140,6 +140,13 @@ export class StandaloneHostClient extends Subscribable implements UnifiedHostCli
     console[consoleMethod](`[${this.config.name}]`, message, data ?? "");
   }
 
+  /**
+   * Update model context - logs in standalone mode.
+   */
+  async updateModelContext(content: ContentBlock[]): Promise<void> {
+    console.debug(`[Standalone] updateModelContext(${content.length} blocks)`);
+  }
+
   on<K extends keyof HostClientEvents>(
     event: K,
     handler: HostClientEvents[K]
@@ -171,10 +178,6 @@ export class StandaloneHostClient extends Subscribable implements UnifiedHostCli
 
       setTitle: (title: string) => {
         console.debug(`[Standalone] exp.setTitle("${title}")`);
-      },
-
-      updateModelContext: async (content: ContentBlock[]) => {
-        console.debug(`[Standalone] exp.updateModelContext(${content.length} blocks)`);
       },
 
       sendNotification: (method: string, params: unknown) => {

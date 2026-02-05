@@ -28,7 +28,7 @@
       "require": "./dist/vite/index.js",
       "default": "./dist/vite/index.js"
     },
-    "./styles/base.css": "./dist/styles/base.css"
+    "./styles/tailwind.css": "./dist/styles/index.css"
   },
   "files": [
     "dist",
@@ -51,22 +51,30 @@
     "zod": "^3.24.4"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.0.0",
     "@types/express": "^5.0.2",
     "@types/node": "^22.15.21",
     "@types/react": "^19.1.6",
     "@types/ws": "^8.5.13",
+    "autoprefixer": "^10.4.0",
     "cac": "^6.7.14",
+    "postcss": "^8.5.0",
     "react": "^19.1.0",
+    "tailwindcss": "^4.0.0",
     "tsup": "^8.5.1",
     "typescript": "^5.8.3",
     "vite": "^6.3.5",
     "vitest": "^3.1.0"
   },
   "peerDependencies": {
-    "react": ">=18.0.0"
+    "react": ">=18.0.0",
+    "tailwindcss": "^4.0.0"
   },
   "peerDependenciesMeta": {
     "react": {
+      "optional": true
+    },
+    "tailwindcss": {
       "optional": true
     }
   },

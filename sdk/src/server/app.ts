@@ -587,26 +587,33 @@ export class App {
   /**
    * Get the HMR port for injecting the live reload client.
    *
-   * When MCP_HMR_PORT is set (by host), uses that directly.
+   * When MCP_HMR_PORT is set (by host), uses that directly - this implies dev mode.
    * Falls back to reading hmr.json for non-host environments (manual npm run dev).
+   * Only uses isDev flag when neither MCP_HMR_PORT nor hmr.json are available.
    */
   private getHmrPort(): number | null {
-    if (!this.isDev) return null;
     if (this.hmrPort !== null) return this.hmrPort;
 
-    // Use MCP_HMR_PORT when available (set by host)
+    // Use MCP_HMR_PORT when available (set by host) - presence implies dev mode
     const hmrPortFromHost = process.env.MCP_HMR_PORT ? parseInt(process.env.MCP_HMR_PORT, 10) : null;
     if (hmrPortFromHost && !isNaN(hmrPortFromHost)) {
       this.hmrPort = hmrPortFromHost;
       return this.hmrPort;
     }
 
-    // Fallback to config file for non-host environments
-    const hmrConfig = readHmrConfig();
-    if (hmrConfig) {
-      this.hmrPort = hmrConfig.port;
+    // Fallback to config file for non-host environments (manual npm run dev)
+    if (!this.hmrConfigChecked) {
+      const hmrConfig = readHmrConfig();
+      if (hmrConfig) {
+        this.hmrPort = hmrConfig.port;
+      }
+      this.hmrConfigChecked = true;
     }
-    this.hmrConfigChecked = true;
+
+    // If no HMR config found and not in dev mode, return null
+    if (this.hmrPort === null && !this.isDev) {
+      return null;
+    }
 
     return this.hmrPort;
   }

@@ -190,6 +190,38 @@ export class ChatGptWebHostClient extends Subscribable implements UnifiedHostCli
     console[consoleMethod](`[${this.config.name}]`, message, data ?? "");
   }
 
+  /**
+   * Update model context for future turns.
+   *
+   * On ChatGPT, this maps to setWidgetState per their MCP Apps compatibility.
+   * The content blocks are converted to a string and stored as modelContent.
+   */
+  async updateModelContext(content: ContentBlock[]): Promise<void> {
+    if (!window.openai?.setWidgetState) return;
+
+    // Convert content blocks to string (only text blocks supported)
+    const textContent = content
+      .filter((block): block is { type: "text"; text: string } =>
+        block.type === "text" && typeof (block as { text?: string }).text === "string"
+      )
+      .map((block) => block.text)
+      .join("\n");
+
+    if (!textContent) return;
+
+    // Get existing widget state to preserve privateContent
+    const existingState = this.state.widgetState || {};
+    const newState: WidgetState = {
+      ...existingState,
+      modelContent: textContent,
+    };
+
+    // Update local state and notify ChatGPT
+    this.setState({ widgetState: newState });
+    window.openai.setWidgetState(newState);
+    this.emit("widget-state-change", newState);
+  }
+
   on<K extends keyof HostClientEvents>(
     event: K,
     handler: HostClientEvents[K]
@@ -227,9 +259,6 @@ export class ChatGptWebHostClient extends Subscribable implements UnifiedHostCli
 
       // MCP Apps-only (no-op on ChatGPT)
       setTitle: (_title: string) => {},
-
-      // MCP Apps-only (no-op on ChatGPT)
-      updateModelContext: async (_content: ContentBlock[]) => {},
 
       // MCP Apps-only (no-op on ChatGPT)
       sendNotification: (_method: string, _params: unknown) => {},
