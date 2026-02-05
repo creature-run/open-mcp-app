@@ -1,45 +1,48 @@
 /* =============================================
   Heading utilities (combine size + weight + line-height)
+  
+  Uses spec-compliant --font-weight-* variables.
+  All headings use semibold weight by default.
 ============================================= */
 @utility heading-xs {
   font-size: var(--font-heading-xs-size);
-  font-weight: var(--font-heading-xs-weight);
+  font-weight: var(--font-weight-semibold);
   line-height: var(--font-heading-xs-line-height);
 }
 
 @utility heading-sm {
   font-size: var(--font-heading-sm-size);
-  font-weight: var(--font-heading-sm-weight);
+  font-weight: var(--font-weight-semibold);
   line-height: var(--font-heading-sm-line-height);
 }
 
 @utility heading-md {
   font-size: var(--font-heading-md-size);
-  font-weight: var(--font-heading-md-weight);
+  font-weight: var(--font-weight-semibold);
   line-height: var(--font-heading-md-line-height);
 }
 
 @utility heading-lg {
   font-size: var(--font-heading-lg-size);
-  font-weight: var(--font-heading-lg-weight);
+  font-weight: var(--font-weight-semibold);
   line-height: var(--font-heading-lg-line-height);
 }
 
 @utility heading-xl {
   font-size: var(--font-heading-xl-size);
-  font-weight: var(--font-heading-xl-weight);
+  font-weight: var(--font-weight-bold);
   line-height: var(--font-heading-xl-line-height);
 }
 
 @utility heading-2xl {
   font-size: var(--font-heading-2xl-size);
-  font-weight: var(--font-heading-2xl-weight);
+  font-weight: var(--font-weight-bold);
   line-height: var(--font-heading-2xl-line-height);
 }
 
 @utility heading-3xl {
   font-size: var(--font-heading-3xl-size);
-  font-weight: var(--font-heading-3xl-weight);
+  font-weight: var(--font-weight-bold);
   line-height: var(--font-heading-3xl-line-height);
 }
 

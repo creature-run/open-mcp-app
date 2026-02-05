@@ -1,4 +1,5 @@
 import type {
+  ContentBlock,
   DisplayMode,
   Environment,
   LogLevel,
@@ -9,7 +10,7 @@ import type {
   ExpHostApi,
 } from "../core/types.js";
 
-export type { DisplayMode, Environment, LogLevel, ToolResult, WidgetState, HostContext, WebSocketStatus, ExpHostApi };
+export type { ContentBlock, DisplayMode, Environment, LogLevel, ToolResult, WidgetState, HostContext, WebSocketStatus, ExpHostApi };
 
 export { type StructuredWidgetState } from "../core/types.js";
 
@@ -182,6 +183,24 @@ export interface UseHostReturn {
    * ```
    */
   log: Logger;
+
+  /**
+   * Update the model context for future turns.
+   *
+   * Use this for ephemeral notifications that don't need persistence.
+   * For persistent context, use widgetState.modelContent instead.
+   *
+   * @example
+   * ```tsx
+   * const { updateModelContext } = useHost();
+   *
+   * // Inform the model about a user action
+   * await updateModelContext([
+   *   { type: "text", text: "User selected file: /src/App.tsx" }
+   * ]);
+   * ```
+   */
+  updateModelContext: (content: ContentBlock[]) => Promise<void>;
 
   /**
    * Experimental APIs for non-standard features.

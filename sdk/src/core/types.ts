@@ -239,18 +239,6 @@ export interface ExpHostApi {
   setTitle(title: string): void;
 
   /**
-   * Update the model context for future turns.
-   *
-   * In MCP Apps spec as `ui/update-model-context`. Context is available
-   * to the model in future turns without triggering immediate response.
-   * Each call overwrites previous context.
-   *
-   * - MCP Apps hosts: Supported (if host declares capability)
-   * - ChatGPT: No-op
-   */
-  updateModelContext(content: ContentBlock[]): Promise<void>;
-
-  /**
    * Send a raw notification to the host.
    *
    * Low-level API for power users. Most apps should use higher-level methods.
@@ -380,6 +368,21 @@ export interface UnifiedHostClient {
    * Falls back to browser console on ChatGPT.
    */
   log(level: LogLevel, message: string, data?: Record<string, unknown>): void;
+
+  /**
+   * Update the model context for future turns.
+   *
+   * In MCP Apps spec as `ui/update-model-context`. Context is available
+   * to the model in future turns without triggering immediate response.
+   * Each call overwrites previous context.
+   *
+   * Use this for ephemeral notifications that don't need persistence.
+   * For persistent context, use widgetState.modelContent instead.
+   *
+   * - MCP Apps hosts: Sends `ui/update-model-context` notification
+   * - ChatGPT: Maps to setWidgetState per MCP Apps compatibility
+   */
+  updateModelContext(content: ContentBlock[]): Promise<void>;
 
   /**
    * Register an event handler. Returns unsubscribe function.
