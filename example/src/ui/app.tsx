@@ -1,26 +1,64 @@
 /**
- * Main App Component
+ * MCP Items UI
  *
- * Demonstrates:
- * - HostProvider setup
- * - View routing via useViews()
- * - Widget state management
- * - Tool result handling
+ * A clean, interactive item list with detail view for editing.
+ * Uses Tailwind 4 with SDK theme mapping for host-provided variables.
  */
 
 import { useEffect, useRef, useCallback } from "react";
-import { HostProvider, useHost, useViews } from "open-mcp-app/react";
+import { HostProvider, useHost, useViews, type Environment } from "open-mcp-app/react";
 import { ListView } from "./ListView";
 import { DetailView } from "./DetailView";
 import type { Item, WidgetState, ModelContent, PrivateContent } from "./types";
 import { VIEWS } from "./types";
+// Tailwind 4 integration - imports SDK theme mapping for host-provided variables
+import "open-mcp-app/styles/tailwind.css";
+import "./styles.css";
+
+// =============================================================================
+// Helpers
+// =============================================================================
+
+/**
+ * Get human-readable environment label.
+ */
+function getEnvironmentLabel(env: Environment): string {
+  switch (env) {
+    case "chatgpt":
+      return "ChatGPT";
+    case "mcp-apps":
+      return "MCP Apps";
+    case "standalone":
+      return "Standalone";
+  }
+}
+
+// =============================================================================
+// Main App
+// =============================================================================
+
+export default function App() {
+  return (
+    <HostProvider name="items" version="0.1.0">
+      <AppContent />
+    </HostProvider>
+  );
+}
 
 /**
  * Inner app component that uses SDK hooks.
  */
 function AppContent() {
-  const { isReady, callTool, onToolResult, hostContext, exp_widgetState, exp } =
-    useHost();
+  const {
+    isReady,
+    callTool,
+    onToolResult,
+    hostContext,
+    exp_widgetState,
+    exp,
+    log,
+    environment: hostEnvironment,
+  } = useHost();
 
   // View routing - automatically switches based on tool results
   const { view, params, data } = useViews(VIEWS);
@@ -82,19 +120,22 @@ function AppContent() {
     if (!isReady || hasInitialized.current) return;
     hasInitialized.current = true;
 
+    log.info("Items list connected", { environment: hostEnvironment });
+
     // Check if opened by tool call (has initial data)
     const initialResult = exp.getInitialToolResult();
     if (initialResult?.structuredContent?.items) {
+      log.debug("Initialized from agent tool result");
       const initialItems = initialResult.structuredContent.items as Item[];
       updateWidgetState({ items: initialItems, currentView: "list" });
     } else if (widgetState?.privateContent?.items) {
-      // Restore from widget state
+      log.debug("Restored from widget state");
       // State already loaded, no action needed
     } else {
-      // Opened without data - fetch
+      log.debug("Initialized by user - fetching list");
       listItems({});
     }
-  }, [isReady, exp, listItems, widgetState, updateWidgetState]);
+  }, [isReady, exp, listItems, widgetState, updateWidgetState, log, hostEnvironment]);
 
   /**
    * Handle tool results from AI or UI calls.
@@ -150,9 +191,10 @@ function AppContent() {
    */
   const handleOpenItem = useCallback(
     (id: string) => {
+      log.info("Opening item", { id });
       getItem({ id });
     },
-    [getItem]
+    [getItem, log]
   );
 
   /**
@@ -168,8 +210,8 @@ function AppContent() {
   // Loading state
   if (!isReady) {
     return (
-      <div className="flex items-center justify-center h-full bg-bg-primary">
-        <div className="w-5 h-5 border-2 border-bdr-primary border-t-transparent rounded-full animate-spin" />
+      <div className="flex items-center justify-center h-full w-full bg-bg-primary text-txt-primary">
+        <div className="w-6 h-6 border-2 border-bdr-secondary border-t-txt-primary rounded-full animate-spin" />
       </div>
     );
   }
@@ -177,30 +219,25 @@ function AppContent() {
   // Route to appropriate view
   if (view === "/item/:itemId" && selectedItem) {
     return (
-      <DetailView
-        item={selectedItem}
-        onBack={handleBack}
-        isInline={isInline}
-      />
+      <>
+        <DetailView item={selectedItem} onBack={handleBack} isInline={isInline} />
+        {hostEnvironment === "standalone" && (
+          <div className="fixed bottom-2 right-2 py-1 px-2 bg-bg-tertiary text-txt-secondary text-xs rounded-sm opacity-70">
+            {getEnvironmentLabel(hostEnvironment)}
+          </div>
+        )}
+      </>
     );
   }
 
   return (
-    <ListView
-      items={items}
-      onOpenItem={handleOpenItem}
-      isInline={isInline}
-    />
-  );
-}
-
-/**
- * Root App component with HostProvider.
- */
-export default function App() {
-  return (
-    <HostProvider name="items" version="0.1.0">
-      <AppContent />
-    </HostProvider>
+    <>
+      <ListView items={items} onOpenItem={handleOpenItem} isInline={isInline} />
+      {hostEnvironment === "standalone" && (
+        <div className="fixed bottom-2 right-2 py-1 px-2 bg-bg-tertiary text-txt-secondary text-xs rounded-sm opacity-70">
+          {getEnvironmentLabel(hostEnvironment)}
+        </div>
+      )}
+    </>
   );
 }

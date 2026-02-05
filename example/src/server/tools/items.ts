@@ -16,7 +16,6 @@ import {
   deleteAllItems,
 } from "../lib/data.js";
 import { createItem, updateItem } from "../lib/utils.js";
-import { seedItems } from "../lib/seed.js";
 
 /** UI resource URI - all tools reference this */
 const ITEMS_UI = "ui://items/main";
@@ -45,9 +44,14 @@ export const registerItemTools = ({ app }: { app: App }): void => {
       const items = await getAllItems();
       const completed = items.filter((i) => i.completed).length;
 
+      // Include item IDs in text so AI can reference them for updates/deletes
+      const itemList = items
+        .map((i) => `- "${i.title}" (id: ${i.id})${i.completed ? " ✓" : ""}`)
+        .join("\n");
+
       return {
         data: { items },
-        text: `${items.length} items (${completed} completed)`,
+        text: `${items.length} items (${completed} completed)${items.length > 0 ? `:\n${itemList}` : ""}`,
       };
     }
   );
@@ -78,7 +82,7 @@ export const registerItemTools = ({ app }: { app: App }): void => {
 
       return {
         data: { items },
-        text: `Created "${title}"`,
+        text: `Created "${title}" (id: ${item.id})`,
       };
     }
   );
@@ -151,16 +155,19 @@ export const registerItemTools = ({ app }: { app: App }): void => {
         };
       }
 
-      const updated = updateItem({
-        item: existing,
-        updates: { title, content, completed },
-      });
+      // Only include defined values to avoid overwriting with undefined
+      const updates: Partial<Pick<typeof existing, "title" | "content" | "completed">> = {};
+      if (title !== undefined) updates.title = title;
+      if (content !== undefined) updates.content = content;
+      if (completed !== undefined) updates.completed = completed;
+
+      const updated = updateItem({ item: existing, updates });
       await saveItem({ item: updated });
       const items = await getAllItems();
 
       // Build a helpful response
       const changes: string[] = [];
-      if (title) changes.push("renamed");
+      if (title !== undefined) changes.push("renamed");
       if (content !== undefined) changes.push("updated content");
       if (completed !== undefined) {
         changes.push(completed ? "marked complete" : "marked incomplete");
@@ -233,37 +240,14 @@ export const registerItemTools = ({ app }: { app: App }): void => {
     async ({ query }) => {
       const items = await searchItems({ query });
 
+      // Include item IDs in text so AI can reference them for updates/deletes
+      const itemList = items
+        .map((i) => `- "${i.title}" (id: ${i.id})`)
+        .join("\n");
+
       return {
         data: { items, searchQuery: query },
-        text: `Found ${items.length} items matching "${query}"`,
-      };
-    }
-  );
-
-  /**
-   * items_seed - Generate demo data
-   *
-   * Visibility: model only
-   * - Only AI can generate demo data
-   * - User asks "add some test items"
-   */
-  app.tool(
-    "items_seed",
-    {
-      description:
-        "Generate demo items for testing. Creates 5 sample items. Use when user wants test data.",
-      input: z.object({}),
-      ui: ITEMS_UI,
-      visibility: ["model"],
-      displayModes: ["pip"],
-    },
-    async () => {
-      const created = await seedItems();
-      const items = await getAllItems();
-
-      return {
-        data: { items },
-        text: `Created ${created.length} demo items`,
+        text: `Found ${items.length} items matching "${query}"${items.length > 0 ? `:\n${itemList}` : ""}`,
       };
     }
   );

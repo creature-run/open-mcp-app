@@ -14,9 +14,14 @@ import { APP_ICON } from "./lib/icon.js";
  * Maps URL patterns to tool names for automatic view routing.
  */
 const VIEWS = {
-  "/": ["items_list", "items_create", "items_search", "items_seed", "items_reset"],
+  "/": ["items_list", "items_create", "items_search", "items_reset"],
   "/item/:itemId": ["items_get", "items_update", "items_delete"],
 };
+
+/**
+ * Server port configuration.
+ */
+const PORT = parseInt(process.env.MCP_PORT || process.env.PORT || "3000");
 
 /**
  * Create the MCP App.
@@ -24,26 +29,24 @@ const VIEWS = {
 const app = createApp({
   name: "items",
   version: "0.1.0",
-  port: parseInt(process.env.MCP_PORT || process.env.PORT || "3000"),
+  port: PORT,
   instructions: `This MCP manages items with a visual UI.
 
 IMPORTANT: The user can see the item list in the UI widget. Do NOT repeat item 
-contents in your responses. Keep responses brief:
-- "Added 'Buy groceries' to your list" (not the full list)
-- "Marked 3 items complete" (not which ones)
-- "Found 5 items matching 'work'" (not listing them)
+contents in your responses. Keep responses brief.
+
+CRITICAL: Item IDs are random strings (e.g., "abc123xyz"), NOT sequential numbers.
+- items_create returns the new item's ID in the response - save it for later use
+- If you need to update/delete items and don't have IDs, call items_list first
+- The widget state includes item IDs - check modelContent before guessing
 
 Tools:
-- items_list: Opens the visual list. Use when user wants to see/manage items.
-- items_create { title, content? }: Add a new item. Returns confirmation.
-- items_update { id, title?, content?, completed? }: Modify an item.
-- items_delete { id }: Remove an item. Confirm before deleting.
-- items_search { query }: Find items. Results shown in UI.
-- items_seed: Generate demo data. Use when user wants test items.
-- items_reset { confirm: true }: Delete ALL items. Requires explicit confirmation.
-
-The widget state shows currentView, totalItems, and lastAction - reference these 
-instead of re-listing items.`,
+- items_list: Opens the visual list. Returns all items with their IDs.
+- items_create { title, content? }: Add item. Returns the created item's ID.
+- items_update { id, title?, content?, completed? }: Modify item. ID required.
+- items_delete { id }: Remove item. ID required.
+- items_search { query }: Find items matching query.
+- items_reset { confirm: true }: Delete ALL items.`,
 });
 
 /**
@@ -56,7 +59,7 @@ app.resource({
   uri: "ui://items/main",
   description: "Interactive item list and detail views",
   displayModes: ["pip", "inline"],
-  html: "../../dist/ui/index.html",
+  html: "items/ui/index.html",
   icon: { svg: APP_ICON, alt: "Items" },
   views: VIEWS,
 });
@@ -71,4 +74,4 @@ registerItemTools({ app });
  */
 app.start();
 
-console.log(`Items MCP App running on port ${app.port}`);
+console.log(`Items MCP App running on port ${PORT}`);
