@@ -20,6 +20,14 @@
 import fs from "node:fs";
 import fsPromises from "node:fs/promises";
 import path from "node:path";
+import { z } from "zod";
+import type {
+  CreateMessageRequestParams,
+  CreateMessageResult,
+  CreateMessageResultWithTools,
+  SamplingMessageContentBlock,
+} from "@modelcontextprotocol/sdk/types.js";
+import { getCurrentServer } from "./storageRpc.js";
 
 // ============================================================================
 // Internal Helpers
@@ -411,15 +419,20 @@ import {
   rpcKvList,
   rpcKvListWithValues,
   rpcKvSearch,
+  rpcVectorUpsert,
+  rpcVectorSearch,
+  rpcVectorDelete,
   rpcBlobPut,
   rpcBlobGet,
   rpcBlobDelete,
   rpcBlobList,
   type KvSearchResult,
+  type VectorSearchResult,
 } from "./storageRpc.js";
 
 /** Maximum key length for KV store */
 const MAX_KEY_LENGTH = 256;
+const MAX_VECTOR_TEXT_LENGTH = 20000;
 
 /**
  * Sanitize a key to prevent security issues.
@@ -763,8 +776,66 @@ export async function experimental_kvSearch(
   return null;
 }
 
-// Re-export KvSearchResult type for consumers
-export type { KvSearchResult };
+export function experimental_vectorIsAvailable(): boolean {
+  return isStorageRpcAvailable();
+}
+
+export async function experimental_vectorUpsert(
+  key: string,
+  text: string,
+  metadata?: unknown
+): Promise<boolean> {
+  const sanitizedKey = sanitizeKey(key);
+  const trimmed = text.trim();
+  if (!trimmed) {
+    throw new Error("Text cannot be empty");
+  }
+  if (trimmed.length > MAX_VECTOR_TEXT_LENGTH) {
+    throw new Error(`Text exceeds maximum length of ${MAX_VECTOR_TEXT_LENGTH}`);
+  }
+
+  if (!isStorageRpcAvailable()) {
+    return false;
+  }
+
+  return rpcVectorUpsert(sanitizedKey, trimmed, metadata);
+}
+
+export async function experimental_vectorSearch(
+  query: string,
+  options?: { prefix?: string; limit?: number }
+): Promise<VectorSearchResult[] | null> {
+  const trimmed = query.trim();
+  if (!trimmed) {
+    throw new Error("Search query cannot be empty");
+  }
+  if (trimmed.length > MAX_VECTOR_TEXT_LENGTH) {
+    throw new Error(`Text exceeds maximum length of ${MAX_VECTOR_TEXT_LENGTH}`);
+  }
+
+  const sanitizedPrefix = options?.prefix ? sanitizeKey(options.prefix) : undefined;
+
+  if (!isStorageRpcAvailable()) {
+    return null;
+  }
+
+  return rpcVectorSearch(trimmed, {
+    prefix: sanitizedPrefix,
+    limit: options?.limit,
+  });
+}
+
+export async function experimental_vectorDelete(key: string): Promise<boolean> {
+  const sanitizedKey = sanitizeKey(key);
+
+  if (!isStorageRpcAvailable()) {
+    return false;
+  }
+
+  return rpcVectorDelete(sanitizedKey);
+}
+
+export type { KvSearchResult, VectorSearchResult };
 
 // ============================================================================
 // Blob Store APIs (Creature Extension)
@@ -1005,6 +1076,47 @@ export function experimental_blobListSync(prefix?: string): string[] | null {
   return null;
 }
 
+export async function experimental_sampleMessage(
+  params: CreateMessageRequestParams
+): Promise<CreateMessageResult | CreateMessageResultWithTools> {
+  const server = getCurrentServer();
+  if (!server) {
+    throw new Error("Sampling not available: no server connection");
+  }
+  const rawResult = await server.server.request(
+    { method: "sampling/createMessage", params },
+    z.record(z.unknown())
+  );
+
+  const result = rawResult as Record<string, unknown>;
+  const content = result.content as SamplingMessageContentBlock | SamplingMessageContentBlock[] | undefined;
+  const hasTools = !!(params.tools || params.toolChoice);
+
+  if (!content) {
+    throw new Error("Sampling result missing content");
+  }
+
+  if (!hasTools && Array.isArray(content)) {
+    const text = content
+      .map((block) => {
+        if (block.type === "text") return block.text;
+        if (block.type === "image") return `[image:${block.mimeType}]`;
+        if (block.type === "audio") return `[audio:${block.mimeType}]`;
+        if (block.type === "tool_use") return `[tool_use:${block.name}]`;
+        if (block.type === "tool_result") return `[tool_result:${block.toolUseId}]`;
+        return JSON.stringify(block);
+      })
+      .join("\n");
+    result.content = { type: "text", text };
+  }
+
+  if (hasTools && !Array.isArray(content)) {
+    result.content = [content];
+  }
+
+  return result as CreateMessageResult | CreateMessageResultWithTools;
+}
+
 // ============================================================================
 // Unified `exp` Namespace
 // ============================================================================
@@ -1064,6 +1176,10 @@ export const exp = {
   kvDelete: experimental_kvDelete,
   kvList: experimental_kvList,
   kvSearch: experimental_kvSearch,
+  vectorIsAvailable: experimental_vectorIsAvailable,
+  vectorUpsert: experimental_vectorUpsert,
+  vectorSearch: experimental_vectorSearch,
+  vectorDelete: experimental_vectorDelete,
   /** @deprecated Use kvGet instead */
   kvGetSync: experimental_kvGetSync,
   /** @deprecated Use kvSet instead */
@@ -1087,4 +1203,5 @@ export const exp = {
   blobDeleteSync: experimental_blobDeleteSync,
   /** @deprecated Use blobList instead */
   blobListSync: experimental_blobListSync,
+  sampleMessage: experimental_sampleMessage,
 };
