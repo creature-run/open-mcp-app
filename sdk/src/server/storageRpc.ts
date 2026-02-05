@@ -21,6 +21,9 @@ export const STORAGE_METHODS = {
   KV_LIST: "creature/storage/kv/list",
   KV_LIST_WITH_VALUES: "creature/storage/kv/listWithValues",
   KV_SEARCH: "creature/storage/kv/search",
+  VECTOR_UPSERT: "creature/storage/vector/upsert",
+  VECTOR_SEARCH: "creature/storage/vector/search",
+  VECTOR_DELETE: "creature/storage/vector/delete",
   BLOB_PUT: "creature/storage/blob/put",
   BLOB_GET: "creature/storage/blob/get",
   BLOB_DELETE: "creature/storage/blob/delete",
@@ -35,6 +38,12 @@ export interface KvSearchResult {
   key: string;
   snippet?: string;
   score?: number;
+}
+
+export interface VectorSearchResult {
+  key: string;
+  score: number;
+  metadata?: unknown;
 }
 
 // =============================================================================
@@ -186,6 +195,37 @@ export const rpcKvSearch = async (
     { query, prefix: options?.prefix, limit: options?.limit }
   );
   return result.matches;
+};
+
+export const rpcVectorUpsert = async (
+  key: string,
+  text: string,
+  metadata?: unknown
+): Promise<boolean> => {
+  const result = await sendStorageRequest<{ success: boolean }>(
+    STORAGE_METHODS.VECTOR_UPSERT,
+    { key, text, metadata }
+  );
+  return result.success;
+};
+
+export const rpcVectorSearch = async (
+  query: string,
+  options?: { prefix?: string; limit?: number }
+): Promise<VectorSearchResult[]> => {
+  const result = await sendStorageRequest<{ matches: VectorSearchResult[] }>(
+    STORAGE_METHODS.VECTOR_SEARCH,
+    { query, prefix: options?.prefix, limit: options?.limit }
+  );
+  return result.matches;
+};
+
+export const rpcVectorDelete = async (key: string): Promise<boolean> => {
+  const result = await sendStorageRequest<{ deleted: boolean }>(
+    STORAGE_METHODS.VECTOR_DELETE,
+    { key }
+  );
+  return result.deleted;
 };
 
 // =============================================================================

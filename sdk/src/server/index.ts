@@ -22,7 +22,7 @@ export { wrapServer } from "./middleware.js";
 // Experimental APIs
 // Access via `exp` namespace for consistent pattern with core SDK (host.exp.*).
 export { exp } from "./experimental.js";
-export type { KvSearchResult } from "./experimental.js";
+export type { KvSearchResult, VectorSearchResult } from "./experimental.js";
 
 // Legacy exports (prefer `exp` namespace above)
 export {
@@ -51,6 +51,10 @@ export {
   experimental_kvList,
   experimental_kvListWithValues,
   experimental_kvSearch,
+  experimental_vectorIsAvailable,
+  experimental_vectorUpsert,
+  experimental_vectorSearch,
+  experimental_vectorDelete,
   experimental_kvGetSync,
   experimental_kvSetSync,
   experimental_kvDeleteSync,
@@ -64,4 +68,5 @@ export {
   experimental_blobGetSync,
   experimental_blobDeleteSync,
   experimental_blobListSync,
+  experimental_sampleMessage,
 } from "./experimental.js";
