@@ -205,6 +205,11 @@ export interface ToolExperimentalConfig {
    * Note: defaultDisplayMode is a Creature extension. Not part of MCP Apps spec.
    */
   defaultDisplayMode?: DisplayMode;
+  /**
+   * Whether a new pip should open in background when another pip is already active.
+   * Note: openInBackground is a Creature extension.
+   */
+  openInBackground?: boolean;
 }
 
 /**
