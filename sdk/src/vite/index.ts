@@ -101,19 +101,21 @@ function sendWebSocketFrame(socket: Duplex, data: string): void {
   socket.write(frame);
 }
 
-function startHmrServer(port: number): Promise<void> {
-  return new Promise((resolve) => {
-    if (hmrServer) {
-      resolve();
-      return;
-    }
-    
-    hmrServer = createHttpServer((_req: IncomingMessage, res: ServerResponse) => {
+async function startHmrServer(port: number): Promise<number> {
+  if (hmrServer) {
+    return port;
+  }
+
+  let attemptPort = port;
+  const maxAttempts = 5;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const server = createHttpServer((_req: IncomingMessage, res: ServerResponse) => {
       res.writeHead(200);
       res.end("Creature HMR Server");
     });
-    
-    hmrServer.on("upgrade", (req: IncomingMessage, socket: Duplex, head: Buffer) => {
+
+    server.on("upgrade", (req: IncomingMessage, socket: Duplex, head: Buffer) => {
       const key = req.headers["sec-websocket-key"];
       if (!key) {
         socket.destroy();
@@ -143,21 +145,32 @@ function startHmrServer(port: number): Promise<void> {
         hmrClients.delete(socket);
       });
     });
-    
-    hmrServer.on("error", (err: NodeJS.ErrnoException) => {
-      if (err.code === "EADDRINUSE") {
-        console.warn(`[Creature HMR] Port ${port} in use, HMR disabled. Kill other dev servers or restart.`);
-        hmrServer = null;
-      } else {
-        console.error(`[Creature HMR] Server error:`, err);
+
+    const result = await new Promise<{ started: boolean; error?: NodeJS.ErrnoException }>((resolve) => {
+      server.on("error", (err: NodeJS.ErrnoException) => resolve({ started: false, error: err }));
+      server.listen(attemptPort, () => resolve({ started: true }));
+    });
+
+    if (result.started) {
+      hmrServer = server;
+      if (attemptPort !== port) {
+        console.warn(`[Creature HMR] Port ${port} in use, switched to ${attemptPort}.`);
+        process.env.MCP_HMR_PORT = String(attemptPort);
       }
-      resolve();
-    });
-    
-    hmrServer.listen(port, () => {
-      resolve();
-    });
-  });
+      return attemptPort;
+    }
+
+    if (result.error?.code !== "EADDRINUSE") {
+      console.error(`[Creature HMR] Server error:`, result.error);
+      return attemptPort;
+    }
+
+    console.warn(`[Creature HMR] Port ${attemptPort} in use, retrying with next port.`);
+    attemptPort = await findAvailablePort(attemptPort + 1);
+  }
+
+  console.warn(`[Creature HMR] Failed to bind HMR server after ${maxAttempts} attempts.`);
+  return attemptPort;
 }
 
 function notifyHmrClients(): void {
@@ -307,7 +320,7 @@ createRoot(document.getElementById("root")!).render(createElement(Page));
         // Use MCP_HMR_PORT if provided by host, otherwise find an available port
         const hmrPortFromHost = process.env.MCP_HMR_PORT ? parseInt(process.env.MCP_HMR_PORT, 10) : null;
         hmrPort = hmrPortFromHost || await findAvailablePort(preferredHmrPort);
-        await startHmrServer(hmrPort);
+        hmrPort = await startHmrServer(hmrPort);
 
         // Write hmr.json for environments without MCP_HMR_PORT (manual npm run dev)
         if (hmrServer && !hmrPortFromHost) {
