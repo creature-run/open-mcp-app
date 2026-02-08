@@ -1,6 +1,6 @@
 {
   "name": "open-mcp-app",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "description": "SDK for building MCP Apps that work on any MCP App host",
   "type": "module",
   "exports": {
