@@ -5,8 +5,6 @@ import { creature } from "open-mcp-app/vite";
 import { renameSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 
-const MCP_NAME = "items";
-
 /**
  * Renames main.html to index.html after build.
  * 
@@ -17,7 +15,7 @@ const MCP_NAME = "items";
 const renameToIndex = (): Plugin => ({
   name: "rename-to-index",
   closeBundle() {
-    const outDir = resolve(__dirname, `dist/${MCP_NAME}/ui`);
+    const outDir = resolve(__dirname, "dist/ui");
     const mainPath = resolve(outDir, "main.html");
     const indexPath = resolve(outDir, "index.html");
     if (existsSync(mainPath)) {
@@ -27,7 +25,7 @@ const renameToIndex = (): Plugin => ({
 });
 
 /**
- * Vite config for Items MCP.
+ * Vite config for the MCP App UI.
  *
  * Development mode:
  * - Uses standard Vite dev server with HMR for instant updates
@@ -40,9 +38,10 @@ const renameToIndex = (): Plugin => ({
  * 
  * Tailwind CSS is processed via PostCSS (see postcss.config.js).
  * 
- * Output path matches production structure: dist/{mcpName}/ui/index.html
- * This ensures the server's html path ("items/ui/index.html") resolves correctly
- * in both dev and production modes via the SDK's loadHtml function.
+ * Output path: dist/ui/index.html
+ * This path is name-independent so the agent can freely rename the app
+ * without needing to update this config. The server's html path ("ui/index.html")
+ * resolves correctly via the SDK's loadHtml function.
  */
 export default defineConfig(({ mode }) => {
   const isProduction = mode === "production";
@@ -51,7 +50,7 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       ...(isProduction ? [viteSingleFile()] : []),
-      creature({ uiDir: "src/ui", outDir: `dist/${MCP_NAME}/ui` }),
+      creature({ uiDir: "src/ui", outDir: "dist/ui" }),
       ...(isProduction ? [renameToIndex()] : []),
     ] as PluginOption[],
     build: {

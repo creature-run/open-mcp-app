@@ -10,6 +10,7 @@
     "build": "npm run build:ui && npm run build:server",
     "build:ui": "vite build --mode production",
     "build:server": "tsc -p tsconfig.server.json",
+    "typecheck": "tsc --noEmit",
     "start": "node dist/server/index.js"
   },
   "dependencies": {
