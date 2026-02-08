@@ -1,41 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
-// Import directly from hmr-client to avoid pulling in heavy Node.js deps from vite/index
-import { generateHmrClientScriptTag, type HmrConfig } from "../vite/hmr-client.js";
 
 export function svgToDataUri(svg: string): string {
   const base64 = Buffer.from(svg).toString("base64");
   return `data:image/svg+xml;base64,${base64}`;
-}
-
-export function injectHmrClient(html: string, hmrPort: number): string {
-  const hmrScript = generateHmrClientScriptTag(hmrPort);
-  
-  if (html.includes("</body>")) {
-    return html.replace("</body>", hmrScript + "</body>");
-  }
-  if (html.includes("</html>")) {
-    return html.replace("</html>", hmrScript + "</html>");
-  }
-  return html + hmrScript;
-}
-
-export function readHmrConfig(basePath?: string): HmrConfig | null {
-  const searchPaths = [
-    basePath ? path.resolve(basePath, "node_modules/.creature/hmr.json") : null,
-    path.resolve(process.cwd(), "node_modules/.creature/hmr.json"),
-  ].filter(Boolean) as string[];
-
-  for (const configPath of searchPaths) {
-    if (fs.existsSync(configPath)) {
-      try {
-        return JSON.parse(fs.readFileSync(configPath, "utf-8"));
-      } catch {
-        continue;
-      }
-    }
-  }
-  return null;
 }
 
 /**

@@ -1,9 +1,7 @@
 @theme {
   /* Reset Tailwind defaults */
   --color-*: initial;
-  --shadow-*: initial;
   --radius-*: initial;
-  --font-*: initial;
   --text-*: initial;
 
   /* =============================================
@@ -49,27 +47,6 @@
   --color-bdr-disabled: var(--color-border-disabled);
 
   /* =============================================
-    Ring colors (ring-ring-*)
-  ============================================= */
-  --color-ring-primary: var(--color-ring-primary);
-  --color-ring-secondary: var(--color-ring-secondary);
-  --color-ring-inverse: var(--color-ring-inverse);
-  --color-ring-info: var(--color-ring-info);
-  --color-ring-danger: var(--color-ring-danger);
-  --color-ring-success: var(--color-ring-success);
-  --color-ring-warning: var(--color-ring-warning);
-
-  /* =============================================
-    Typography
-  ============================================= */
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-mono);
-  --font-weight-normal: var(--font-weight-normal);
-  --font-weight-medium: var(--font-weight-medium);
-  --font-weight-semibold: var(--font-weight-semibold);
-  --font-weight-bold: var(--font-weight-bold);
-
-  /* =============================================
     Text sizes (MCP Apps spec)
   ============================================= */
   --text-xs: var(--font-text-xs-size);
@@ -109,11 +86,4 @@
   --radius-xl: var(--border-radius-xl);
   --radius-full: var(--border-radius-full);
 
-  /* =============================================
-    Shadows
-  ============================================= */
-  --shadow-hairline: var(--shadow-hairline);
-  --shadow-sm: var(--shadow-sm);
-  --shadow-md: var(--shadow-md);
-  --shadow-lg: var(--shadow-lg);
 }

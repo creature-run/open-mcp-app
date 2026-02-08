@@ -679,9 +679,9 @@ export async function experimental_kvList(prefix?: string): Promise<string[] | n
  *
  * @example
  * ```typescript
- * import { experimental_kvListWithValues } from "open-mcp-app/server";
+ * import { exp } from "open-mcp-app/server";
  *
- * const entries = await experimental_kvListWithValues("todos:");
+ * const entries = await exp.kvListWithValues("todos:");
  * for (const { key, value } of entries ?? []) {
  *   console.log(key, JSON.parse(value));
  * }
@@ -1175,6 +1175,7 @@ export const exp = {
   kvSet: experimental_kvSet,
   kvDelete: experimental_kvDelete,
   kvList: experimental_kvList,
+  kvListWithValues: experimental_kvListWithValues,
   kvSearch: experimental_kvSearch,
   vectorIsAvailable: experimental_vectorIsAvailable,
   vectorUpsert: experimental_vectorUpsert,
