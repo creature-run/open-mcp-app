@@ -59,7 +59,7 @@ app.resource({
   uri: "ui://items/main",
   description: "Interactive item list and detail views",
   displayModes: ["pip", "inline"],
-  html: "items/ui/index.html",
+  html: "ui/index.html",
   icon: { svg: APP_ICON, alt: "Items" },
   views: VIEWS,
 });

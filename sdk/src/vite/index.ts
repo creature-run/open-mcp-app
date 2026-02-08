@@ -1,16 +1,11 @@
 import { resolve, join, relative } from "node:path";
 import { readdirSync, statSync, existsSync, writeFileSync, mkdirSync, rmSync, readFileSync } from "node:fs";
-import { createServer as createNetServer } from "node:net";
-import { createServer as createHttpServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import type { Duplex } from "node:stream";
 import type { Plugin, UserConfig } from "vite";
 
 export interface CreaturePluginOptions {
   uiDir?: string;
   outDir?: string;
-  hmrPort?: number;
   /**
    * Generate a JS module exporting bundled HTML for serverless deployments.
    * When enabled, creates `dist/ui/bundle.js` with named exports for each page.
@@ -23,23 +18,6 @@ export interface CreaturePluginOptions {
    * @default false
    */
   generateBundle?: boolean;
-}
-
-// Re-export HMR types from hmr-client (lightweight module)
-export { type HmrConfig } from "./hmr-client.js";
-import { type HmrConfig } from "./hmr-client.js";
-
-function findAvailablePort(startPort: number): Promise<number> {
-  return new Promise((resolve) => {
-    const server = createNetServer();
-    server.listen(startPort, () => {
-      const port = (server.address() as { port: number }).port;
-      server.close(() => resolve(port));
-    });
-    server.on("error", () => {
-      resolve(findAvailablePort(startPort + 1));
-    });
-  });
 }
 
 interface EntryPoint {
@@ -71,118 +49,11 @@ function findPages(dir: string, baseDir: string): EntryPoint[] {
   return entries;
 }
 
-let hmrServer: ReturnType<typeof createHttpServer> | null = null;
-let hmrClients: Set<Duplex> = new Set();
-
-function sendWebSocketFrame(socket: Duplex, data: string): void {
-  const payload = Buffer.from(data);
-  const length = payload.length;
-  
-  let frame: Buffer;
-  if (length < 126) {
-    frame = Buffer.alloc(2 + length);
-    frame[0] = 0x81;
-    frame[1] = length;
-    payload.copy(frame, 2);
-  } else if (length < 65536) {
-    frame = Buffer.alloc(4 + length);
-    frame[0] = 0x81;
-    frame[1] = 126;
-    frame.writeUInt16BE(length, 2);
-    payload.copy(frame, 4);
-  } else {
-    frame = Buffer.alloc(10 + length);
-    frame[0] = 0x81;
-    frame[1] = 127;
-    frame.writeBigUInt64BE(BigInt(length), 2);
-    payload.copy(frame, 10);
-  }
-  
-  socket.write(frame);
-}
-
-function startHmrServer(port: number): Promise<void> {
-  return new Promise((resolve) => {
-    if (hmrServer) {
-      resolve();
-      return;
-    }
-    
-    hmrServer = createHttpServer((_req: IncomingMessage, res: ServerResponse) => {
-      res.writeHead(200);
-      res.end("Creature HMR Server");
-    });
-    
-    hmrServer.on("upgrade", (req: IncomingMessage, socket: Duplex, head: Buffer) => {
-      const key = req.headers["sec-websocket-key"];
-      if (!key) {
-        socket.destroy();
-        return;
-      }
-      
-      const acceptKey = createHash("sha1")
-        .update(key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11")
-        .digest("base64");
-      
-      socket.write(
-        "HTTP/1.1 101 Switching Protocols\r\n" +
-        "Upgrade: websocket\r\n" +
-        "Connection: Upgrade\r\n" +
-        `Sec-WebSocket-Accept: ${acceptKey}\r\n` +
-        "\r\n"
-      );
-      
-      hmrClients.add(socket);
-      sendWebSocketFrame(socket, JSON.stringify({ type: "connected" }));
-      
-      socket.on("close", () => {
-        hmrClients.delete(socket);
-      });
-      
-      socket.on("error", () => {
-        hmrClients.delete(socket);
-      });
-    });
-    
-    hmrServer.on("error", (err: NodeJS.ErrnoException) => {
-      if (err.code === "EADDRINUSE") {
-        console.warn(`[Creature HMR] Port ${port} in use, HMR disabled. Kill other dev servers or restart.`);
-        hmrServer = null;
-      } else {
-        console.error(`[Creature HMR] Server error:`, err);
-      }
-      resolve();
-    });
-    
-    hmrServer.listen(port, () => {
-      resolve();
-    });
-  });
-}
-
-function notifyHmrClients(): void {
-  const message = JSON.stringify({ type: "full-reload" });
-  const toRemove: Duplex[] = [];
-  
-  for (const client of hmrClients) {
-    try {
-      if (!client.destroyed) {
-        sendWebSocketFrame(client, message);
-      } else {
-        toRemove.push(client);
-      }
-    } catch {
-      toRemove.push(client);
-    }
-  }
-  
-  for (const client of toRemove) {
-    hmrClients.delete(client);
-  }
-  
-  if (hmrClients.size > 0) {
-    console.log("App UI reloaded");
-  }
+/**
+ * Log a UI rebuild completion message for dev watch mode.
+ */
+function notifyUiReload(): void {
+  console.log("App UI reloaded");
 }
 
 /**
@@ -203,14 +74,12 @@ function notifyHmrClients(): void {
 export function creature(options: CreaturePluginOptions = {}): Plugin {
   const uiDir = options.uiDir || "src/ui";
   const outDir = options.outDir || "dist/ui";
-  const preferredHmrPort = options.hmrPort || 5899;
   const generateBundle = options.generateBundle || false;
   
   let root: string;
   let tempDir: string;
   let entries: EntryPoint[] = [];
   let hasSingleFilePlugin = false;
-  let hmrPort: number | null = null;
   let isWatchMode = false;
   let remainingPages: string[] = [];
 
@@ -302,28 +171,11 @@ createRoot(document.getElementById("root")!).render(createElement(Page));
       if (!tempDir) return;
 
       isWatchMode = this.meta.watchMode === true;
-
-      if (isWatchMode && !hmrServer) {
-        // Use MCP_HMR_PORT if provided by host, otherwise find an available port
-        const hmrPortFromHost = process.env.MCP_HMR_PORT ? parseInt(process.env.MCP_HMR_PORT, 10) : null;
-        hmrPort = hmrPortFromHost || await findAvailablePort(preferredHmrPort);
-        await startHmrServer(hmrPort);
-
-        // Write hmr.json for environments without MCP_HMR_PORT (manual npm run dev)
-        if (hmrServer && !hmrPortFromHost) {
-          mkdirSync(tempDir, { recursive: true });
-          const hmrConfig: HmrConfig = { port: hmrPort };
-          writeFileSync(
-            join(tempDir, "hmr.json"),
-            JSON.stringify(hmrConfig, null, 2)
-          );
-        }
-      }
     },
 
     writeBundle() {
       if (!hasSingleFilePlugin || remainingPages.length === 0) {
-        if (isWatchMode) notifyHmrClients();
+        if (isWatchMode) notifyUiReload();
         return;
       }
       
@@ -336,7 +188,7 @@ createRoot(document.getElementById("root")!).render(createElement(Page));
       }
       
       if (isWatchMode) {
-        notifyHmrClients();
+        notifyUiReload();
       } else {
         remainingPages = [];
       }
@@ -382,7 +234,5 @@ ${exports.join("\n\n")}
     },
   };
 }
-
-export { generateHmrClientScript, generateHmrClientScriptTag, HMR_RELOAD_NOTIFICATION } from "./hmr-client.js";
 
 export default creature;

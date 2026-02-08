@@ -87,6 +87,17 @@ host.exp.setWidgetState({
 const state = host.widgetState;
 ```
 
+**Behavior:** The SDK de-duplicates identical `exp.setWidgetState` payloads and may throttle rapid updates to avoid render loops.
+
+### Connection Resilience
+
+The React host client is designed to be safe to call early and often:
+
+- **Tool calls queue until ready**: `callTool` waits for the host connection before sending.
+- **In-flight dedupe**: identical concurrent tool calls share a single request.
+- **Buffered logs and notifications**: `log.*` and `exp.sendNotification` are queued until ready.
+- **Widget state dedupe**: repeated `exp.setWidgetState` payloads are ignored to avoid loops.
+
 ### Update Model Context
 
 Explicitly inform the AI model about user actions without triggering an immediate response. Use this when the UI needs the model to know about important interactions (file selections, preferences, etc.) for future turns.
@@ -149,7 +160,6 @@ export default {
 ```
 
 The Vite plugin provides:
-- Hot Module Replacement in the Creature iframe
 - Automatic port discovery between UI and server
 - Development proxy configuration
 

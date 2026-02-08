@@ -48,7 +48,6 @@ export {
   experimental_kvSet,
   experimental_kvDelete,
   experimental_kvList,
-  experimental_kvListWithValues,
   experimental_kvSearch,
   experimental_vectorIsAvailable,
   experimental_vectorUpsert,

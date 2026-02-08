@@ -27,6 +27,11 @@ export interface UseHostConfig {
   onTeardown?: () => Promise<void>;
   /** Called when widget state changes (restored from host or updated) */
   onWidgetStateChange?: (widgetState: WidgetState | null) => void;
+  /**
+   * Optional throttle for widget state updates (milliseconds).
+   * When set, rapid widgetState updates are coalesced to reduce render loops.
+   */
+  widgetStateThrottleMs?: number;
 }
 
 // ============================================================================

@@ -379,10 +379,8 @@ export interface AppConfig {
   instructions?: string;
   /** Port for HTTP transport (default: 3000 or MCP_PORT env) */
   port?: number;
-  /** Enable dev mode with HMR support (default: auto-detect from NODE_ENV) */
+  /** Enable dev mode (default: auto-detect from NODE_ENV) */
   dev?: boolean;
-  /** HMR port override (default: auto-detect from Vite config or 5173) */
-  hmrPort?: number;
 
   // Transport Session Lifecycle Callbacks
 
