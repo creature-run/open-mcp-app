@@ -1,0 +1,46 @@
+{
+  "name": "open-mcp-app-ui",
+  "version": "0.0.1",
+  "description": "UI component library for MCP Apps",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "tsup": "^8.5.1",
+    "typescript": "^5.8.3"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "chatgpt",
+    "creature",
+    "claude",
+    "ai-tools",
+    "ui"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/creature-run/open-mcp-app.git",
+    "directory": "sdk-ui"
+  },
+  "bugs": {
+    "url": "https://github.com/creature-run/open-mcp-app/issues"
+  }
+}
