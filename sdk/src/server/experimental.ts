@@ -697,7 +697,7 @@ export async function experimental_kvList(options?: {
  *
  * @example
  * ```typescript
- * import { experimental_kvListWithValues } from "open-mcp-app/server";
+ * import { exp } from "open-mcp-app/server";
  *
  * const page = await experimental_kvListWithValues({ prefix: "todos:", limit: 100 });
  * for (const { key, value } of page?.entries ?? []) {

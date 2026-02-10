@@ -20,7 +20,7 @@ import type {
   TransportSessionInfo,
 } from "./types.js";
 import { MIME_TYPES } from "./types.js";
-import { svgToDataUri, isInitializeRequest, injectHmrClient, readHmrConfig, htmlLoader } from "./utils.js";
+import { svgToDataUri, isInitializeRequest, htmlLoader } from "./utils.js";
 import { WebSocketManager } from "./websocket.js";
 import type { WebSocketConnection } from "./types.js";
 import { setCurrentServer } from "./storageRpc.js";
@@ -43,8 +43,6 @@ export class App {
   private instanceWebSockets = new Map<string, WebSocketConnection<unknown, unknown>>();
   private httpServer: Server | null = null;
   private isDev: boolean;
-  private hmrPort: number | null = null;
-  private hmrConfigChecked = false;
   private callerDir: string;
   private shutdownRegistered = false;
   private isShuttingDown = false;
@@ -68,9 +66,6 @@ export class App {
     this.config = config;
     this.isDev = config.dev ?? process.env.NODE_ENV === "development";
     
-    if (this.isDev && config.hmrPort) {
-      this.hmrPort = config.hmrPort;
-    }
   }
 
   // ==========================================================================
@@ -584,40 +579,6 @@ export class App {
     return { type: "object", additionalProperties: true };
   }
 
-  /**
-   * Get the HMR port for injecting the live reload client.
-   *
-   * When MCP_HMR_PORT is set (by host), uses that directly - this implies dev mode.
-   * Falls back to reading hmr.json for non-host environments (manual npm run dev).
-   * Only uses isDev flag when neither MCP_HMR_PORT nor hmr.json are available.
-   */
-  private getHmrPort(): number | null {
-    if (this.hmrPort !== null) return this.hmrPort;
-
-    // Use MCP_HMR_PORT when available (set by host) - presence implies dev mode
-    const hmrPortFromHost = process.env.MCP_HMR_PORT ? parseInt(process.env.MCP_HMR_PORT, 10) : null;
-    if (hmrPortFromHost && !isNaN(hmrPortFromHost)) {
-      this.hmrPort = hmrPortFromHost;
-      return this.hmrPort;
-    }
-
-    // Fallback to config file for non-host environments (manual npm run dev)
-    if (!this.hmrConfigChecked) {
-      const hmrConfig = readHmrConfig();
-      if (hmrConfig) {
-        this.hmrPort = hmrConfig.port;
-      }
-      this.hmrConfigChecked = true;
-    }
-
-    // If no HMR config found and not in dev mode, return null
-    if (this.hmrPort === null && !this.isDev) {
-      return null;
-    }
-
-    return this.hmrPort;
-  }
-
   // ==========================================================================
   // Private: Instance Helpers
   // ==========================================================================
@@ -715,6 +676,19 @@ export class App {
     const transportSessionId = req.headers["mcp-session-id"] as string | undefined;
 
     try {
+      /**
+       * Ensure tools/list is always available, even when no tools are registered.
+       * This prevents clients from receiving -32601 and keeps empty-tool apps valid.
+       */
+      if (req.body?.method === "tools/list" && this.tools.size === 0) {
+        res.json({
+          jsonrpc: "2.0",
+          id: req.body?.id ?? null,
+          result: { tools: [] },
+        });
+        return;
+      }
+
       let transport: StreamableHTTPServerTransport;
 
       if (transportSessionId && this.transports.has(transportSessionId)) {
@@ -836,7 +810,7 @@ export class App {
         version: this.config.version,
         ...(this.config.instructions && { instructions: this.config.instructions }),
       },
-      { capabilities: { logging: {} } }
+      { capabilities: { logging: {}, tools: {}, resources: {} } }
     );
 
     this.registerResources(server);
@@ -868,11 +842,6 @@ export class App {
         },
         async () => {
           let html = typeof config.html === "function" ? await config.html() : config.html;
-
-          const hmrPort = this.getHmrPort();
-          if (hmrPort) {
-            html = injectHmrClient(html, hmrPort);
-          }
 
           const mcpAppsMeta: Record<string, unknown> = {
             ui: {
