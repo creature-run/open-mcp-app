@@ -56,7 +56,7 @@ export type WidgetState = StructuredWidgetState | Record<string, unknown>;
 // Tool Results
 // ============================================================================
 
-/**
+/*
  * Tool call result structure.
  */
 export interface ToolResult<T = Record<string, unknown>> {

@@ -64,16 +64,25 @@ export const getAllItems = async (): Promise<Item[]> => {
   let items: Item[];
 
   if (exp.kvIsAvailable()) {
-    const keys = await exp.kvList(ITEM_PREFIX);
-    if (keys && keys.length > 0) {
-      const values = await Promise.all(
-        keys.map((key) => exp.kvGet(key))
-      );
-      items = values
-        .filter((v): v is string => v !== null)
-        .map((v) => JSON.parse(v) as Item);
-    } else {
-      items = [];
+    items = [];
+    let cursor: string | undefined;
+
+    while (true) {
+      const page = await exp.kvListWithValues({
+        prefix: ITEM_PREFIX,
+        cursor,
+        limit: 100,
+      });
+      if (!page) break;
+
+      for (const entry of page.entries) {
+        items.push(JSON.parse(entry.value) as Item);
+      }
+
+      if (!page.nextCursor) {
+        break;
+      }
+      cursor = page.nextCursor;
     }
   } else {
     items = Array.from(memoryStore.values());

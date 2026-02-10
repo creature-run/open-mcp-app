@@ -46,6 +46,27 @@ export interface VectorSearchResult {
   metadata?: unknown;
 }
 
+export interface ListOptions {
+  prefix?: string;
+  cursor?: string;
+  limit?: number;
+}
+
+export interface KvListResult {
+  keys: string[];
+  nextCursor: string | null;
+}
+
+export interface KvListWithValuesResult {
+  entries: Array<{ key: string; value: string }>;
+  nextCursor: string | null;
+}
+
+export interface BlobListResult {
+  names: string[];
+  nextCursor: string | null;
+}
+
 // =============================================================================
 // Server Context
 // =============================================================================
@@ -161,12 +182,18 @@ export const rpcKvDelete = async (key: string): Promise<boolean> => {
 /**
  * List keys in the KV store via RPC.
  */
-export const rpcKvList = async (prefix?: string): Promise<string[]> => {
-  const result = await sendStorageRequest<{ keys: string[] }>(
+export const rpcKvList = async (
+  options?: ListOptions
+): Promise<KvListResult> => {
+  const result = await sendStorageRequest<KvListResult>(
     STORAGE_METHODS.KV_LIST,
-    { prefix }
+    {
+      prefix: options?.prefix,
+      cursor: options?.cursor,
+      limit: options?.limit,
+    }
   );
-  return result.keys;
+  return result;
 };
 
 /**
@@ -174,13 +201,17 @@ export const rpcKvList = async (prefix?: string): Promise<string[]> => {
  * Returns both keys and values in a single request to avoid N+1 lookups.
  */
 export const rpcKvListWithValues = async (
-  prefix?: string
-): Promise<Array<{ key: string; value: string }>> => {
-  const result = await sendStorageRequest<{ entries: Array<{ key: string; value: string }> }>(
+  options?: ListOptions
+): Promise<KvListWithValuesResult> => {
+  const result = await sendStorageRequest<KvListWithValuesResult>(
     STORAGE_METHODS.KV_LIST_WITH_VALUES,
-    { prefix }
+    {
+      prefix: options?.prefix,
+      cursor: options?.cursor,
+      limit: options?.limit,
+    }
   );
-  return result.entries;
+  return result;
 };
 
 /**
@@ -284,10 +315,16 @@ export const rpcBlobDelete = async (name: string): Promise<boolean> => {
 /**
  * List blobs via RPC.
  */
-export const rpcBlobList = async (prefix?: string): Promise<string[]> => {
-  const result = await sendStorageRequest<{ names: string[] }>(
+export const rpcBlobList = async (
+  options?: ListOptions
+): Promise<BlobListResult> => {
+  const result = await sendStorageRequest<BlobListResult>(
     STORAGE_METHODS.BLOB_LIST,
-    { prefix }
+    {
+      prefix: options?.prefix,
+      cursor: options?.cursor,
+      limit: options?.limit,
+    }
   );
-  return result.names;
+  return result;
 };

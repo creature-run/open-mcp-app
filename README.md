@@ -448,8 +448,8 @@ import { exp } from "open-mcp-app/server";
 | `exp.kvGet(key)` | Get a value by key, returns `string \| null` |
 | `exp.kvSet(key, value)` | Store a string value, returns `boolean` |
 | `exp.kvDelete(key)` | Delete a key, returns `boolean` |
-| `exp.kvList(prefix?)` | List keys, optionally filtered by prefix |
-| `exp.kvListWithValues(prefix?)` | List keys with their values |
+| `exp.kvList({ prefix?, cursor?, limit? })` | List keys page with `{ keys, nextCursor }` |
+| `exp.kvListWithValues({ prefix?, cursor?, limit? })` | List entries page with `{ entries, nextCursor }` |
 | `exp.kvSearch(query, opts?)` | Full-text search across values |
 | `exp.kvIsAvailable()` | Check if KV store is available |
 
@@ -460,7 +460,7 @@ import { exp } from "open-mcp-app/server";
 | `exp.blobPut(name, data, mimeType?)` | Store binary data (max 10MB) |
 | `exp.blobGet(name)` | Retrieve binary data and mime type |
 | `exp.blobDelete(name)` | Delete a blob |
-| `exp.blobList(prefix?)` | List blob names |
+| `exp.blobList({ prefix?, cursor?, limit? })` | List blob names page with `{ names, nextCursor }` |
 | `exp.blobIsAvailable()` | Check if blob store is available |
 
 **File I/O**: Sandboxed filesystem access:

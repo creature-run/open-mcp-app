@@ -641,23 +641,38 @@ export function experimental_kvDeleteSync(key: string): boolean {
  * Uses RPC to communicate with the Creature host for storage operations.
  * This ensures consistent behavior for both local and hosted MCPs.
  *
- * @param prefix - Optional prefix to filter keys
- * @returns Array of matching keys, or null if storage unavailable
+ * @param options - List options
+ * @param options.prefix - Optional prefix to filter keys
+ * @param options.cursor - Cursor from a previous page (`nextCursor`)
+ * @param options.limit - Max items per page (default 100)
+ * @returns Paginated keys and next cursor, or null if storage unavailable
  *
  * @example
  * ```typescript
  * import { experimental_kvList } from "open-mcp-app/server";
  *
- * const userKeys = await experimental_kvList("user:");
+ * const firstPage = await experimental_kvList({ prefix: "user:", limit: 100 });
+ * const nextPage = firstPage?.nextCursor
+ *   ? await experimental_kvList({ prefix: "user:", cursor: firstPage.nextCursor, limit: 100 })
+ *   : null;
  * ```
  */
-export async function experimental_kvList(prefix?: string): Promise<string[] | null> {
-  const sanitizedPrefix = prefix ? sanitizeKey(prefix) : undefined;
+export async function experimental_kvList(options?: {
+  prefix?: string;
+  cursor?: string;
+  limit?: number;
+}): Promise<{ keys: string[]; nextCursor: string | null } | null> {
+  const sanitizedPrefix = options?.prefix ? sanitizeKey(options.prefix) : undefined;
+  const sanitizedCursor = options?.cursor ? sanitizeKey(options.cursor) : undefined;
   
   // Use RPC when available (preferred path for both local and hosted MCPs)
   if (isStorageRpcAvailable()) {
     try {
-      return await rpcKvList(sanitizedPrefix);
+      return await rpcKvList({
+        prefix: sanitizedPrefix,
+        cursor: sanitizedCursor,
+        limit: options?.limit,
+      });
     } catch (error) {
       console.error("[KV] RPC error in kvList:", error);
       return null;
@@ -674,28 +689,36 @@ export async function experimental_kvList(prefix?: string): Promise<string[] | n
  * This is more efficient than calling kvList + kvGet for each key,
  * as it fetches all data in a single RPC call.
  *
- * @param prefix - Optional prefix to filter keys
- * @returns Array of key-value pairs, or null if storage unavailable
+ * @param options - List options
+ * @param options.prefix - Optional prefix to filter keys
+ * @param options.cursor - Cursor from a previous page (`nextCursor`)
+ * @param options.limit - Max items per page (default 100)
+ * @returns Paginated key-value pairs and next cursor, or null if storage unavailable
  *
  * @example
  * ```typescript
  * import { experimental_kvListWithValues } from "open-mcp-app/server";
  *
- * const entries = await experimental_kvListWithValues("todos:");
- * for (const { key, value } of entries ?? []) {
+ * const page = await experimental_kvListWithValues({ prefix: "todos:", limit: 100 });
+ * for (const { key, value } of page?.entries ?? []) {
  *   console.log(key, JSON.parse(value));
  * }
  * ```
  */
 export async function experimental_kvListWithValues(
-  prefix?: string
-): Promise<Array<{ key: string; value: string }> | null> {
-  const sanitizedPrefix = prefix ? sanitizeKey(prefix) : undefined;
+  options?: { prefix?: string; cursor?: string; limit?: number }
+): Promise<{ entries: Array<{ key: string; value: string }>; nextCursor: string | null } | null> {
+  const sanitizedPrefix = options?.prefix ? sanitizeKey(options.prefix) : undefined;
+  const sanitizedCursor = options?.cursor ? sanitizeKey(options.cursor) : undefined;
   
   // Use RPC when available (preferred path for both local and hosted MCPs)
   if (isStorageRpcAvailable()) {
     try {
-      return await rpcKvListWithValues(sanitizedPrefix);
+      return await rpcKvListWithValues({
+        prefix: sanitizedPrefix,
+        cursor: sanitizedCursor,
+        limit: options?.limit,
+      });
     } catch (error) {
       console.error("[KV] RPC error in kvListWithValues:", error);
       return null;
@@ -1033,23 +1056,35 @@ export function experimental_blobDeleteSync(name: string): boolean {
  * Uses RPC to communicate with the Creature host for storage operations.
  * This ensures consistent behavior for both local and hosted MCPs.
  *
- * @param prefix - Optional prefix to filter blob names
- * @returns Array of blob names, or null if storage unavailable
+ * @param options - List options
+ * @param options.prefix - Optional prefix to filter blob names
+ * @param options.cursor - Cursor from a previous page (`nextCursor`)
+ * @param options.limit - Max items per page (default 100)
+ * @returns Paginated blob names and next cursor, or null if storage unavailable
  *
  * @example
  * ```typescript
  * import { experimental_blobList } from "open-mcp-app/server";
  *
- * const images = await experimental_blobList("images/");
+ * const images = await experimental_blobList({ prefix: "images/", limit: 100 });
  * ```
  */
-export async function experimental_blobList(prefix?: string): Promise<string[] | null> {
-  const sanitizedPrefix = prefix ? sanitizeKey(prefix) : undefined;
+export async function experimental_blobList(options?: {
+  prefix?: string;
+  cursor?: string;
+  limit?: number;
+}): Promise<{ names: string[]; nextCursor: string | null } | null> {
+  const sanitizedPrefix = options?.prefix ? sanitizeKey(options.prefix) : undefined;
+  const sanitizedCursor = options?.cursor ? sanitizeKey(options.cursor) : undefined;
 
   // Use RPC when available
   if (isStorageRpcAvailable()) {
     try {
-      return await rpcBlobList(sanitizedPrefix);
+      return await rpcBlobList({
+        prefix: sanitizedPrefix,
+        cursor: sanitizedCursor,
+        limit: options?.limit,
+      });
     } catch (error) {
       console.error("[Blob] RPC error in blobList:", error);
       return null;
@@ -1175,6 +1210,7 @@ export const exp = {
   kvSet: experimental_kvSet,
   kvDelete: experimental_kvDelete,
   kvList: experimental_kvList,
+  kvListWithValues: experimental_kvListWithValues,
   kvSearch: experimental_kvSearch,
   vectorIsAvailable: experimental_vectorIsAvailable,
   vectorUpsert: experimental_vectorUpsert,

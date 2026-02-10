@@ -39,7 +39,7 @@ if (experimental_kvIsAvailable()) {
   }
   
   // List keys with a prefix
-  const userKeys = await experimental_kvList("user:");
+  const userKeysPage = await experimental_kvList({ prefix: "user:", limit: 100 });
   
   // Delete data
   await experimental_kvDelete("user:preferences");
@@ -84,16 +84,30 @@ Delete a key. Returns `true` if the key existed and was deleted.
 const deleted = await experimental_kvDelete("settings");
 ```
 
-### `experimental_kvList(prefix?: string): Promise<string[] | null>`
+### `experimental_kvList(options?: { prefix?: string; cursor?: string; limit?: number }): Promise<{ keys: string[]; nextCursor: string | null } | null>`
 
-List all keys, optionally filtered by prefix. Returns `null` if storage unavailable.
+List keys with cursor-based pagination. Returns `null` if storage unavailable.
 
 ```typescript
-// List all keys
-const allKeys = await experimental_kvList();
+let cursor: string | undefined;
+do {
+  const page = await experimental_kvList({ prefix: "user:", cursor, limit: 100 });
+  if (!page) break;
 
-// List keys starting with "user:"
-const userKeys = await experimental_kvList("user:");
+  console.log(page.keys);
+  cursor = page.nextCursor ?? undefined;
+} while (cursor);
+```
+
+### `experimental_kvListWithValues(options?: { prefix?: string; cursor?: string; limit?: number }): Promise<{ entries: Array<{ key: string; value: string }>; nextCursor: string | null } | null>`
+
+List key-value entries with cursor-based pagination.
+
+```typescript
+const page = await experimental_kvListWithValues({ prefix: "todos:", limit: 100 });
+for (const entry of page?.entries ?? []) {
+  console.log(entry.key, entry.value);
+}
 ```
 
 ### Sync Variants
@@ -142,12 +156,15 @@ if (blob) {
 
 Delete a blob. Returns `true` if deleted.
 
-### `experimental_blobList(prefix?: string): Promise<string[] | null>`
+### `experimental_blobList(options?: { prefix?: string; cursor?: string; limit?: number }): Promise<{ names: string[]; nextCursor: string | null } | null>`
 
-List blob names, optionally filtered by prefix.
+List blob names with cursor-based pagination.
 
 ```typescript
-const images = await experimental_blobList("images/");
+const firstPage = await experimental_blobList({ prefix: "images/", limit: 100 });
+const more = firstPage?.nextCursor
+  ? await experimental_blobList({ prefix: "images/", cursor: firstPage.nextCursor, limit: 100 })
+  : null;
 ```
 
 ### Sync Variants
@@ -243,14 +260,23 @@ class KvDataStore<T> implements DataStore<T> {
   }
 
   async list(): Promise<T[]> {
-    const keys = await experimental_kvList(`${this.collection}:`);
-    if (!keys) return [];
-    
     const items: T[] = [];
-    for (const key of keys) {
-      const value = await experimental_kvGet(key);
-      if (value) items.push(JSON.parse(value));
-    }
+    let cursor: string | undefined;
+
+    do {
+      const page = await experimental_kvListWithValues({
+        prefix: `${this.collection}:`,
+        cursor,
+        limit: 100,
+      });
+      if (!page) break;
+
+      for (const entry of page.entries) {
+        items.push(JSON.parse(entry.value));
+      }
+      cursor = page.nextCursor ?? undefined;
+    } while (cursor);
+
     return items;
   }
 }
@@ -280,7 +306,7 @@ When running in Creature, data is stored at:
 
 ```
 ~/Library/Application Support/Creature/mcp-storage/<projectId>/<mcpKey>/
-├── kv.json          # KV store data
+├── kv.sqlite        # KV store data
 └── blobs/           # Blob files
     └── images/
         └── photo.png
