@@ -1,0 +1,46 @@
+/**
+ * Build-time CSS source for generating the library's single styles.css.
+ *
+ * This file is NOT shipped. It is consumed by @tailwindcss/cli during the
+ * build to produce dist/styles.css — a single file consumers import.
+ *
+ * The output includes:
+ *   - SDK Tailwind CSS (theme, reset, base, custom utilities)
+ *   - Fallback CSS variable values (safe defaults when no host)
+ *   - All Tailwind utility classes used by the library's components
+ *
+ * Consumer usage:
+ *   import "open-mcp-app-ui/styles.css";
+ */
+
+/* SDK CSS — brings in tailwindcss, theme tokens, reset, and custom utilities */
+@import "open-mcp-app/styles/tailwind.css";
+
+/* Fallback values for all 75 MCP Apps spec CSS variables */
+@import "./fallbacks.css";
+
+/* Component-specific CSS that can't be expressed with Tailwind alone */
+@import "./form-control.css";
+@import "./checkbox.css";
+@import "./radio.css";
+@import "./slider.css";
+@import "./tag-input.css";
+@import "./menu.css";
+
+/**
+ * Ring color tokens mapped to the MCP Apps spec ring variables.
+ * These aren't in the SDK's @theme block yet, but the library's
+ * focus-visible styles use ring-ring-* classes.
+ */
+@theme {
+  --color-ring-primary: var(--color-ring-primary);
+  --color-ring-secondary: var(--color-ring-secondary);
+  --color-ring-inverse: var(--color-ring-inverse);
+  --color-ring-info: var(--color-ring-info);
+  --color-ring-danger: var(--color-ring-danger);
+  --color-ring-success: var(--color-ring-success);
+  --color-ring-warning: var(--color-ring-warning);
+}
+
+/* Scan the library's compiled JS for Tailwind class names */
+@source "../../dist";

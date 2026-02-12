@@ -1,0 +1,14 @@
+/*
+ * Tailwind 4 custom variants for MCP Apps display modes.
+ *
+ * These match the data-display-mode attribute set by <AppLayout>.
+ * Usage: inline:hidden, pip:block, fullscreen:text-lg, etc.
+ *
+ * Import alongside the SDK styles:
+ *   import "open-mcp-app/styles/tailwind.css";
+ *   import "open-mcp-app-ui/styles/display-modes.css";
+ */
+
+@custom-variant inline (&:where([data-display-mode="inline"], [data-display-mode="inline"] *));
+@custom-variant pip (&:where([data-display-mode="pip"], [data-display-mode="pip"] *));
+@custom-variant fullscreen (&:where([data-display-mode="fullscreen"], [data-display-mode="fullscreen"] *));

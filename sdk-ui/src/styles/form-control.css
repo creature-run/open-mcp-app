@@ -1,0 +1,77 @@
+/**
+ * Form control border effect.
+ *
+ * Uses inset box-shadow instead of CSS border, following the same pattern
+ * as OpenAI's apps-sdk-ui. This avoids all border+outline doubling,
+ * provides smoother transitions, and keeps the focus indicator as a
+ * single visual element (the shadow ring itself changes weight + color).
+ *
+ * Usage: add class="omu-control" and data-error for error state.
+ *
+ * States:
+ *   default  → 1px inset ring using --color-border-primary
+ *   hover    → ring changes to --color-border-secondary
+ *   focus    → ring thickens to 2px and uses --color-ring-primary
+ *   error    → ring uses --color-border-danger
+ *   disabled → 50% opacity, not-allowed cursor
+ */
+
+.omu-control {
+  border: 0;
+  outline: none !important;
+  box-shadow: inset 0 0 0 1px var(--color-border-primary);
+  transition:
+    box-shadow 150ms ease,
+    background-color 150ms ease;
+}
+
+.omu-control:focus,
+.omu-control:focus-visible {
+  outline: none !important;
+}
+
+.omu-control:hover:not(:disabled):not(:has(:disabled)):not([data-error]):not(:focus):not(:focus-within) {
+  box-shadow: inset 0 0 0 1px var(--color-border-secondary);
+}
+
+.omu-control:focus:not([data-error]),
+.omu-control:focus-within:not([data-error]) {
+  box-shadow: inset 0 0 0 2px var(--color-ring-primary);
+}
+
+.omu-control[data-error] {
+  box-shadow: inset 0 0 0 1px var(--color-border-danger);
+}
+
+.omu-control[data-error]:focus-within {
+  box-shadow: inset 0 0 0 2px var(--color-border-danger);
+}
+
+.omu-control:where([data-disabled]),
+.omu-control:has(:disabled) {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/**
+ * Date picker — improves native date input appearance.
+ * Tones down the browser-default calendar indicator icon
+ * so it doesn't dominate the input visually.
+ */
+
+/**
+ * DatePicker dropdown — entry animation for the calendar popup.
+ * Same spring-like feel as Menu/Select dropdowns.
+ */
+
+@keyframes omu-datepicker-enter {
+  0% {
+    opacity: 0;
+    transform: scale(0.97) translateY(-2px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}

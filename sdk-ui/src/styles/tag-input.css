@@ -1,0 +1,16 @@
+/**
+ * TagInput — Shake animation for duplicate tag detection.
+ *
+ * Applied to a tag pill when a user attempts to add a duplicate.
+ * The tag briefly shakes horizontally to visually signal the conflict.
+ */
+
+.omu-shake {
+  animation: omu-shake 500ms ease;
+}
+
+@keyframes omu-shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-4px); }
+  40%, 80% { transform: translateX(4px); }
+}

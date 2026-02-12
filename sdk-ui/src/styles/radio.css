@@ -1,0 +1,50 @@
+/**
+ * RadioGroup — Animated radio indicator styles.
+ *
+ * Creates a circular indicator that fills with an animated dot when selected.
+ * The outer circle uses spec border variables. When checked, the inner dot
+ * scales in with a smooth animation.
+ *
+ * Structure: .omu-radio > .omu-radio-dot
+ */
+
+.omu-radio {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid var(--color-border-primary);
+  border-radius: 50%;
+  background-color: transparent;
+  cursor: pointer;
+  transition: border-color 150ms ease;
+}
+
+.omu-radio:hover:not([data-disabled]):not([data-checked]) {
+  border-color: var(--color-border-secondary);
+}
+
+.omu-radio[data-checked] {
+  border-color: var(--color-background-inverse);
+}
+
+.omu-radio[data-disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.omu-radio-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: var(--color-background-inverse);
+  animation: omu-radio-scale-in 250ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes omu-radio-scale-in {
+  0% { transform: scale(0); }
+  100% { transform: scale(1); }
+}

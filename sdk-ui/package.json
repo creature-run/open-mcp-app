@@ -1,27 +1,53 @@
 {
   "name": "open-mcp-app-ui",
-  "version": "0.0.1",
-  "description": "UI component library for MCP Apps",
+  "version": "0.0.2",
+  "description": "UI component library for MCP Apps, built on the MCP Apps spec",
   "type": "module",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
-      "require": "./dist/index.js",
       "default": "./dist/index.js"
-    }
+    },
+    "./table": {
+      "types": "./dist/table/index.d.ts",
+      "import": "./dist/table/index.js",
+      "default": "./dist/table/index.js"
+    },
+    "./editor": {
+      "types": "./dist/editor/index.d.ts",
+      "import": "./dist/editor/index.js",
+      "default": "./dist/editor/index.js"
+    },
+    "./styles.css": "./dist/styles.css",
+    "./styles/fallbacks.css": "./dist/styles/fallbacks.css",
+    "./styles/display-modes.css": "./dist/styles/display-modes.css"
   },
   "files": [
     "dist",
     "README.md"
   ],
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && npx @tailwindcss/cli -i src/styles/build-utilities.css -o dist/styles.css --minify",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
+  "peerDependencies": {
+    "open-mcp-app": ">=0.0.7",
+    "react": ">=18.0.0"
+  },
+  "peerDependenciesMeta": {
+    "open-mcp-app": {
+      "optional": false
+    }
+  },
   "devDependencies": {
+    "@tailwindcss/cli": "^4.0.0",
+    "@types/react": "^19.1.6",
+    "@types/react-syntax-highlighter": "^15.5.13",
+    "open-mcp-app": "file:../sdk",
+    "react": "^19.1.0",
     "tsup": "^8.5.1",
     "typescript": "^5.8.3"
   },
@@ -32,7 +58,8 @@
     "creature",
     "claude",
     "ai-tools",
-    "ui"
+    "ui",
+    "components"
   ],
   "license": "MIT",
   "repository": {
@@ -42,5 +69,8 @@
   },
   "bugs": {
     "url": "https://github.com/creature-run/open-mcp-app/issues"
+  },
+  "dependencies": {
+    "react-syntax-highlighter": "^16.1.0"
   }
 }
