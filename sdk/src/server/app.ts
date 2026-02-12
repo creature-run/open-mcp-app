@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { AsyncLocalStorage } from "node:async_hooks";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Server } from "node:http";
@@ -9,6 +10,8 @@ import type { Request, Response } from "express";
 import { z } from "zod";
 import type {
   AppConfig,
+  AuthConfig,
+  AuthContext,
   ResourceConfig,
   ToolConfig,
   ToolDefinition,
@@ -25,6 +28,8 @@ import { WebSocketManager } from "./websocket.js";
 import type { WebSocketConnection } from "./types.js";
 import { setCurrentServer } from "./storageRpc.js";
 
+
+const authStore = new AsyncLocalStorage<{ token: string | null; verifiedData?: unknown }>();
 
 // ============================================================================
 // App Class
@@ -446,6 +451,9 @@ export class App {
       const input = toolConfig.input ? toolConfig.input.parse(args) : args;
       const instanceId = (args.instanceId as string) || this.generateInstanceId();
 
+      // Resolve auth context
+      const auth = await this.resolveAuth(args);
+
       // Create a simple context for direct request handling
       const context: ToolContext = {
         instanceId,
@@ -455,6 +463,7 @@ export class App {
         onMessage: () => {},
         onConnect: () => {},
         websocketUrl: undefined,
+        auth,
       };
 
       const result = await handler(input, context);
@@ -632,6 +641,68 @@ export class App {
   }
 
   // ==========================================================================
+  // Private: Auth Validation & Resolution
+  // ==========================================================================
+
+  /**
+   * Reject requests with invalid Bearer tokens per OAuth 2.1 Section 5.3.
+   * Returns true if the request was rejected (caller should return early).
+   */
+  private async rejectInvalidToken(req: Request, res: Response): Promise<boolean> {
+    if (!this.config.auth?.verify) return false;
+
+    const authHeader = req.headers.authorization;
+    const httpToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    if (!httpToken) return false;
+
+    const verifyResult = await this.config.auth.verify(httpToken);
+    if (verifyResult != null) {
+      // Cache verify result to avoid double-calling verify in tool handlers
+      const store = authStore.getStore();
+      if (store) store.verifiedData = verifyResult;
+      return false;
+    }
+
+    const resourceMetadataUrl = `${this.config.auth.resource}/.well-known/oauth-protected-resource`;
+    res.status(401)
+      .setHeader(
+        "WWW-Authenticate",
+        `Bearer resource_metadata="${resourceMetadataUrl}"`
+      )
+      .json({
+        jsonrpc: "2.0",
+        error: { code: -32001, message: "Unauthorized: invalid or expired token" },
+        id: req.body?.id ?? null,
+      });
+    return true;
+  }
+
+  /**
+   * Resolve auth context from tool call args and HTTP header.
+   * Priority: _creatureToken (host-injected) > HTTP Authorization header.
+   * Uses cached verify result for HTTP tokens to avoid double-verification.
+   */
+  private async resolveAuth(args: Record<string, unknown>): Promise<AuthContext | null> {
+    const creatureToken = typeof args._creatureToken === 'string' ? args._creatureToken : null;
+    const store = authStore.getStore();
+    const httpToken = store?.token ?? null;
+    const rawToken = creatureToken || httpToken;
+
+    if (!rawToken) return null;
+
+    if (this.config.auth?.verify) {
+      // Use cached verify result if available (HTTP token already validated by rejectInvalidToken)
+      if (rawToken === httpToken && store?.verifiedData !== undefined) {
+        return { token: rawToken, data: store.verifiedData };
+      }
+      const data = await this.config.auth.verify(rawToken);
+      return data != null ? { token: rawToken, data } : null;
+    }
+
+    return { token: rawToken, data: null };
+  }
+
+  // ==========================================================================
   // Private: Express Server
   // ==========================================================================
 
@@ -643,7 +714,7 @@ export class App {
     app.use((req: Request, res: Response, next: () => void) => {
       res.setHeader("Access-Control-Allow-Origin", "*");
       res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
-      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Accept, Mcp-Session-Id");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Accept, Authorization, Mcp-Session-Id");
       res.setHeader("Access-Control-Expose-Headers", "Mcp-Session-Id");
 
       if (req.method === "OPTIONS") {
@@ -664,6 +735,18 @@ export class App {
       });
     });
 
+    // OAuth protected resource metadata
+    if (this.config.auth) {
+      app.get("/.well-known/oauth-protected-resource", (_req, res) => {
+        res.json({
+          resource: this.config.auth!.resource,
+          authorization_servers: this.config.auth!.authorizationServers,
+          scopes_supported: [],
+          bearer_methods_supported: ["header"],
+        });
+      });
+    }
+
     // MCP endpoints
     app.post("/mcp", (req, res) => this.handleMcpPost(req, res));
     app.get("/mcp", (req, res) => this.handleMcpGet(req, res));
@@ -673,9 +756,25 @@ export class App {
   }
 
   private async handleMcpPost(req: Request, res: Response): Promise<void> {
+    // Extract Bearer token from HTTP Authorization header and thread it
+    // through AsyncLocalStorage so tool handlers can access it.
+    const authHeader = req.headers.authorization;
+    const httpToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+
+    await authStore.run({ token: httpToken }, () => this._handleMcpPost(req, res));
+  }
+
+  private async _handleMcpPost(req: Request, res: Response): Promise<void> {
     const transportSessionId = req.headers["mcp-session-id"] as string | undefined;
 
     try {
+      // RFC 9728 / OAuth 2.1 Section 5.3: If auth is configured and a Bearer token
+      // is present but invalid, MUST return HTTP 401 before processing the request.
+      // Initialize requests are exempt (client needs to establish session first).
+      if (!isInitializeRequest(req.body)) {
+        if (await this.rejectInvalidToken(req, res)) return;
+      }
+
       /**
        * Ensure tools/list is always available, even when no tools are registered.
        * This prevents clients from receiving -32601 and keeps empty-tool apps valid.
@@ -710,10 +809,10 @@ export class App {
         transport = this.createTransport();
         const server = this.createMcpServer();
         await server.connect(transport);
-        
+
         // Set the current server for storage RPC access
         setCurrentServer(server);
-        
+
         await transport.handleRequest(req, res, req.body);
         return;
       } else {
@@ -739,6 +838,9 @@ export class App {
   }
 
   private async handleMcpGet(req: Request, res: Response): Promise<void> {
+    // Validate Bearer token on GET (SSE) requests per OAuth 2.1 Section 5
+    if (await this.rejectInvalidToken(req, res)) return;
+
     const transportSessionId = req.headers["mcp-session-id"] as string | undefined;
 
     if (!transportSessionId || !this.transports.has(transportSessionId)) {
@@ -751,6 +853,9 @@ export class App {
   }
 
   private async handleMcpDelete(req: Request, res: Response): Promise<void> {
+    // Validate Bearer token on DELETE requests per OAuth 2.1 Section 5
+    if (await this.rejectInvalidToken(req, res)) return;
+
     const transportSessionId = req.headers["mcp-session-id"] as string | undefined;
 
     if (!transportSessionId || !this.transports.has(transportSessionId)) {
@@ -955,6 +1060,9 @@ export class App {
               websocketUrl = ws?.websocketUrl;
             }
 
+            // Resolve auth context
+            const auth = await this.resolveAuth(args);
+
             // Build handler context
             const context: ToolContext = {
               instanceId: instanceId || "",
@@ -980,8 +1088,9 @@ export class App {
                 }
               },
               websocketUrl,
+              auth,
             };
-            
+
             const result = await handler(input, context);
             return this.formatToolResult(result, instanceId, websocketUrl);
           } catch (error) {

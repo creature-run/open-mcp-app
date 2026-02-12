@@ -308,6 +308,8 @@ export interface ToolContext {
    * Automatically included in tool result's structuredContent.
    */
   websocketUrl: string | undefined;
+  /** Auth context. Null if no token was provided or verification failed. */
+  auth: AuthContext | null;
 }
 
 /**
@@ -355,6 +357,32 @@ export interface TransportSessionInfo {
 }
 
 // ============================================================================
+// Auth
+// ============================================================================
+
+/** Auth configuration for MCP OAuth. */
+export interface AuthConfig {
+  /** This MCP server's resource URL (for well-known metadata). */
+  resource: string;
+  /** OAuth authorization server URL(s). */
+  authorizationServers: string[];
+  /**
+   * Verify a token and return user data.
+   * Return null/undefined to indicate invalid token.
+   * If not provided, context.auth.data will be null (token-only mode).
+   */
+  verify?: (token: string) => Promise<unknown | null | undefined>;
+}
+
+/** Auth context available in tool handlers. */
+export interface AuthContext {
+  /** The raw token string. */
+  token: string;
+  /** Result from auth.verify(), or null if no verify function configured. */
+  data: unknown;
+}
+
+// ============================================================================
 // App Configuration
 // ============================================================================
 
@@ -381,6 +409,8 @@ export interface AppConfig {
   port?: number;
   /** Enable dev mode (default: auto-detect from NODE_ENV) */
   dev?: boolean;
+  /** OAuth auth configuration. Enables well-known metadata and context.auth in tool handlers. */
+  auth?: AuthConfig;
 
   // Transport Session Lifecycle Callbacks
 
