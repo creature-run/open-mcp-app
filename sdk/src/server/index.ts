@@ -2,6 +2,8 @@ export { createApp, App } from "./app.js";
 export { loadHtml, htmlLoader, svgToDataUri, isHtmlContent } from "./utils.js";
 export type {
   AppConfig,
+  AuthConfig,
+  AuthContext,
   ResourceConfig,
   ToolConfig,
   ToolResult,
