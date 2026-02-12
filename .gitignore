@@ -1,5 +1,7 @@
 # Creature
 .creature/
+node-binary
+node-binary/
 
 # Dependencies
 package-lock.json
