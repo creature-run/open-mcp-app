@@ -1,14 +1,19 @@
 /**
  * AppLayout — Display-mode-aware root layout.
  *
- * Sets a `data-display-mode` attribute for CSS-based adaptation and
- * provides displayMode to children via DisplayModeContext.
+ * Uses a two-div architecture:
+ *   - Outer div: scroll container + data-display-mode attribute. No padding,
+ *     so overflow clipping never cuts off full-bleed children.
+ *   - Inner div: adaptive padding + gap based on displayMode.
  *
- * Reads displayMode from props. When used with the SDK, pass hostContext
- * values directly — this avoids a hard dependency on the SDK package
- * and keeps the component testable.
+ * This separation means children can achieve full-width layouts (e.g. edge-to-edge
+ * dividers, tables, images) using negative margins without being clipped by the
+ * scroll container's overflow boundary.
  *
- * @example With SDK's useHost
+ * Pass `noPadding` to remove the inner padding/gap entirely — useful when you
+ * want full manual control over spacing (e.g. a detail view with a sticky header).
+ *
+ * @example Standard usage
  * ```tsx
  * const { hostContext } = useHost();
  *
@@ -17,6 +22,16 @@
  *   availableDisplayModes={hostContext?.availableDisplayModes}
  * >
  *   <MyContent />
+ * </AppLayout>
+ * ```
+ *
+ * @example Full-bleed content (no padding)
+ * ```tsx
+ * <AppLayout displayMode={hostContext?.displayMode} noPadding>
+ *   <FullWidthHeader />
+ *   <div className="px-3 flex flex-col gap-3">
+ *     <MainContent />
+ *   </div>
  * </AppLayout>
  * ```
  */
@@ -38,6 +53,11 @@ export interface AppLayoutProps extends HTMLAttributes<HTMLDivElement> {
    * Defaults to an array containing just the current displayMode.
    */
   availableDisplayModes?: DisplayMode[];
+  /**
+   * Remove the inner padding and gap. When true, children get full control
+   * over their own spacing and can render edge-to-edge without any offset.
+   */
+  noPadding?: boolean;
 }
 
 /**
@@ -74,10 +94,11 @@ const gapClasses: Record<DisplayMode, string> = {
  * }
  * ```
  *
- * @example Testing with explicit mode
+ * @example No padding for full control
  * ```tsx
- * <AppLayout displayMode="inline">
- *   <CompactView />
+ * <AppLayout displayMode="pip" noPadding>
+ *   <StickyHeader />
+ *   <div className="p-3"><Content /></div>
  * </AppLayout>
  * ```
  */
@@ -85,6 +106,7 @@ export const AppLayout = ({
   children,
   displayMode = "pip",
   availableDisplayModes,
+  noPadding = false,
   className = "",
   ...rest
 }: AppLayoutProps) => {
@@ -95,20 +117,46 @@ export const AppLayout = ({
     [displayMode, resolvedAvailable]
   );
 
-  const classes = [
-    "flex flex-col min-h-0 w-full",
-    paddingClasses[displayMode],
-    gapClasses[displayMode],
+  /**
+   * Outer div: scroll container.
+   * Handles overflow scrolling and sets the display mode data attribute.
+   * No padding — so overflow clipping never eats into child content.
+   */
+  const outerClasses = [
+    "min-h-0 w-full",
     displayMode === "inline" ? "overflow-hidden" : "overflow-y-auto",
     className,
   ]
     .filter(Boolean)
     .join(" ");
 
+  /**
+   * Inner div: padding + gap + flex column layout.
+   * Children live here and get adaptive spacing by default.
+   *
+   * When noPadding is false (default): uses min-h-full so content can grow
+   * beyond the viewport and the outer scroll container handles scrolling.
+   *
+   * When noPadding is true: uses h-full so the inner div is exactly the
+   * outer div's height. This lets children with flex-1 + min-h-0 constrain
+   * themselves and manage their own internal scrolling — which is the whole
+   * point of noPadding (full layout control).
+   */
+  const innerClasses = [
+    "flex flex-col",
+    noPadding ? "h-full" : "min-h-full",
+    !noPadding && paddingClasses[displayMode],
+    !noPadding && gapClasses[displayMode],
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <DisplayModeContext.Provider value={contextValue}>
-      <div data-display-mode={displayMode} className={classes} {...rest}>
-        {children}
+      <div data-display-mode={displayMode} className={outerClasses} {...rest}>
+        <div className={innerClasses}>
+          {children}
+        </div>
       </div>
     </DisplayModeContext.Provider>
   );

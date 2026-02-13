@@ -9,8 +9,8 @@
  * Usage: add class="omu-control" and data-error for error state.
  *
  * States:
- *   default  → 1px inset ring using --color-border-primary
- *   hover    → ring changes to --color-border-secondary
+ *   default  → 1px inset ring using --color-border-secondary (subtle)
+ *   hover    → ring darkens to --color-border-primary (more prominent)
  *   focus    → ring thickens to 2px and uses --color-ring-primary
  *   error    → ring uses --color-border-danger
  *   disabled → 50% opacity, not-allowed cursor
@@ -19,7 +19,7 @@
 .omu-control {
   border: 0;
   outline: none !important;
-  box-shadow: inset 0 0 0 1px var(--color-border-primary);
+  box-shadow: inset 0 0 0 1px var(--color-border-secondary);
   transition:
     box-shadow 150ms ease,
     background-color 150ms ease;
@@ -31,7 +31,7 @@
 }
 
 .omu-control:hover:not(:disabled):not(:has(:disabled)):not([data-error]):not(:focus):not(:focus-within) {
-  box-shadow: inset 0 0 0 1px var(--color-border-secondary);
+  box-shadow: inset 0 0 0 1px var(--color-border-primary);
 }
 
 .omu-control:focus:not([data-error]),

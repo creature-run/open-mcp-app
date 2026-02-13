@@ -1,21 +1,23 @@
 /**
  * open-mcp-app-ui/table
  *
- * High-performance virtualized data table built on TanStack Table + TanStack Virtual.
- * This is an optional import — apps that don't use it pay zero bundle cost.
+ * High-performance virtualized data table built on TanStack Table v8
+ * + TanStack Virtual. This is an optional import — apps that don't
+ * use it pay zero bundle cost.
  *
- * Phase 2: Placeholder export. Implementation coming soon.
- *
- * Planned usage:
+ * Usage:
  *   import { DataTable } from "open-mcp-app-ui/table";
  *
  *   <DataTable
- *     columns={[{ accessorKey: "name", header: "Name", sortable: true }]}
+ *     columns={[{ accessorKey: "name", header: "Name" }]}
  *     data={items}
  *     sortable
  *     virtualized
  *   />
+ *
+ * Re-exports TanStack Table's ColumnDef type so consumers don't need
+ * to install @tanstack/react-table directly for type annotations.
  */
 
-export const DATA_TABLE_VERSION = "0.0.1";
-export const DATA_TABLE_STATUS = "planned" as const;
+export { DataTable, type DataTableProps } from "./DataTable.js";
+export { type ColumnDef } from "@tanstack/react-table";

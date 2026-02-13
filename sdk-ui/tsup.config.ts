@@ -16,6 +16,7 @@ export default defineConfig({
     index: "src/index.ts",
     "table/index": "src/table/index.ts",
     "editor/index": "src/editor/index.ts",
+    "charts/index": "src/charts/index.ts",
   },
   format: ["esm"],
   dts: true,
@@ -24,24 +25,20 @@ export default defineConfig({
   splitting: false,
   external: [
     "react",
+    "react-dom",
     "open-mcp-app",
     "open-mcp-app/react",
     "@tanstack/react-table",
     "@tanstack/react-virtual",
-    "@milkdown/core",
-    "@milkdown/react",
-    "@milkdown/preset-commonmark",
-    "@milkdown/prose",
+    /^@milkdown\//,
+    "recharts",
+    "lucide-react",
   ],
   async onSuccess() {
     mkdirSync("dist/styles", { recursive: true });
     copyFileSync(
       join("src", "styles", "fallbacks.css"),
       join("dist", "styles", "fallbacks.css")
-    );
-    copyFileSync(
-      join("src", "styles", "display-modes.css"),
-      join("dist", "styles", "display-modes.css")
     );
     console.log("CSS source files copied to dist/styles/");
   },

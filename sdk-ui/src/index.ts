@@ -12,8 +12,8 @@
  *   import { Button, Input, Card } from "open-mcp-app-ui";
  *
  * Optional heavy components (separate imports to keep core lean):
- *   import { DataTable } from "open-mcp-app-ui/table";   // Phase 2
- *   import { Editor } from "open-mcp-app-ui/editor";     // Phase 2
+ *   import { DataTable } from "open-mcp-app-ui/table";
+ *   import { Editor } from "open-mcp-app-ui/editor";
  */
 
 // ============================================================================

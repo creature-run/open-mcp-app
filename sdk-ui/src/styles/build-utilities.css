@@ -26,6 +26,7 @@
 @import "./slider.css";
 @import "./tag-input.css";
 @import "./menu.css";
+@import "./editor.css";
 
 /**
  * Ring color tokens mapped to the MCP Apps spec ring variables.

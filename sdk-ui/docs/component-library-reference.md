@@ -4,19 +4,74 @@ UI components for MCP Apps. All components are styled via MCP Apps spec CSS vari
 
 ## Setup
 
+**app.tsx:**
+
 ```tsx
-// Required: SDK Tailwind theme mapping
-import "open-mcp-app/styles/tailwind.css";
+import { HostProvider, useHost } from "open-mcp-app/react";
+import { AppLayout } from "open-mcp-app-ui";
+import "open-mcp-app-ui/styles.css";
+import "./styles.css";
 
-// Optional: fallback theme for development without a host
-import "open-mcp-app-ui/styles/fallbacks.css";
+// Import components as needed
+import { Button, Input, Card, Heading, Text } from "open-mcp-app-ui";
 
-// Optional: Tailwind display-mode variants (inline:, pip:, fullscreen:)
-import "open-mcp-app-ui/styles/display-modes.css";
+// Optional heavy components (separate imports)
+import { DataTable } from "open-mcp-app-ui/table";
+import { Editor } from "open-mcp-app-ui/editor";
+import { LineChart, Line, XAxis, YAxis, Tooltip } from "open-mcp-app-ui/charts";
 
-// Import components
-import { AppLayout, Show, Button, Input, Card, Heading, Text } from "open-mcp-app-ui";
+// Icons (bundled dependency — no extra install)
+import { Plus, Trash2, Settings } from "lucide-react";
 ```
+
+**styles.css:**
+
+```css
+@import "open-mcp-app/styles/tailwind.css";
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+}
+```
+
+The Tailwind import in `styles.css` generates utility classes for your app's source files. The `open-mcp-app-ui/styles.css` import provides pre-compiled CSS for the library's own components. Both are required.
+
+---
+
+## Fonts
+
+The host injects two font families via CSS variables. Use the corresponding Tailwind classes:
+
+| CSS Variable | Tailwind Class | Description |
+|---|---|---|
+| `--font-sans` | `font-sans` | Primary UI font. Applied to body text, headings, buttons, inputs — everything by default. |
+| `--font-mono` | `font-mono` | Monospace font. Use for code, terminal output, technical data, IDs, hashes, timestamps, JSON, file paths, and anything where character alignment matters. |
+
+### When to use `font-mono`
+
+- **Code snippets and inline code** — variable names, function calls, shell commands
+- **Technical identifiers** — UUIDs, API keys, commit hashes, order IDs
+- **Tabular numeric data** — prices, counts, metrics where digits should align vertically
+- **Log output and terminal-style displays** — structured text where spacing is meaningful
+- **File paths and URLs** — `/src/components/App.tsx`, `https://api.example.com`
+- **JSON/YAML previews** — structured data formats
+
+```tsx
+{/* Inline code reference */}
+<Text>Run <span className="font-mono text-sm bg-bg-secondary px-1 py-0.5 rounded">npm install</span> to get started.</Text>
+
+{/* Technical ID */}
+<Text variant="secondary" size="sm" className="font-mono">order-4f8a2b91</Text>
+
+{/* Log-style output */}
+<div className="font-mono text-sm bg-bg-secondary p-3 rounded">
+  [2026-02-10 14:32:01] Connected to database
+  [2026-02-10 14:32:02] Server listening on :8080
+</div>
+```
+
+The `CodeBlock` and `Editor` components already apply the monospace font automatically for code content — you don't need to add `font-mono` to those.
 
 ---
 
@@ -26,102 +81,96 @@ MCP Apps run in three display modes: `"inline"` (60–300px tall, inside convers
 
 ### AppLayout
 
-Display-mode-aware root layout. Sets `data-display-mode` attribute and provides display mode to children.
-
-**Props:**
+Display-mode-aware root layout. Uses two nested divs internally: an outer scroll container (no padding, so overflow never clips full-bleed children) and an inner wrapper with adaptive padding/gap.
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | displayMode | `"inline" \| "pip" \| "fullscreen"` | `"pip"` | Current display mode. Pass `hostContext?.displayMode`. |
-| availableDisplayModes | `DisplayMode[]` | `[displayMode]` | Modes the host supports. Pass `hostContext?.availableDisplayModes`. |
-| className | `string` | `""` | Additional CSS classes. |
+| availableDisplayModes | `DisplayMode[]` | `[displayMode]` | Modes the host supports. |
+| noPadding | `boolean` | `false` | Remove inner padding/gap. Children get full edge-to-edge control. |
+| className | `string` | `""` | Additional CSS classes on the outer scroll container. |
 | children | `ReactNode` | — | Content. |
 
-**Example:**
-
 ```tsx
-import { HostProvider, useHost } from "open-mcp-app/react";
-import { AppLayout, Show, Heading, Text, Button } from "open-mcp-app-ui";
+<AppLayout displayMode={hostContext?.displayMode} availableDisplayModes={hostContext?.availableDisplayModes}>
+  <MainView />
+</AppLayout>
 
-function App() {
-  return (
-    <HostProvider name="my-app" version="1.0.0">
-      <AppContent />
-    </HostProvider>
-  );
-}
-
-function AppContent() {
-  const { hostContext } = useHost();
-
-  return (
-    <AppLayout
-      displayMode={hostContext?.displayMode}
-      availableDisplayModes={hostContext?.availableDisplayModes}
-    >
-      <Heading size="md">My App</Heading>
-
-      <Show on="inline">
-        <Text variant="secondary">3 items · Tap to expand</Text>
-      </Show>
-
-      <Show on={["pip", "fullscreen"]}>
-        <FullItemsList />
-      </Show>
-    </AppLayout>
-  );
-}
+{/* Full-bleed: no padding, manual spacing */}
+<AppLayout displayMode={hostContext?.displayMode} noPadding>
+  <StickyHeader />
+  <div className="p-3 flex flex-col gap-3">
+    <Content />
+  </div>
+</AppLayout>
 ```
 
 ### Show
 
-Conditionally renders children based on the current display mode. Must be inside `<AppLayout>`.
-
-**Props:**
+Conditional render by display mode.
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | on | `DisplayMode \| DisplayMode[]` | — | Mode(s) to render in. |
-| children | `ReactNode` | — | Content shown when mode matches. |
-| fallback | `ReactNode` | `null` | Content shown when mode does NOT match. |
-
-**Examples:**
+| fallback | `ReactNode` | — | Content when mode doesn't match. |
+| children | `ReactNode` | — | Content to conditionally render. |
 
 ```tsx
-{/* Only in inline mode */}
-<Show on="inline">
-  <Text variant="secondary">Compact summary</Text>
-</Show>
-
-{/* In pip and fullscreen */}
-<Show on={["pip", "fullscreen"]}>
-  <DetailedView />
-</Show>
-
-{/* With fallback */}
-<Show on="fullscreen" fallback={<Text>Expand for more</Text>}>
-  <FullDashboard />
-</Show>
+<Show on="inline"><Text>Compact summary</Text></Show>
+<Show on={["pip", "fullscreen"]}><DetailedList /></Show>
 ```
 
 ### useDisplayMode
 
-Hook for programmatic display mode access. Must be inside `<AppLayout>`.
+Hook for programmatic display mode access.
 
 ```tsx
-import { useDisplayMode } from "open-mcp-app-ui";
-
 const { displayMode, isInline, isPip, isFullscreen, availableDisplayModes } = useDisplayMode();
 ```
 
 ### Tailwind Display Mode Variants
 
-After importing `display-modes.css`, use `inline:`, `pip:`, `fullscreen:` variants:
+Built into the SDK's Tailwind CSS — no extra import needed. CSS-level adaptation using `data-display-mode` attribute selectors:
 
 ```tsx
-<div className="hidden pip:block fullscreen:block">Only in pip and fullscreen</div>
-<div className="text-sm inline:text-xs fullscreen:text-base">Adaptive text size</div>
-<div className="p-2 inline:p-1 fullscreen:p-4">Adaptive padding</div>
+<div className="text-sm inline:text-xs fullscreen:text-base">Adaptive text</div>
+<div className="hidden pip:block fullscreen:block">Hidden in inline</div>
+```
+
+---
+
+## Typography
+
+### Heading
+
+Semantic heading (h1–h6) with independent visual size control.
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| level | `1 \| 2 \| 3 \| 4 \| 5 \| 6` | `2` | HTML heading level. |
+| size | `"xs" \| "sm" \| "md" \| "lg" \| "xl" \| "2xl" \| "3xl"` | `"md"` | Visual size. |
+| children | `ReactNode` | — | Content. |
+
+```tsx
+<Heading size="lg">Page Title</Heading>
+<Heading level={3} size="sm">Subsection</Heading>
+```
+
+### Text
+
+Body text wrapper with semantic variants.
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| variant | `"primary" \| "secondary" \| "tertiary"` | `"primary"` | Text color variant. |
+| size | `"xs" \| "sm" \| "base" \| "lg"` | `"base"` | Font size. |
+| as | `ElementType` | `"p"` | HTML element. |
+| children | `ReactNode` | — | Content. |
+
+```tsx
+<Text>Primary body text</Text>
+<Text variant="secondary" size="sm">Description text</Text>
+<Text variant="tertiary" as="span" size="xs">Timestamp</Text>
 ```
 
 ---
@@ -130,279 +179,507 @@ After importing `display-modes.css`, use `inline:`, `pip:`, `fullscreen:` varian
 
 ### Button
 
-Action trigger with semantic variants.
-
-**Props:**
+Action button with semantic variants and loading state.
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | variant | `"primary" \| "secondary" \| "danger" \| "ghost"` | `"primary"` | Visual style. |
 | size | `"sm" \| "md" \| "lg"` | `"md"` | Button size. |
+| loading | `boolean` | `false` | Show loading spinner and disable. |
+| loadingIcon | `ReactNode` | — | Custom spinner element. |
 | disabled | `boolean` | `false` | Disables the button. |
-| loading | `boolean` | `false` | Shows spinner, disables interaction. |
 | children | `ReactNode` | — | Button label. |
-
-**Examples:**
 
 ```tsx
 <Button variant="primary" onClick={handleSave}>Save</Button>
-<Button variant="secondary" onClick={handleCancel}>Cancel</Button>
 <Button variant="danger" size="sm" onClick={handleDelete}>Delete</Button>
-<Button variant="ghost" onClick={handleMore}>More options</Button>
-<Button variant="primary" loading>Saving...</Button>
+<Button variant="ghost" loading>Processing...</Button>
 ```
 
 ### Input
 
-Text input with label and error handling.
-
-**Props:**
+Text input with label, error, and helper text.
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | label | `string` | — | Label above the input. |
 | error | `string` | — | Error message. Shows error styling. |
-| helperText | `string` | — | Helper text below (hidden when error is set). |
+| helperText | `string` | — | Helper text below. |
 | size | `"sm" \| "md" \| "lg"` | `"md"` | Input size. |
-| placeholder | `string` | — | Placeholder text. |
-| disabled | `boolean` | `false` | Disables the input. |
-
-**Examples:**
+| block | `boolean` | `true` | Full width. |
 
 ```tsx
 <Input label="Name" placeholder="Enter name..." value={name} onChange={(e) => setName(e.target.value)} />
-<Input label="Email" type="email" error="Invalid email address" />
-<Input label="Search" placeholder="Search..." helperText="Search by name or ID" />
+<Input label="Email" error="Invalid email" value={email} onChange={(e) => setEmail(e.target.value)} />
 ```
 
 ### Textarea
 
-Multi-line text input.
-
-**Props:**
+Multi-line text input with label and error handling.
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| label | `string` | — | Label above the textarea. |
+| label | `string` | — | Label above. |
 | error | `string` | — | Error message. |
 | helperText | `string` | — | Helper text below. |
-| rows | `number` | `3` | Number of visible rows. |
-| resize | `"none" \| "vertical" \| "horizontal" \| "both"` | `"vertical"` | Resize behavior. |
-
-**Examples:**
+| rows | `number` | `3` | Visible rows. |
+| resize | `"none" \| "vertical" \| "both"` | `"vertical"` | Resize behavior. |
 
 ```tsx
-<Textarea label="Description" rows={4} placeholder="Enter description..." />
-<Textarea label="Notes" error="Required field" resize="none" />
+<Textarea label="Description" rows={4} value={desc} onChange={(e) => setDesc(e.target.value)} />
 ```
 
 ### Select
 
-Dropdown selection with native `<select>`.
-
-**Props:**
+Custom dropdown select with keyboard navigation and check marks.
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| label | `string` | — | Label above the select. |
-| options | `{ value: string; label?: string; disabled?: boolean }[]` | — | Options to display. |
-| placeholder | `string` | — | Placeholder as first disabled option. |
+| label | `string` | — | Label above. |
+| options | `SelectOption[] \| SelectOptionGroup[]` | — | Options (flat or grouped). |
+| value | `string` | `""` | Controlled value. |
+| onChange | `(value: string) => void` | — | Selection change handler. |
+| placeholder | `string` | `"Select..."` | Placeholder text. |
 | error | `string` | — | Error message. |
-| helperText | `string` | — | Helper text below. |
-| size | `"sm" \| "md" \| "lg"` | `"md"` | Select size. |
-
-**Examples:**
+| helperText | `string` | — | Helper text. |
+| size | `"sm" \| "md" \| "lg"` | `"md"` | Size. |
+| disabled | `boolean` | `false` | Disabled state. |
 
 ```tsx
 <Select
   label="Status"
-  placeholder="Choose status..."
-  options={[
-    { value: "active", label: "Active" },
-    { value: "archived", label: "Archived" },
-  ]}
+  options={[{ value: "active", label: "Active" }, { value: "archived", label: "Archived" }]}
   value={status}
-  onChange={(e) => setStatus(e.target.value)}
+  onChange={setStatus}
 />
 ```
 
 ### Checkbox
 
-Boolean toggle with label.
-
-**Props:**
+Animated checkbox with optional label.
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| label | `string` | — | Label next to the checkbox. |
-| checked | `boolean` | — | Checked state. |
+| label | `string` | — | Label text. |
+| checked | `boolean` | `false` | Controlled checked state. |
 | onChange | `ChangeEventHandler` | — | Change handler. |
-| disabled | `boolean` | `false` | Disables the checkbox. |
-
-**Examples:**
+| disabled | `boolean` | `false` | Disabled state. |
 
 ```tsx
-<Checkbox label="Accept terms" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
-<Checkbox label="Remember me" />
+<Checkbox label="Accept terms" checked={accepted} onChange={(e) => setAccepted(e.target.checked)} />
 ```
 
 ### Switch
 
 Toggle switch for on/off states.
 
-**Props:**
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| label | `string` | — | Label text. |
+| checked | `boolean` | `false` | Controlled state. |
+| onChange | `ChangeEventHandler` | — | Change handler. |
+| disabled | `boolean` | `false` | Disabled state. |
+
+```tsx
+<Switch label="Dark mode" checked={dark} onChange={(e) => setDark(e.target.checked)} />
+```
+
+### RadioGroup
+
+Radio option group with animated selection indicator.
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| label | `string` | — | Label next to the switch. |
-| checked | `boolean` | `false` | Whether the switch is on. |
-| onChange | `(checked: boolean) => void` | — | Called with the new checked value. |
-| disabled | `boolean` | `false` | Disables the switch. |
-
-**Examples:**
+| value | `string` | — | Selected value. |
+| onChange | `(value: string) => void` | — | Selection change handler. |
+| aria-label | `string` | — | Accessible label. |
+| direction | `"row" \| "col"` | `"col"` | Layout direction. |
+| disabled | `boolean` | `false` | Disables the group. |
 
 ```tsx
-<Switch label="Dark mode" checked={isDark} onChange={setIsDark} />
-<Switch label="Notifications" checked={notifs} onChange={setNotifs} />
+<RadioGroup value={size} onChange={setSize} aria-label="Size">
+  <RadioGroup.Item value="sm">Small</RadioGroup.Item>
+  <RadioGroup.Item value="md">Medium</RadioGroup.Item>
+  <RadioGroup.Item value="lg">Large</RadioGroup.Item>
+</RadioGroup>
+```
+
+### Slider
+
+Range slider with optional value display and formatting.
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| label | `string` | — | Label above. |
+| value | `number` | — | Current value. |
+| min | `number` | `0` | Minimum. |
+| max | `number` | `100` | Maximum. |
+| step | `number` | `1` | Step increment. |
+| showValue | `boolean` | `false` | Show current value. |
+| formatValue | `(v: number) => string` | — | Value format function. |
+| onChange | `ChangeEventHandler` | — | Change handler. |
+
+```tsx
+<Slider label="Volume" value={vol} onChange={(e) => setVol(+e.target.value)} showValue />
+```
+
+### TagInput
+
+Multi-tag input with validation and keyboard support.
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| label | `string` | — | Label above. |
+| value | `Tag[]` | — | Controlled tag list. `Tag = { value: string; valid: boolean }` |
+| onChange | `(tags: Tag[]) => void` | — | Change handler. |
+| validator | `(value: string) => boolean` | — | Validation function. |
+| maxTags | `number` | — | Maximum tags. |
+| placeholder | `string` | `"Add a tag..."` | Placeholder. |
+
+```tsx
+<TagInput label="Tags" value={tags} onChange={setTags} placeholder="Type and press Enter..." />
+```
+
+### DatePicker
+
+Custom date picker with calendar dropdown.
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| label | `string` | — | Label above. |
+| value | `string` | `""` | Date value (YYYY-MM-DD). |
+| onChange | `(value: string) => void` | — | Selection handler. |
+| min | `string` | — | Min date (YYYY-MM-DD). |
+| max | `string` | — | Max date (YYYY-MM-DD). |
+| placeholder | `string` | `"Select date"` | Placeholder. |
+| error | `string` | — | Error message. |
+
+```tsx
+<DatePicker label="Start Date" value={date} onChange={setDate} />
+```
+
+### DateRangePicker
+
+Two coordinated date pickers for start/end range.
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| label | `string` | — | Label above. |
+| startDate | `string` | `""` | Start date (YYYY-MM-DD). |
+| endDate | `string` | `""` | End date (YYYY-MM-DD). |
+| onChange | `(range: { startDate: string; endDate: string }) => void` | — | Change handler. |
+
+```tsx
+<DateRangePicker label="Date Range" startDate={range.startDate} endDate={range.endDate} onChange={setRange} />
+```
+
+### ToggleGroup
+
+Segmented control with animated sliding indicator.
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| value | `string` | — | Selected value. |
+| onChange | `(value: string) => void` | — | Selection handler. |
+| size | `"sm" \| "md" \| "lg"` | `"md"` | Size variant. |
+| block | `boolean` | `false` | Full width. |
+| pill | `boolean` | `false` | Pill shape. |
+
+```tsx
+<ToggleGroup value={view} onChange={setView} aria-label="View">
+  <ToggleGroup.Option value="grid">Grid</ToggleGroup.Option>
+  <ToggleGroup.Option value="list">List</ToggleGroup.Option>
+</ToggleGroup>
 ```
 
 ---
 
-## Feedback
+## Feedback & Overlays
 
 ### Alert
 
-Status message banner.
-
-**Props:**
+Status banner with color and style variants.
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| variant | `"info" \| "danger" \| "success" \| "warning"` | `"info"` | Semantic color. |
-| title | `string` | — | Bold title above body text. |
-| children | `ReactNode` | — | Alert body content. |
-| dismissible | `boolean` | `false` | Show dismiss button. |
-| onDismiss | `() => void` | — | Called on dismiss. |
-
-**Examples:**
+| color | `"info" \| "danger" \| "success" \| "warning"` | `"info"` | Color variant. |
+| variant | `"outline" \| "soft" \| "solid"` | `"outline"` | Visual style. |
+| children | `ReactNode` | — | Alert content. |
 
 ```tsx
-<Alert variant="success" title="Saved">Your changes have been saved.</Alert>
-<Alert variant="danger">Something went wrong. Please try again.</Alert>
-<Alert variant="info" dismissible>Tip: You can drag items to reorder.</Alert>
-<Alert variant="warning" title="Warning">This action cannot be undone.</Alert>
+<Alert color="success">Item saved successfully.</Alert>
+<Alert color="danger" variant="soft">Something went wrong.</Alert>
 ```
 
 ### Badge
 
-Small status indicator.
-
-**Props:**
+Compact status indicator.
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| variant | `"info" \| "danger" \| "success" \| "warning" \| "secondary"` | `"secondary"` | Semantic color. |
+| variant | `"info" \| "danger" \| "success" \| "warning" \| "secondary"` | `"secondary"` | Color variant. |
 | children | `ReactNode` | — | Badge content. |
-
-**Examples:**
 
 ```tsx
 <Badge variant="success">Active</Badge>
-<Badge variant="danger">3 errors</Badge>
-<Badge variant="warning">Pending</Badge>
-<Badge variant="secondary">Draft</Badge>
+<Badge variant="danger">Error</Badge>
+```
+
+### Menu
+
+Dropdown menu with items, checkbox items, separators, and labels.
+
+Sub-components: `Menu.Trigger`, `Menu.Content`, `Menu.Item`, `Menu.CheckboxItem`, `Menu.Separator`, `Menu.Label`.
+
+```tsx
+<Menu>
+  <Menu.Trigger>
+    <Button variant="secondary">Actions</Button>
+  </Menu.Trigger>
+  <Menu.Content>
+    <Menu.Item onSelect={() => handleEdit()}>Edit</Menu.Item>
+    <Menu.Item onSelect={() => handleDuplicate()}>Duplicate</Menu.Item>
+    <Menu.Separator />
+    <Menu.Item onSelect={() => handleDelete()} danger>Delete</Menu.Item>
+  </Menu.Content>
+</Menu>
 ```
 
 ---
 
-## Layout & Data Display
+## Navigation
+
+### Tabs
+
+Underline-style tab bar.
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| value | `string` | — | Active tab value. |
+| onChange | `(value: string) => void` | — | Tab click handler. |
+| children | `ReactNode` | — | `Tabs.Tab` elements. |
+
+```tsx
+<Tabs value={activeTab} onChange={setActiveTab}>
+  <Tabs.Tab value="overview">Overview</Tabs.Tab>
+  <Tabs.Tab value="settings">Settings</Tabs.Tab>
+</Tabs>
+{activeTab === "overview" && <OverviewPanel />}
+{activeTab === "settings" && <SettingsPanel />}
+```
+
+---
+
+## Data Display
 
 ### Card
 
 Content container with border and shadow.
 
-**Props:**
-
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| variant | `"default" \| "ghost"` | `"default"` | `"default"` has border+shadow, `"ghost"` is borderless. |
+| variant | `"default" \| "ghost"` | `"default"` | Ghost removes border/shadow. |
 | padding | `"none" \| "sm" \| "md" \| "lg"` | `"md"` | Internal padding. |
-| children | `ReactNode` | — | Card content. |
-
-**Examples:**
+| children | `ReactNode` | — | Content. |
 
 ```tsx
-<Card>
-  <Heading size="sm">Settings</Heading>
-  <Input label="Name" />
-  <Button variant="primary">Save</Button>
-</Card>
-
-<Card variant="ghost" padding="none">
-  <Text variant="secondary">Borderless content</Text>
-</Card>
+<Card><Text>Default card</Text></Card>
+<Card variant="ghost" padding="lg"><Text>Ghost card, large padding</Text></Card>
 ```
 
-### Heading
+### CodeBlock
 
-Semantic heading with spec-driven typography. Uses SDK's `heading-*` utility classes.
-
-**Props:**
+Syntax-highlighted code block with copy button. Always dark background.
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| level | `1 \| 2 \| 3 \| 4 \| 5 \| 6` | `2` | HTML heading level (h1–h6). |
-| size | `"xs" \| "sm" \| "md" \| "lg" \| "xl" \| "2xl" \| "3xl"` | `"md"` | Visual size (independent of level). |
-| children | `ReactNode` | — | Heading text. |
-
-**Examples:**
-
-```tsx
-<Heading level={1} size="2xl">Page Title</Heading>
-<Heading level={2} size="lg">Section</Heading>
-<Heading size="sm">Subsection</Heading>
-```
-
-### Text
-
-Body text with semantic color variants.
-
-**Props:**
-
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| variant | `"primary" \| "secondary" \| "tertiary"` | `"primary"` | Text color. |
-| size | `"sm" \| "md" \| "lg"` | `"md"` | Text size. |
-| as | `"p" \| "span" \| "div"` | `"p"` | HTML element to render. |
-| children | `ReactNode` | — | Text content. |
-
-**Examples:**
+| children | `string` | — | Code content. |
+| language | `string` | — | Language for syntax highlighting. |
+| copyable | `boolean` | `true` | Show copy button. |
+| showLineNumbers | `boolean` | `false` | Show line numbers. |
 
 ```tsx
-<Text>Primary body text</Text>
-<Text variant="secondary" size="sm">Description or helper text</Text>
-<Text variant="tertiary" as="span">Timestamp or metadata</Text>
+<CodeBlock language="tsx">{`const App = () => <div>Hello</div>;`}</CodeBlock>
 ```
 
 ### Divider
 
 Horizontal separator line.
 
-**Props:**
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| spacing | `"none" \| "sm" \| "md" \| "lg"` | `"md"` | Vertical margin. |
+
+```tsx
+<Divider />
+<Divider spacing="sm" />
+```
+
+---
+
+## High-Performance Components
+
+These are separate imports to keep the core bundle lean. Apps that don't use them pay zero bundle cost.
+
+### DataTable
+
+High-performance virtualized data table built on TanStack Table + TanStack Virtual.
+
+**Import:** `import { DataTable, type ColumnDef } from "open-mcp-app-ui/table";`
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| spacing | `"none" \| "sm" \| "md" \| "lg"` | `"md"` | Vertical spacing above and below. |
-
-**Examples:**
+| columns | `ColumnDef<T, unknown>[]` | — | Column definitions. |
+| data | `T[]` | — | Row data. |
+| sortable | `boolean` | `false` | Enable column sorting. |
+| filterable | `boolean` | `false` | Show global filter input. |
+| pageSize | `number` | — | Enable pagination. |
+| virtualized | `boolean` | `false` | Enable row virtualization (recommended >100 rows). |
+| stickyHeader | `boolean` | `true` | Sticky header on scroll. |
+| emptyMessage | `ReactNode` | `"No data"` | Empty state content. |
+| onRowClick | `(row: { original: T; index: number }) => void` | — | Row click handler. |
+| loading | `boolean` | `false` | Show skeleton rows. |
+| compact | `boolean` | `false` | Reduce row height. |
+| filterPlaceholder | `string` | `"Filter..."` | Filter input placeholder. |
 
 ```tsx
-<Heading size="md">Section A</Heading>
-<Divider />
-<Heading size="md">Section B</Heading>
+const columns = [
+  { accessorKey: "name", header: "Name" },
+  { accessorKey: "role", header: "Role" },
+  { accessorKey: "status", header: "Status" },
+];
 
-<Divider spacing="lg" />
+<DataTable columns={columns} data={users} sortable filterable />
+<DataTable columns={columns} data={largeDataset} sortable virtualized />
+<DataTable columns={columns} data={items} sortable pageSize={20} />
 ```
+
+### Editor
+
+Markdown + rich text editor built on Milkdown (ProseMirror + Remark). Supports WYSIWYG, raw markdown, and split modes. No border by default — use `bordered` to add one.
+
+**Import:** `import { Editor } from "open-mcp-app-ui/editor";`
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| value | `string` | `""` | Markdown string (source of truth). |
+| onChange | `(markdown: string) => void` | — | Content change handler. |
+| mode | `"wysiwyg" \| "markdown" \| "split"` | `"wysiwyg"` | Editing mode. Omit for a mode toggle in toolbar. |
+| placeholder | `string` | — | Placeholder text. |
+| toolbar | `ToolbarItem[] \| false` | Default set | Toolbar buttons, or `false` to hide. |
+| readOnly | `boolean` | `false` | View-only mode. |
+| bordered | `boolean` | `false` | Add border and rounded corners. |
+| minHeight | `number` | `120` | Minimum height in pixels. |
+| maxHeight | `number` | — | Maximum height before scroll. |
+| autoFocus | `boolean` | `false` | Focus on mount. |
+
+**Toolbar items:** `"bold"`, `"italic"`, `"strikethrough"`, `"heading"`, `"bulletList"`, `"orderedList"`, `"taskList"`, `"code"`, `"codeBlock"`, `"blockquote"`, `"link"`, `"divider"`, `"undo"`, `"redo"`
+
+```tsx
+<Editor value={markdown} onChange={setMarkdown} placeholder="Start writing..." />
+<Editor value={markdown} onChange={setMarkdown} bordered />
+<Editor value={markdown} onChange={setMarkdown} mode="split" />
+<Editor value={content} readOnly />
+<Editor value="" toolbar={false} minHeight={200} placeholder="Clean writing surface..." />
+```
+
+**EditorRef** (imperative access):
+
+```tsx
+const editorRef = useRef<EditorRef>(null);
+<Editor ref={editorRef} value={markdown} onChange={setMarkdown} />
+
+editorRef.current?.setMarkdown("# New content");
+const md = editorRef.current?.getMarkdown();
+editorRef.current?.focus();
+```
+
+---
+
+## Charts
+
+Themed chart components. **Separate import:** `import { ... } from "open-mcp-app-ui/charts"`.
+
+All charts auto-theme via CSS variables (axis labels, grid lines, tooltips, series colors).
+
+### LineChart
+
+```tsx
+import { LineChart, Line, XAxis, YAxis, Tooltip, Legend } from "open-mcp-app-ui/charts";
+
+<LineChart data={monthlyData} height={300}>
+  <XAxis dataKey="month" />
+  <YAxis />
+  <Tooltip />
+  <Legend />
+  <Line dataKey="revenue" name="Revenue" />
+  <Line dataKey="costs" name="Costs" />
+</LineChart>
+```
+
+### BarChart
+
+```tsx
+import { BarChart, Bar, XAxis, YAxis, Tooltip } from "open-mcp-app-ui/charts";
+
+<BarChart data={salesData} height={300}>
+  <XAxis dataKey="category" />
+  <YAxis />
+  <Tooltip />
+  <Bar dataKey="sales" />
+</BarChart>
+```
+
+### AreaChart
+
+```tsx
+import { AreaChart, Area, XAxis, YAxis, Tooltip } from "open-mcp-app-ui/charts";
+
+<AreaChart data={trafficData} height={300}>
+  <XAxis dataKey="date" />
+  <YAxis />
+  <Tooltip />
+  <Area dataKey="visitors" />
+</AreaChart>
+```
+
+### PieChart
+
+```tsx
+import { PieChart, Pie, Tooltip, Legend } from "open-mcp-app-ui/charts";
+
+<PieChart height={300}>
+  <Tooltip />
+  <Legend />
+  <Pie data={distribution} dataKey="value" nameKey="label" />
+</PieChart>
+```
+
+### ScatterChart, RadarChart, ComposedChart
+
+```tsx
+import { ScatterChart, Scatter, XAxis, YAxis, Tooltip } from "open-mcp-app-ui/charts";
+import { RadarChart, Radar, PolarGrid, PolarAngleAxis } from "open-mcp-app-ui/charts";
+import { ComposedChart, Bar, Line, Area } from "open-mcp-app-ui/charts";
+```
+
+All chart types share props: `height` (default 300), `grid` (default true), `colorPalette` (custom series colors).
+
+---
+
+## Icons
+
+`lucide-react` is bundled as a dependency — no separate install. Import directly:
+
+```tsx
+import { Plus, Trash2, Settings, Search } from "lucide-react";
+
+<Button><Plus size={16} /> Add</Button>
+```
+
+Every icon accepts `size`, `color`, `strokeWidth`, `className`. Icons use `currentColor` by default — they inherit theme text color automatically.
+
+Full list: [lucide.dev/icons](https://lucide.dev/icons)
 
 ---
 
@@ -411,142 +688,98 @@ Horizontal separator line.
 ### Form with Validation
 
 ```tsx
-import { AppLayout, Card, Heading, Input, Textarea, Select, Button, Alert } from "open-mcp-app-ui";
+import { Card, Heading, Input, Select, Button, Alert } from "open-mcp-app-ui";
 
-function CreateItemForm() {
-  const { hostContext } = useHost();
-  const [error, setError] = useState("");
-
-  return (
-    <AppLayout displayMode={hostContext?.displayMode}>
-      <Card>
-        <Heading size="md">Create Item</Heading>
-        {error && <Alert variant="danger">{error}</Alert>}
-        <Input label="Title" placeholder="Enter title..." />
-        <Textarea label="Description" rows={3} />
-        <Select
-          label="Category"
-          placeholder="Select category..."
-          options={[
-            { value: "bug", label: "Bug" },
-            { value: "feature", label: "Feature" },
-          ]}
-        />
-        <Button variant="primary" onClick={handleSubmit}>Create</Button>
-      </Card>
-    </AppLayout>
-  );
-}
+<Card>
+  <Heading size="md">Create Item</Heading>
+  {error && <Alert color="danger">{error}</Alert>}
+  <Input label="Title" placeholder="Enter title..." value={title} onChange={(e) => setTitle(e.target.value)} />
+  <Select label="Category" placeholder="Choose..." options={categories} value={cat} onChange={setCat} />
+  <Button variant="primary" onClick={handleCreate} loading={saving}>Create</Button>
+</Card>
 ```
 
 ### Adaptive Layout for Inline and PIP
 
 ```tsx
-import { AppLayout, Show, Card, Heading, Text, Badge, Button } from "open-mcp-app-ui";
+import { AppLayout, Show, Heading, Text, Button, Card } from "open-mcp-app-ui";
 
-function NotesApp() {
-  const { hostContext } = useHost();
+<AppLayout displayMode={hostContext?.displayMode}>
+  <Heading size="md">Notes</Heading>
 
-  return (
-    <AppLayout displayMode={hostContext?.displayMode}>
-      <Show on="inline">
-        <div className="flex items-center justify-between">
-          <div>
-            <Heading size="sm">Notes</Heading>
-            <Text variant="secondary" size="sm">
-              {notes.length} notes · <Badge variant="success">{active} active</Badge>
-            </Text>
-          </div>
-          <Button variant="ghost" size="sm">Open →</Button>
-        </div>
-      </Show>
+  <Show on="inline">
+    <Text variant="secondary" size="sm">3 notes</Text>
+    <Button variant="ghost" size="sm">Open Editor →</Button>
+  </Show>
 
-      <Show on={["pip", "fullscreen"]}>
-        <Heading size="lg">Notes</Heading>
-        {notes.map((note) => (
-          <Card key={note.id}>
-            <Heading size="sm">{note.title}</Heading>
-            <Text variant="secondary" size="sm">{note.body}</Text>
-          </Card>
-        ))}
-        <Button variant="primary">New Note</Button>
-      </Show>
-    </AppLayout>
-  );
-}
+  <Show on={["pip", "fullscreen"]}>
+    {notes.map((n) => (
+      <Card key={n.id}>
+        <Heading size="sm">{n.title}</Heading>
+        <Text variant="secondary" size="sm">{n.body}</Text>
+      </Card>
+    ))}
+  </Show>
+</AppLayout>
 ```
 
-### Settings Page
+### Data Table with Actions
 
 ```tsx
-import { AppLayout, Card, Heading, Input, Switch, Select, Divider, Button } from "open-mcp-app-ui";
+import { DataTable } from "open-mcp-app-ui/table";
+import { Badge, Button } from "open-mcp-app-ui";
 
-function SettingsPage() {
-  const { hostContext } = useHost();
+const columns = [
+  { accessorKey: "name", header: "Name" },
+  {
+    accessorKey: "status",
+    header: "Status",
+    cell: ({ getValue }) => <Badge variant={getValue() === "active" ? "success" : "secondary"}>{getValue()}</Badge>,
+  },
+  {
+    id: "actions",
+    header: "",
+    cell: ({ row }) => <Button variant="ghost" size="sm" onClick={() => openItem(row.original.id)}>Open</Button>,
+  },
+];
 
-  return (
-    <AppLayout displayMode={hostContext?.displayMode}>
-      <Heading size="lg">Settings</Heading>
-
-      <Card>
-        <Heading size="sm">Profile</Heading>
-        <Input label="Display Name" value={name} onChange={(e) => setName(e.target.value)} />
-        <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-      </Card>
-
-      <Card>
-        <Heading size="sm">Preferences</Heading>
-        <Switch label="Email notifications" checked={emailNotifs} onChange={setEmailNotifs} />
-        <Switch label="Sound effects" checked={sounds} onChange={setSounds} />
-        <Divider spacing="sm" />
-        <Select
-          label="Language"
-          options={[
-            { value: "en", label: "English" },
-            { value: "es", label: "Spanish" },
-          ]}
-          value={lang}
-          onChange={(e) => setLang(e.target.value)}
-        />
-      </Card>
-
-      <Button variant="primary" onClick={handleSave}>Save Changes</Button>
-    </AppLayout>
-  );
-}
+<DataTable columns={columns} data={items} sortable filterable onRowClick={({ original }) => openItem(original.id)} />
 ```
 
 ---
 
 ## Anti-Patterns
 
-**Do NOT hardcode colors. Use spec variables via Tailwind classes:**
+**Do NOT build custom tables — use DataTable:**
 
 ```tsx
-{/* Bad */}
-<div style={{ color: "#333", background: "#fff" }}>...</div>
+{/* Bad — raw HTML table, no theming, no sorting, no pagination */}
+<table>
+  <thead><tr><th>Name</th><th>Status</th></tr></thead>
+  <tbody>{items.map(i => <tr key={i.id}><td>{i.name}</td><td>{i.status}</td></tr>)}</tbody>
+</table>
 
-{/* Good */}
-<div className="text-txt-primary bg-bg-primary">...</div>
+{/* Bad — div grid pretending to be a table */}
+<div className="grid grid-cols-2 gap-2">
+  {items.map(i => <div key={i.id}>{i.name}</div>)}
+</div>
+
+{/* Good — DataTable handles theming, sorting, filtering, virtualization */}
+import { DataTable } from "open-mcp-app-ui/table";
+
+<DataTable
+  columns={[
+    { accessorKey: "name", header: "Name" },
+    { accessorKey: "status", header: "Status" },
+  ]}
+  data={items}
+  sortable
+/>
 ```
 
-**Do NOT skip AppLayout. It provides display mode context for Show:**
+Any time data is displayed in rows and columns, a grid, or a structured list, **always reach for `<DataTable>` first**. It works for everything from simple 2-column key-value pairs to large sortable/filterable datasets.
 
-```tsx
-{/* Bad — Show won't work without AppLayout */}
-<HostProvider name="app" version="1.0.0">
-  <Show on="inline">...</Show>
-</HostProvider>
-
-{/* Good */}
-<HostProvider name="app" version="1.0.0">
-  <AppLayout displayMode={hostContext?.displayMode}>
-    <Show on="inline">...</Show>
-  </AppLayout>
-</HostProvider>
-```
-
-**Do NOT forget to pass displayMode to AppLayout:**
+**Do NOT use AppLayout without displayMode:**
 
 ```tsx
 {/* Bad — defaults to "pip", won't adapt */}
@@ -558,4 +791,25 @@ function SettingsPage() {
 <AppLayout displayMode={hostContext?.displayMode}>
   <Show on="inline">Shows in inline</Show>
 </AppLayout>
+```
+
+**Do NOT hardcode colors:**
+
+```tsx
+{/* Bad */}
+<div style={{ color: "#333" }}>Hardcoded</div>
+
+{/* Good */}
+<Text variant="primary">Uses theme</Text>
+<div className="text-txt-primary">Uses theme class</div>
+```
+
+**Do NOT forget to pass displayMode to AppLayout:**
+
+```tsx
+{/* Bad */}
+<AppLayout><Show on="inline">Won't work</Show></AppLayout>
+
+{/* Good */}
+<AppLayout displayMode={hostContext?.displayMode}><Show on="inline">Works</Show></AppLayout>
 ```
