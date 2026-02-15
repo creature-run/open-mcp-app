@@ -1,0 +1,47 @@
+/**
+ * Chart theming via CSS — overrides Recharts' default SVG presentation attributes.
+ *
+ * Recharts renders axes, ticks, and grids as SVG elements with inline
+ * attributes (stroke="#666", fill="#666"). CSS rules with sufficient
+ * specificity override SVG presentation attributes, making this the most
+ * reliable theming approach — no JS color resolution or fragile type
+ * detection needed.
+ *
+ * Two variants are supported:
+ *   .omu-chart (default)       → uses --color-border-primary
+ *   .omu-chart-secondary       → uses --color-border-secondary
+ *
+ * Chart wrappers set the class on their container div.
+ */
+
+/* ── Default variant: primary border ────────────────────────────────── */
+
+.omu-chart .recharts-cartesian-axis-line,
+.omu-chart .recharts-cartesian-axis-tick-line {
+  stroke: var(--color-border-primary, #d1d5db) !important;
+}
+
+.omu-chart .recharts-cartesian-axis-tick-value {
+  fill: var(--color-text-secondary, #6b7280) !important;
+}
+
+.omu-chart .recharts-cartesian-grid line {
+  stroke: var(--color-border-primary, #d1d5db) !important;
+  opacity: 0.5;
+}
+
+/* ── Secondary variant: subtler border ──────────────────────────────── */
+
+.omu-chart-secondary .recharts-cartesian-axis-line,
+.omu-chart-secondary .recharts-cartesian-axis-tick-line {
+  stroke: var(--color-border-secondary, #e5e7eb) !important;
+}
+
+.omu-chart-secondary .recharts-cartesian-axis-tick-value {
+  fill: var(--color-text-secondary, #6b7280) !important;
+}
+
+.omu-chart-secondary .recharts-cartesian-grid line {
+  stroke: var(--color-border-secondary, #e5e7eb) !important;
+  opacity: 0.5;
+}

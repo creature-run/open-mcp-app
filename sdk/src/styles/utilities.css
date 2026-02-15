@@ -6,43 +6,43 @@
 ============================================= */
 @utility heading-xs {
   font-size: var(--font-heading-xs-size);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-medium);
   line-height: var(--font-heading-xs-line-height);
 }
 
 @utility heading-sm {
   font-size: var(--font-heading-sm-size);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-medium);
   line-height: var(--font-heading-sm-line-height);
 }
 
 @utility heading-md {
   font-size: var(--font-heading-md-size);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-medium);
   line-height: var(--font-heading-md-line-height);
 }
 
 @utility heading-lg {
   font-size: var(--font-heading-lg-size);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-medium);
   line-height: var(--font-heading-lg-line-height);
 }
 
 @utility heading-xl {
   font-size: var(--font-heading-xl-size);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-semibold);
   line-height: var(--font-heading-xl-line-height);
 }
 
 @utility heading-2xl {
   font-size: var(--font-heading-2xl-size);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-semibold);
   line-height: var(--font-heading-2xl-line-height);
 }
 
 @utility heading-3xl {
   font-size: var(--font-heading-3xl-size);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-semibold);
   line-height: var(--font-heading-3xl-line-height);
 }
 
@@ -96,4 +96,14 @@
   width: var(--icon-size-xl);
   height: var(--icon-size-xl);
 }
+
+/* =============================================
+  Display mode variants for MCP Apps.
+
+  Match the data-display-mode attribute set by the UI library's <AppLayout>.
+  Usage: inline:hidden, pip:block, fullscreen:text-lg, etc.
+============================================= */
+@custom-variant inline (&:where([data-display-mode="inline"], [data-display-mode="inline"] *));
+@custom-variant pip (&:where([data-display-mode="pip"], [data-display-mode="pip"] *));
+@custom-variant fullscreen (&:where([data-display-mode="fullscreen"], [data-display-mode="fullscreen"] *));
 

@@ -1,0 +1,102 @@
+/**
+ * Checkbox — Animated checkmark styles.
+ *
+ * Recreates the OpenAI apps-sdk-ui animated checkbox using CSS
+ * transitions and the MCP Apps spec CSS variables. The checkmark
+ * is an "L" shape rotated -45° to form a ✓. Each arm scales in
+ * with a staggered delay for a satisfying draw-on effect.
+ *
+ * Structure: .omu-checkbox > .omu-checkmark > (.omu-arm-short + .omu-arm-long)
+ */
+
+/* ------------------------------------------------------------ *
+ *  Box — the outer square
+ * ------------------------------------------------------------ */
+
+.omu-checkbox {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--color-border-primary);
+  border-radius: var(--border-radius-sm);
+  background-color: transparent;
+  cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease;
+}
+
+.omu-checkbox:hover:not([data-disabled]):not([data-checked]) {
+  border-color: var(--color-border-secondary);
+}
+
+.omu-checkbox[data-checked] {
+  border-color: var(--color-background-inverse);
+  background-color: var(--color-background-inverse);
+}
+
+.omu-checkbox[data-disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ------------------------------------------------------------ *
+ *  Checkmark — the rotated container that turns an L into a ✓
+ * ------------------------------------------------------------ */
+
+.omu-checkmark {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 64%;
+  height: 32%;
+  transform: rotate(-45deg) translate(-10%, 100%);
+  transform-origin: center;
+}
+
+/* ------------------------------------------------------------ *
+ *  Arms — the two bars that form the ✓ shape
+ *
+ *  Short arm (left vertical) scales on Y.
+ *  Long arm (bottom horizontal) scales on X.
+ *  Staggered delays: short 80ms, long 160ms on check;
+ *  instant collapse (0ms) on uncheck.
+ * ------------------------------------------------------------ */
+
+.omu-arm-short {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  background: var(--color-text-inverse);
+  transform-origin: 0 0;
+  transform: scaleY(0);
+  transition: transform 100ms ease;
+}
+
+.omu-checkbox[data-checked] .omu-arm-short {
+  transform: scaleY(1);
+  transition: transform 100ms ease 80ms;
+}
+
+.omu-arm-long {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  background: var(--color-text-inverse);
+  transform-origin: 0 100%;
+  transform: scaleX(0);
+  transition: transform 100ms ease;
+}
+
+.omu-checkbox[data-checked] .omu-arm-long {
+  transform: scaleX(1);
+  transition: transform 100ms ease 160ms;
+}

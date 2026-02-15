@@ -1,0 +1,81 @@
+/**
+ * Slider — Native range input styling.
+ *
+ * Overrides the browser default appearance for the range input to
+ * create a consistent look using MCP Apps spec CSS variables.
+ * Uses the -webkit and -moz vendor prefixes for cross-browser support.
+ */
+
+.omu-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--color-border-primary);
+  outline: none;
+  transition: background 150ms ease;
+}
+
+.omu-slider:hover:not(:disabled) {
+  background: var(--color-border-secondary);
+}
+
+/* Webkit thumb (Chrome, Safari, Edge) */
+.omu-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--color-background-inverse);
+  border-radius: 50%;
+  background: var(--color-background-primary);
+  cursor: pointer;
+  transition: box-shadow 150ms ease, transform 150ms ease;
+}
+
+.omu-slider::-webkit-slider-thumb:hover {
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-background-inverse) 15%, transparent);
+}
+
+.omu-slider::-webkit-slider-thumb:active {
+  transform: scale(1.1);
+}
+
+.omu-slider:focus-visible::-webkit-slider-thumb {
+  outline: 2px solid var(--color-ring-primary);
+  outline-offset: 2px;
+}
+
+/* Firefox thumb */
+.omu-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--color-background-inverse);
+  border-radius: 50%;
+  background: var(--color-background-primary);
+  cursor: pointer;
+  transition: box-shadow 150ms ease, transform 150ms ease;
+}
+
+.omu-slider::-moz-range-thumb:hover {
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-background-inverse) 15%, transparent);
+}
+
+.omu-slider::-moz-range-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--color-border-primary);
+}
+
+.omu-slider:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.omu-slider:disabled::-webkit-slider-thumb {
+  cursor: not-allowed;
+}
+
+.omu-slider:disabled::-moz-range-thumb {
+  cursor: not-allowed;
+}

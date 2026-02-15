@@ -1,0 +1,301 @@
+/**
+ * Editor Component Styles
+ *
+ * Styles for the Milkdown/ProseMirror rich text editor. These cannot be
+ * expressed as Tailwind utility classes because Milkdown renders its own
+ * DOM structure that we don't control.
+ *
+ * All colors, fonts, radii, and spacing use MCP Apps spec CSS variables
+ * for automatic host theming.
+ */
+
+/* =============================================================================
+   ProseMirror Base
+============================================================================= */
+
+.omu-editor-content .milkdown {
+  outline: none;
+  font-size: var(--font-text-md-size);
+  line-height: var(--font-text-md-line-height);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.omu-editor-content .milkdown .editor {
+  outline: none;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.omu-editor-content .milkdown .editor > .paragraph:only-child,
+.omu-editor-content .milkdown .editor > p:only-child {
+  flex: 1;
+}
+
+/* Placeholder styling is defined at the bottom of this file,
+   targeting .ProseMirror[data-placeholder] directly. */
+
+/* =============================================================================
+   Typography - Headings
+============================================================================= */
+
+.omu-editor-content .milkdown h1 {
+  font-size: var(--font-heading-lg-size);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--font-heading-lg-line-height);
+  margin-bottom: 1rem;
+  margin-top: 1.5rem;
+  color: var(--color-text-primary);
+}
+
+.omu-editor-content .milkdown h1:first-child {
+  margin-top: 0;
+}
+
+.omu-editor-content .milkdown h2 {
+  font-size: var(--font-heading-md-size);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--font-heading-md-line-height);
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+  color: var(--color-text-primary);
+}
+
+.omu-editor-content .milkdown h3 {
+  font-size: var(--font-heading-sm-size);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--font-heading-sm-line-height);
+  margin-top: 1.25rem;
+  margin-bottom: 0.5rem;
+  color: var(--color-text-primary);
+}
+
+/* =============================================================================
+   Typography - Body
+============================================================================= */
+
+.omu-editor-content .milkdown p {
+  margin-bottom: 0.75rem;
+  font-size: var(--font-text-md-size);
+  line-height: var(--font-text-md-line-height);
+}
+
+.omu-editor-content .milkdown p:last-child {
+  margin-bottom: 0;
+}
+
+.omu-editor-content .milkdown strong {
+  font-weight: var(--font-weight-semibold);
+}
+
+.omu-editor-content .milkdown em {
+  font-style: italic;
+}
+
+.omu-editor-content .milkdown del,
+.omu-editor-content .milkdown s {
+  text-decoration: line-through;
+  color: var(--color-text-secondary);
+}
+
+/* =============================================================================
+   Links
+============================================================================= */
+
+.omu-editor-content .milkdown a {
+  color: var(--color-text-info);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.omu-editor-content .milkdown a:hover {
+  opacity: 0.8;
+}
+
+/* =============================================================================
+   Code
+============================================================================= */
+
+.omu-editor-content .milkdown code {
+  font-family: var(--font-mono);
+  font-size: var(--font-text-sm-size);
+  background: var(--color-background-secondary);
+  padding: 0.125rem 0.375rem;
+  border-radius: var(--border-radius-sm);
+}
+
+.omu-editor-content .milkdown pre {
+  background: var(--color-background-secondary);
+  border: var(--border-width-regular) solid var(--color-border-secondary);
+  border-radius: var(--border-radius-md);
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+  overflow-x: auto;
+}
+
+.omu-editor-content .milkdown pre code {
+  background: transparent;
+  padding: 0;
+  font-size: var(--font-text-sm-size);
+  line-height: var(--font-text-sm-line-height);
+}
+
+/* =============================================================================
+   Lists
+============================================================================= */
+
+.omu-editor-content .milkdown ul {
+  margin-bottom: 0.75rem;
+  padding-left: 1.5rem;
+  list-style-type: disc;
+}
+
+.omu-editor-content .milkdown ol {
+  margin-bottom: 0.75rem;
+  padding-left: 1.5rem;
+  list-style-type: decimal;
+}
+
+.omu-editor-content .milkdown li {
+  margin-bottom: 0.25rem;
+  font-size: var(--font-text-md-size);
+  line-height: var(--font-text-md-line-height);
+}
+
+.omu-editor-content .milkdown li p {
+  margin-bottom: 0.25rem;
+}
+
+.omu-editor-content .milkdown li:last-child {
+  margin-bottom: 0;
+}
+
+/* =============================================================================
+   Task Lists
+============================================================================= */
+
+/**
+ * Task list items rendered by Milkdown GFM.
+ * Milkdown renders an actual <input type="checkbox"> inside the list item.
+ * We style it via appearance: none and add a custom visual indicator,
+ * while keeping the real checkbox clickable for toggling.
+ */
+.omu-editor-content .milkdown li[data-item-type="task"] {
+  list-style: none;
+  position: relative;
+  margin-left: -4px;
+}
+
+/* Style the real checkbox input that Milkdown renders */
+.omu-editor-content .milkdown li[data-item-type="task"] input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid var(--color-border-primary);
+  border-radius: 3px;
+  background: var(--color-background-primary);
+  cursor: pointer;
+  vertical-align: middle;
+  position: relative;
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+
+.omu-editor-content .milkdown li[data-item-type="task"] input[type="checkbox"]:checked {
+  background: var(--color-text-primary);
+  border-color: var(--color-text-primary);
+}
+
+.omu-editor-content .milkdown li[data-item-type="task"] input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 0px;
+  width: 5px;
+  height: 9px;
+  border: solid var(--color-background-primary);
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+}
+
+/* =============================================================================
+   Blockquotes
+============================================================================= */
+
+.omu-editor-content .milkdown blockquote {
+  border-left: 3px solid var(--color-border-primary);
+  padding-left: 1rem;
+  margin-bottom: 0.75rem;
+  color: var(--color-text-secondary);
+  font-style: italic;
+}
+
+.omu-editor-content .milkdown blockquote p {
+  margin-bottom: 0.5rem;
+}
+
+.omu-editor-content .milkdown blockquote p:last-child {
+  margin-bottom: 0;
+}
+
+/* =============================================================================
+   Horizontal Rule
+============================================================================= */
+
+.omu-editor-content .milkdown hr {
+  border: none;
+  border-top: var(--border-width-regular) solid var(--color-border-primary);
+  margin: 1.5rem 0;
+}
+
+/* =============================================================================
+   Selection
+============================================================================= */
+
+/**
+ * Selection uses the ring/accent color with transparency so it
+ * matches the app's focus color rather than a barely-visible grey.
+ */
+.omu-editor-content .milkdown ::selection {
+  background: color-mix(in srgb, var(--color-ring-primary) 30%, transparent);
+  color: var(--color-text-primary);
+}
+
+/* =============================================================================
+   Read-only
+============================================================================= */
+
+.omu-editor-content[data-readonly] {
+  cursor: default;
+}
+
+.omu-editor-content[data-readonly] .milkdown .editor {
+  cursor: default;
+}
+
+/* =============================================================================
+   Toolbar — sits inside the parent flex container, no extra border/radius
+============================================================================= */
+
+.omu-editor .omu-editor-toolbar {
+  border: none;
+  border-radius: 0;
+}
+
+/* =============================================================================
+   Placeholder — shown on the ProseMirror element when content is empty
+============================================================================= */
+
+.omu-editor-content .ProseMirror[data-placeholder]:empty::before,
+.omu-editor-content .ProseMirror.ProseMirror-empty[data-placeholder]::before {
+  content: attr(data-placeholder);
+  color: var(--color-text-tertiary);
+  font-style: italic;
+  position: absolute;
+  pointer-events: none;
+  opacity: 0.7;
+}
