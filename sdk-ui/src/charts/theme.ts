@@ -1,3 +1,5 @@
+import React from "react";
+
 /**
  * Chart Theme — CSS variable mapping for Recharts.
  *
@@ -10,10 +12,33 @@
 /**
  * Resolve a CSS variable value at runtime.
  * Falls back to the provided default if the variable is not set.
+ *
+ * Recharts requires resolved color values for SVG attributes (stroke, fill)
+ * because SVG doesn't support var() in most attributes. We check both
+ * document.documentElement (inline styles set by the host SDK) and
+ * document.body as a fallback, since hosts may inject CSS variables
+ * on either element.
  */
 export const getCSSVar = ({ name, fallback }: { name: string; fallback: string }): string => {
   if (typeof window === "undefined") return fallback;
-  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+  /* Try inline style first (faster, no reflow) — hosts set vars via setProperty */
+  const root = document.documentElement;
+  let value = root.style.getPropertyValue(name).trim();
+
+  /* Fall back to computed style (catches vars set via stylesheets / :root) */
+  if (!value) {
+    value = getComputedStyle(root).getPropertyValue(name).trim();
+  }
+
+  /* Some hosts inject on <body> instead */
+  if (!value && document.body) {
+    value = document.body.style.getPropertyValue(name).trim();
+    if (!value) {
+      value = getComputedStyle(document.body).getPropertyValue(name).trim();
+    }
+  }
+
   return value || fallback;
 };
 
@@ -40,27 +65,93 @@ export const getTooltipStyle = () => ({
 });
 
 /**
- * Themed grid line color for <CartesianGrid>.
+ * Border variant type shared across chart sub-components.
+ * - "default" uses --color-border-primary (stronger)
+ * - "secondary" uses --color-border-secondary (subtler)
  */
-export const getGridColor = (): string =>
-  getCSSVar({ name: "--color-border-secondary", fallback: "#e5e7eb" });
+export type ChartBorderVariant = "default" | "secondary";
+
+/**
+ * Resolve the border CSS variable for the given variant.
+ */
+const getBorderColor = ({ variant = "default" }: { variant?: ChartBorderVariant } = {}): string =>
+  variant === "secondary"
+    ? getCSSVar({ name: "--color-border-secondary", fallback: "#e5e7eb" })
+    : getCSSVar({ name: "--color-border-primary", fallback: "#d1d5db" });
+
+/**
+ * Themed grid line color for <CartesianGrid>.
+ * Grids default to secondary (subtle background lines).
+ */
+export const getGridColor = ({ variant = "secondary" }: { variant?: ChartBorderVariant } = {}): string =>
+  getBorderColor({ variant });
 
 /**
  * Themed axis tick/label style for <XAxis> and <YAxis>.
+ * Axis lines default to primary (visible structural lines).
  */
-export const getAxisStyle = () => ({
+export const getAxisStyle = ({ variant = "default" }: { variant?: ChartBorderVariant } = {}) => ({
   tick: {
     fill: getCSSVar({ name: "--color-text-secondary", fallback: "#6b7280" }),
     fontSize: getCSSVar({ name: "--font-text-xs-size", fallback: "11px" }),
     fontFamily: getCSSVar({ name: "--font-sans", fallback: "ui-sans-serif, system-ui, sans-serif" }),
   },
   axisLine: {
-    stroke: getCSSVar({ name: "--color-border-secondary", fallback: "#e5e7eb" }),
+    stroke: getBorderColor({ variant }),
   },
   tickLine: {
-    stroke: getCSSVar({ name: "--color-border-secondary", fallback: "#e5e7eb" }),
+    stroke: getBorderColor({ variant }),
   },
 });
+
+/**
+ * Apply themed styles to axis and grid children via cloneElement.
+ *
+ * Recharts identifies axis/grid components by child.type, so wrapping them
+ * in custom components breaks chart rendering. Instead, chart wrappers
+ * call this in their Children.map loop to inject theme props while
+ * preserving the original Recharts component type.
+ *
+ * Handles XAxis, YAxis (tick/axisLine/tickLine) and CartesianGrid
+ * (stroke + 50% opacity). Returns a cloned element with themed props,
+ * or null if the child is not a recognized chart structural component.
+ */
+export const themeAxisChild = ({
+  child,
+  variant = "default",
+  XAxis,
+  YAxis,
+  CartesianGrid,
+}: {
+  child: React.ReactElement<any>;
+  variant?: ChartBorderVariant;
+  XAxis: any;
+  YAxis: any;
+  CartesianGrid?: any;
+}): React.ReactElement<any> | null => {
+  const t = child.type as any;
+  const dn = t?.displayName;
+
+  if (t === XAxis || t === YAxis || dn === "XAxis" || dn === "YAxis") {
+    const style = getAxisStyle({ variant });
+    const props = child.props as any;
+    return React.cloneElement(child, {
+      tick: props.tick === false ? false : { ...style.tick, ...(typeof props.tick === "object" && props.tick ? props.tick : {}) },
+      axisLine: props.axisLine === false ? false : { ...style.axisLine, ...(typeof props.axisLine === "object" && props.axisLine ? props.axisLine : {}) },
+      tickLine: props.tickLine === false ? false : { ...style.tickLine, ...(typeof props.tickLine === "object" && props.tickLine ? props.tickLine : {}) },
+    });
+  }
+
+  if (CartesianGrid && (t === CartesianGrid || dn === "CartesianGrid")) {
+    const props = child.props as any;
+    return React.cloneElement(child, {
+      stroke: props.stroke ?? getGridColor({ variant }),
+      opacity: props.opacity ?? 0.5,
+    });
+  }
+
+  return null;
+};
 
 /**
  * Themed legend style for <Legend>.

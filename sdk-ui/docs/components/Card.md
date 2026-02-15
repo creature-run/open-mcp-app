@@ -1,6 +1,6 @@
 # Card
 
-Content container with border and shadow.
+Content container with border.
 
 ```tsx
 import { Card } from "open-mcp-app-ui";
@@ -10,7 +10,7 @@ import { Card } from "open-mcp-app-ui";
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| variant | `"default" \| "ghost"` | `"default"` | `"default"` has border+shadow, `"ghost"` is borderless. |
+| variant | `"default" \| "secondary" \| "ghost"` | `"default"` | `"default"` = primary border, `"secondary"` = subtler border, `"ghost"` = no border. |
 | padding | `"none" \| "sm" \| "md" \| "lg"` | `"md"` | Internal padding. |
 | children | `ReactNode` | — | Card content. |
 
@@ -23,6 +23,10 @@ Also extends `HTMLAttributes<HTMLDivElement>`.
   <Heading size="sm">Settings</Heading>
   <Input label="Name" />
   <Button variant="primary">Save</Button>
+</Card>
+
+<Card variant="secondary">
+  <Text>Subtler border for less visual weight</Text>
 </Card>
 
 <Card variant="ghost" padding="none">

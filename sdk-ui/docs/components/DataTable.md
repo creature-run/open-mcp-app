@@ -26,6 +26,7 @@ import { DataTable, type ColumnDef } from "open-mcp-app-ui/table";
 | loading | `boolean` | `false` | Show animated skeleton rows. |
 | compact | `boolean` | `false` | Reduce row height (xs text, tighter padding). |
 | filterPlaceholder | `string` | `"Filter..."` | Placeholder for the filter input. |
+| borderVariant | `"default" \| "secondary"` | `"default"` | Outer border and header border color. `"secondary"` uses a subtler border. |
 | className | `string` | — | Additional classes on the wrapper. |
 
 ## Column Definitions
@@ -79,12 +80,13 @@ Key `ColumnDef` fields:
   filterPlaceholder="Search items..."
 />
 
-{/* Paginated */}
+{/* Paginated with subtler border */}
 <DataTable
   columns={columns}
   data={items}
   sortable
   pageSize={20}
+  borderVariant="secondary"
 />
 
 {/* Virtualized for large datasets */}
@@ -135,7 +137,7 @@ All visual elements use MCP Apps spec CSS variables:
 | Row hover | `--color-background-secondary` |
 | Row text | `--color-text-primary` |
 | Row border | `--color-border-secondary` |
-| Table border | `--color-border-primary` |
+| Table border | `--color-border-primary` (or `--color-border-secondary` with `borderVariant="secondary"`) |
 | Empty state text | `--color-text-tertiary` |
 | Filter input | Standard spec input styling |
 | Pagination buttons | Standard spec button styling |

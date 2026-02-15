@@ -73,6 +73,13 @@ export interface DataTableProps<T> {
   loading?: boolean;
   /** Reduce row height for tighter layouts (e.g. inline display mode). */
   compact?: boolean;
+  /**
+   * Border style for the table container.
+   * - "default" — uses --color-border-primary (stronger)
+   * - "secondary" — uses --color-border-secondary (subtler)
+   * Defaults to "default".
+   */
+  borderVariant?: "default" | "secondary";
   /** Additional CSS classes on the outermost wrapper. */
   className?: string;
   /** Placeholder text for the filter input. */
@@ -199,6 +206,7 @@ export const DataTable = <T,>({
   onRowClick,
   loading = false,
   compact = false,
+  borderVariant = "default",
   className = "",
   filterPlaceholder = "Filter...",
 }: DataTableProps<T>) => {
@@ -274,7 +282,7 @@ export const DataTable = <T,>({
         <tr
           key={row.id}
           className={[
-            "border-b border-bdr-secondary transition-colors",
+            "border-b border-bdr-secondary last:border-b-0 transition-colors",
             isClickable ? "cursor-pointer hover:bg-bg-secondary" : "",
           ].join(" ")}
           style={style}
@@ -362,7 +370,7 @@ export const DataTable = <T,>({
   // -------------------------------------------------------------------------
 
   return (
-    <div className={`flex flex-col gap-2 ${className}`}>
+    <div className={`flex flex-col gap-2 min-h-0 ${className}`}>
       {/* Global filter input */}
       {filterable && !loading && (
         <div className="flex items-center">
@@ -371,13 +379,7 @@ export const DataTable = <T,>({
             value={globalFilter}
             onChange={(e) => setGlobalFilter(e.target.value)}
             placeholder={filterPlaceholder}
-            className={[
-              "w-full max-w-xs text-sm px-3 py-1.5 rounded-md",
-              "bg-bg-primary text-txt-primary placeholder:text-txt-tertiary",
-              "border border-bdr-secondary",
-              "outline-none focus:outline focus:outline-2 focus:outline-offset-0 focus:outline-ring-primary",
-              "transition-colors",
-            ].join(" ")}
+            className="omu-control w-full max-w-xs text-sm px-3 py-1.5 rounded-md bg-bg-primary text-txt-primary placeholder:text-txt-tertiary"
           />
         </div>
       )}
@@ -386,8 +388,8 @@ export const DataTable = <T,>({
       <div
         ref={scrollRef}
         className={[
-          "overflow-auto rounded-lg",
-          "border border-bdr-primary",
+          "overflow-auto rounded-lg flex-1 min-h-0",
+          borderVariant === "secondary" ? "border border-bdr-secondary" : "border border-bdr-primary",
           virtualized ? "max-h-[600px]" : "",
         ].join(" ")}
       >
@@ -407,7 +409,7 @@ export const DataTable = <T,>({
                     className={[
                       "text-txt-secondary font-medium",
                       compact ? "px-3 py-1.5 text-xs" : "px-3 py-2.5 text-xs",
-                      "border-b border-bdr-primary",
+                      borderVariant === "secondary" ? "border-b border-bdr-secondary" : "border-b border-bdr-primary",
                       "whitespace-nowrap",
                     ].join(" ")}
                     style={{ width: header.getSize() !== 150 ? header.getSize() : undefined }}

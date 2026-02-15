@@ -47,6 +47,16 @@ export {
   ResponsiveContainer,
 } from "recharts";
 
+// Theme utilities for raw Recharts usage and advanced customization
+export {
+  type ChartBorderVariant,
+  getCSSVar,
+  getGridColor,
+  getAxisStyle,
+  getTooltipStyle,
+  getLegendStyle,
+} from "./theme.js";
+
 // Types
 export type { ChartContainerProps } from "./types.js";
 export { DEFAULT_PALETTE } from "./types.js";

@@ -24,6 +24,7 @@ Time series, trends. Curved or straight lines.
 | height | `number` | `300` | Chart height in pixels |
 | grid | `boolean` | `true` | Show CartesianGrid |
 | colorPalette | `string[]` | theme palette | Custom series colors |
+| borderVariant | `"default" \| "secondary"` | `"default"` | Axis line and tick mark color. `"secondary"` uses a subtler border. |
 | className | `string` | `""` | Wrapper class |
 
 ```tsx
@@ -49,6 +50,7 @@ Comparisons, categories. Vertical columns by default.
 | height | `number` | `300` | Chart height |
 | grid | `boolean` | `true` | Show CartesianGrid |
 | colorPalette | `string[]` | theme palette | Custom series colors |
+| borderVariant | `"default" \| "secondary"` | `"default"` | Axis line and tick mark color. |
 
 ```tsx
 import { BarChart, Bar, XAxis, YAxis, Tooltip } from "open-mcp-app-ui/charts";
@@ -72,6 +74,7 @@ Volume, cumulative trends. Gradient fill with opacity.
 | height | `number` | `300` | Chart height |
 | grid | `boolean` | `true` | Show CartesianGrid |
 | colorPalette | `string[]` | theme palette | Custom series colors |
+| borderVariant | `"default" \| "secondary"` | `"default"` | Axis line and tick mark color. |
 
 ```tsx
 import { AreaChart, Area, XAxis, YAxis, Tooltip } from "open-mcp-app-ui/charts";
@@ -119,6 +122,7 @@ Correlations, distributions.
 | height | `number` | `300` | Chart height |
 | grid | `boolean` | `true` | Show CartesianGrid |
 | colorPalette | `string[]` | theme palette | Series colors |
+| borderVariant | `"default" \| "secondary"` | `"default"` | Axis line and tick mark color. |
 
 ```tsx
 import { ScatterChart, Scatter, XAxis, YAxis, Tooltip } from "open-mcp-app-ui/charts";
@@ -162,6 +166,7 @@ Mix Bar + Line + Area in one chart.
 | height | `number` | `300` | Chart height |
 | grid | `boolean` | `true` | Show CartesianGrid |
 | colorPalette | `string[]` | theme palette | Series colors |
+| borderVariant | `"default" \| "secondary"` | `"default"` | Axis line and tick mark color. |
 
 ```tsx
 import { ComposedChart, Bar, Line, Area, XAxis, YAxis, Tooltip } from "open-mcp-app-ui/charts";
@@ -203,12 +208,23 @@ import { ComposedChart, Bar, Line, Area, XAxis, YAxis, Tooltip } from "open-mcp-
 
 ## Theming
 
-Charts auto-theme via CSS variables:
+Charts auto-theme via CSS variables. **Always use these wrappers instead of raw Recharts components** — they ensure axis lines, grid lines, tick marks, and labels match the host theme in both light and dark mode.
 
-- **Series colors**: From `--color-accent`, `--color-text-secondary`, `--color-ring-primary`, etc.
-- **Grid lines**: `--color-border-secondary` at low opacity
+- **Axis lines & tick marks**: `--color-border-primary` by default, `--color-border-secondary` with `borderVariant="secondary"`
+- **Grid lines**: Same border color as axes at 50% opacity. Follows `borderVariant`.
 - **Axis labels**: `--color-text-secondary`, `--font-sans`
+- **Series colors**: Auto-assigned from palette. Override with `colorPalette`.
 - **Tooltip**: `--color-background-secondary` bg, `--color-text-primary` text, `--color-border-secondary` border
+
+`borderVariant` controls axis lines, tick marks, AND grid lines together:
+
+```tsx
+<LineChart data={data} height={300} borderVariant="secondary">
+  <XAxis dataKey="month" />
+  <YAxis />
+  <Line dataKey="revenue" />
+</LineChart>
+```
 
 Override palette per chart:
 

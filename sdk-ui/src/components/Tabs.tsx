@@ -21,6 +21,13 @@ export interface TabsProps extends Omit<HTMLAttributes<HTMLDivElement>, "onChang
   onChange: (value: string) => void;
   /** Tab items (should be Tabs.Tab elements). */
   children: ReactNode;
+  /**
+   * Border color variant for the bottom rule.
+   * - "default" — uses --color-border-primary (stronger)
+   * - "secondary" — uses --color-border-secondary (subtler)
+   * Defaults to "default".
+   */
+  borderVariant?: "default" | "secondary";
 }
 
 export interface TabProps {
@@ -59,19 +66,25 @@ const TabsContext = createContext<{ value: string; onChange: (v: string) => void
  * ```
  */
 const TabsRoot = forwardRef<HTMLDivElement, TabsProps>(
-  ({ value, onChange, children, className = "", ...rest }, ref) => (
-    <TabsContext.Provider value={{ value, onChange }}>
-      <div
-        ref={ref}
-        role="tablist"
-        className={["flex shrink-0", className].filter(Boolean).join(" ")}
-        style={{ borderBottom: "1px solid var(--color-border-secondary, #d4d4d4)" }}
-        {...rest}
-      >
-        {children}
-      </div>
-    </TabsContext.Provider>
-  )
+  ({ value, onChange, children, borderVariant = "default", className = "", ...rest }, ref) => {
+    const borderColor = borderVariant === "secondary"
+      ? "var(--color-border-secondary, #d4d4d4)"
+      : "var(--color-border-primary, #b8b8b8)";
+
+    return (
+      <TabsContext.Provider value={{ value, onChange }}>
+        <div
+          ref={ref}
+          role="tablist"
+          className={["flex shrink-0", className].filter(Boolean).join(" ")}
+          style={{ borderBottom: `1px solid ${borderColor}` }}
+          {...rest}
+        >
+          {children}
+        </div>
+      </TabsContext.Provider>
+    );
+  }
 );
 
 TabsRoot.displayName = "Tabs";

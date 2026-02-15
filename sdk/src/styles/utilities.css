@@ -97,3 +97,13 @@
   height: var(--icon-size-xl);
 }
 
+/* =============================================
+  Display mode variants for MCP Apps.
+
+  Match the data-display-mode attribute set by the UI library's <AppLayout>.
+  Usage: inline:hidden, pip:block, fullscreen:text-lg, etc.
+============================================= */
+@custom-variant inline (&:where([data-display-mode="inline"], [data-display-mode="inline"] *));
+@custom-variant pip (&:where([data-display-mode="pip"], [data-display-mode="pip"] *));
+@custom-variant fullscreen (&:where([data-display-mode="fullscreen"], [data-display-mode="fullscreen"] *));
+

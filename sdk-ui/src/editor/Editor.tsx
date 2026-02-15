@@ -3,7 +3,7 @@
  *
  * Built on Milkdown (ProseMirror + Remark) for markdown-first editing
  * with perfect round-trip fidelity. Supports WYSIWYG, raw markdown,
- * and split (side-by-side) editing modes.
+ * and raw markdown editing modes.
  *
  * Styled exclusively with MCP Apps spec CSS variables. All typography,
  * colors, borders, and spacing use the host's theme tokens.
@@ -77,7 +77,7 @@ export type ToolbarItem =
   | "redo";
 
 /** Editing mode. */
-export type EditorMode = "wysiwyg" | "markdown" | "split";
+export type EditorMode = "wysiwyg" | "markdown";
 
 export interface EditorProps {
   /** Markdown string (source of truth). */
@@ -88,7 +88,6 @@ export interface EditorProps {
    * Editing mode:
    * - "wysiwyg" — Rich text rendering with formatting (default)
    * - "markdown" — Raw markdown text editing
-   * - "split" — Side-by-side WYSIWYG and markdown
    *
    * Omit to show a mode toggle in the toolbar so users can switch freely.
    */
@@ -104,10 +103,11 @@ export interface EditorProps {
   readOnly?: boolean;
   /**
    * Show a border and rounded corners around the editor.
-   * When false (default), the editor sits flat within its container,
-   * making it easy to embed inside cards or other bordered elements.
+   * - false (default) — no border, sits flat within its container
+   * - true / "default" — uses --color-border-primary (stronger)
+   * - "secondary" — uses --color-border-secondary (subtler)
    */
-  bordered?: boolean;
+  bordered?: boolean | "default" | "secondary";
   /** Minimum editor height in pixels. */
   minHeight?: number;
   /** Maximum editor height in pixels before scrolling. */
@@ -326,7 +326,7 @@ const EditorToolbar = ({
 
 /**
  * Mode toggle buttons shown at the right of the toolbar.
- * Allows switching between wysiwyg, markdown, and split modes.
+ * Allows switching between wysiwyg and markdown modes.
  */
 const ModeToggle = ({
   mode,
@@ -338,7 +338,6 @@ const ModeToggle = ({
   const modes: { value: EditorMode; label: string }[] = [
     { value: "wysiwyg", label: "Rich" },
     { value: "markdown", label: "MD" },
-    { value: "split", label: "Split" },
   ];
 
   return (
@@ -583,7 +582,7 @@ const MarkdownTextarea = ({
  * Markdown + rich text editor with toolbar and mode switching.
  *
  * Built on Milkdown (ProseMirror + Remark) for markdown-first editing.
- * Supports WYSIWYG, raw markdown, and split editing modes. Styled with
+ * Supports WYSIWYG and raw markdown editing modes. Styled with
  * MCP Apps spec CSS variables for automatic host theming.
  *
  * By default the editor has no border or rounded corners so it sits
@@ -686,18 +685,14 @@ export const Editor = forwardRef<EditorRef, EditorProps>(
       (markdown: string) => {
         setRawValue(markdown);
         onChange?.(markdown);
-        // Sync to WYSIWYG if in split mode
-        if (mode === "split") {
-          actionsRef.current?.setMarkdown(markdown);
-        }
       },
-      [onChange, mode]
+      [onChange]
     );
 
     /**
      * Handle toolbar button clicks.
      *
-     * In WYSIWYG/split mode, toolbar actions execute real Milkdown
+     * In WYSIWYG mode, toolbar actions execute real Milkdown
      * commands that toggle marks (bold, italic) or wrap blocks
      * (heading, list, blockquote) on the current selection.
      *
@@ -805,7 +800,7 @@ export const Editor = forwardRef<EditorRef, EditorProps>(
          * Read the latest content from whichever pane is active before
          * switching. This ensures rawValue is always up to date.
          */
-        if (mode === "wysiwyg" || mode === "split") {
+        if (mode === "wysiwyg") {
           const current = actionsRef.current?.getMarkdown() ?? rawValue;
           setRawValue(current);
         }
@@ -813,12 +808,11 @@ export const Editor = forwardRef<EditorRef, EditorProps>(
         setInternalMode(newMode);
 
         /**
-         * Force remount of MilkdownProvider when switching TO a mode
-         * that includes the WYSIWYG editor. This recreates Milkdown
-         * with the latest rawValue as defaultValue, avoiding stale
-         * context and "editorView not found" errors.
+         * Force remount of MilkdownProvider when switching TO WYSIWYG.
+         * This recreates Milkdown with the latest rawValue as defaultValue,
+         * avoiding stale context and "editorView not found" errors.
          */
-        if (newMode === "wysiwyg" || newMode === "split") {
+        if (newMode === "wysiwyg") {
           setMilkdownKey((k) => k + 1);
         }
       },
@@ -847,7 +841,10 @@ export const Editor = forwardRef<EditorRef, EditorProps>(
           "omu-editor flex flex-col overflow-hidden",
           "bg-bg-primary text-txt-primary",
           bordered
-            ? "border border-bdr-primary rounded-md focus-within:outline focus-within:outline-2 focus-within:outline-offset-0 focus-within:outline-ring-primary"
+            ? [
+                "rounded-md focus-within:outline focus-within:outline-2 focus-within:outline-offset-0 focus-within:outline-ring-primary",
+                bordered === "secondary" ? "border border-bdr-secondary" : "border border-bdr-primary",
+              ].join(" ")
             : "",
           className,
         ].join(" ")}
@@ -868,8 +865,8 @@ export const Editor = forwardRef<EditorRef, EditorProps>(
         {/* Editor content */}
         <div className="flex flex-1 min-h-0 overflow-hidden">
           {/* WYSIWYG pane */}
-          {(mode === "wysiwyg" || mode === "split") && (
-            <div className={`flex flex-col flex-1 min-h-0 ${mode === "split" ? "border-r border-bdr-secondary" : ""}`}>
+          {mode === "wysiwyg" && (
+            <div className="flex flex-col flex-1 min-h-0">
               <MilkdownProvider key={milkdownKey}>
                 <MilkdownInner
                   defaultValue={rawValue}
@@ -885,13 +882,13 @@ export const Editor = forwardRef<EditorRef, EditorProps>(
           )}
 
           {/* Markdown pane */}
-          {(mode === "markdown" || mode === "split") && (
+          {mode === "markdown" && (
             <div className="flex flex-col flex-1 min-h-0">
               <MarkdownTextarea
                 value={rawValue}
                 onChange={handleRawChange}
                 readOnly={readOnly}
-                placeholder={mode === "markdown" ? placeholder : "Raw markdown..."}
+                placeholder={placeholder}
                 autoFocus={autoFocus && mode === "markdown"}
                 minHeight={minHeight - 40}
                 maxHeight={maxHeight ? maxHeight - 40 : undefined}

@@ -8,21 +8,30 @@ import {
   Line as RechartsLine,
   Bar as RechartsBar,
   Area as RechartsArea,
+  XAxis as RechartsXAxis,
+  YAxis as RechartsYAxis,
   CartesianGrid,
 } from "recharts";
 import { ChartContainer, getSeriesColor } from "./ChartContainer.js";
-import { getGridColor } from "./theme.js";
+import { themeAxisChild, type ChartBorderVariant } from "./theme.js";
 import type { ChartContainerProps } from "./types.js";
 
 interface ThemedComposedChartProps extends ChartContainerProps {
   data: Record<string, unknown>[];
   children: ReactNode;
   grid?: boolean;
+  /**
+   * Border variant for axis lines and tick marks.
+   * - "default" — uses --color-border-primary (stronger)
+   * - "secondary" — uses --color-border-secondary (subtler)
+   */
+  borderVariant?: ChartBorderVariant;
 }
 
 /**
  * Themed ComposedChart.
- * Auto-assigns palette colors to Line, Bar, and Area children.
+ * Auto-assigns palette colors to Line, Bar, and Area children and
+ * applies themed axis styles to XAxis/YAxis children.
  */
 export const ComposedChart = ({
   data,
@@ -31,12 +40,17 @@ export const ComposedChart = ({
   className,
   style,
   grid = true,
+  borderVariant = "default",
   children,
 }: ThemedComposedChartProps) => {
   let seriesIndex = 0;
 
   const themedChildren = Children.map(children, (child) => {
     if (!isValidElement(child)) return child;
+
+    const themedAxis = themeAxisChild({ child: child as React.ReactElement<any>, variant: borderVariant, XAxis: RechartsXAxis, YAxis: RechartsYAxis, CartesianGrid });
+    if (themedAxis) return themedAxis;
+
     const t = child.type as any;
     const dn = t?.displayName;
 
@@ -69,9 +83,9 @@ export const ComposedChart = ({
   });
 
   return (
-    <ChartContainer height={height} className={className} style={style}>
+    <ChartContainer height={height} className={className} style={style} borderVariant={borderVariant}>
       <RechartsComposedChart data={data} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-        {grid && <CartesianGrid strokeDasharray="3 3" stroke={getGridColor()} opacity={0.5} />}
+        {grid && <CartesianGrid strokeDasharray="3 3" />}
         {themedChildren}
       </RechartsComposedChart>
     </ChartContainer>

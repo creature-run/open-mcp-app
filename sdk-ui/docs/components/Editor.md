@@ -1,6 +1,6 @@
 # Editor
 
-Markdown + rich text editor built on Milkdown (ProseMirror + Remark). Supports WYSIWYG, raw markdown, and split (side-by-side) editing modes. Markdown is the source of truth — perfect round-trip fidelity.
+Markdown + rich text editor built on Milkdown (ProseMirror + Remark). Supports WYSIWYG and raw markdown editing modes. Markdown is the source of truth — perfect round-trip fidelity.
 
 **Separate import** — not part of the core bundle:
 
@@ -14,11 +14,11 @@ import { Editor } from "open-mcp-app-ui/editor";
 |------|------|---------|-------------|
 | value | `string` | `""` | Markdown string (source of truth). |
 | onChange | `(markdown: string) => void` | — | Called when content changes. |
-| mode | `"wysiwyg" \| "markdown" \| "split"` | `"wysiwyg"` | Editing mode. Omit to show a mode toggle in the toolbar. |
+| mode | `"wysiwyg" \| "markdown"` | `"wysiwyg"` | Editing mode. Omit to show a mode toggle in the toolbar. |
 | placeholder | `string` | — | Placeholder text when empty. |
 | toolbar | `ToolbarItem[] \| false` | Default set | Toolbar buttons, or `false` to hide. |
 | readOnly | `boolean` | `false` | View-only mode (renders styled markdown). |
-| bordered | `boolean` | `false` | Add border and rounded corners. When false, the editor sits flat inside its container. |
+| bordered | `boolean \| "default" \| "secondary"` | `false` | Add border and rounded corners. `true`/`"default"` = primary border, `"secondary"` = subtler border. When false, the editor sits flat inside its container. |
 | minHeight | `number` | `120` | Minimum height in pixels. |
 | maxHeight | `number` | — | Maximum height before scrolling. |
 | autoFocus | `boolean` | `false` | Focus editor on mount. |
@@ -27,7 +27,7 @@ import { Editor } from "open-mcp-app-ui/editor";
 ## Types
 
 ```tsx
-type EditorMode = "wysiwyg" | "markdown" | "split";
+type EditorMode = "wysiwyg" | "markdown";
 
 type ToolbarItem =
   | "bold" | "italic" | "strikethrough"
@@ -52,12 +52,20 @@ interface EditorRef {
   placeholder="Start writing..."
 />
 
-{/* With border and rounded corners */}
+{/* With primary border */}
 <Editor
   value={markdown}
   onChange={setMarkdown}
   bordered
   placeholder="Standalone editor..."
+/>
+
+{/* With secondary (subtler) border */}
+<Editor
+  value={markdown}
+  onChange={setMarkdown}
+  bordered="secondary"
+  placeholder="Editor with subtle border..."
 />
 
 {/* With mode locked to markdown */}
@@ -66,13 +74,6 @@ interface EditorRef {
   onChange={setMarkdown}
   mode="markdown"
   placeholder="Write markdown..."
-/>
-
-{/* Split mode (WYSIWYG + raw markdown side by side) */}
-<Editor
-  value={markdown}
-  onChange={setMarkdown}
-  mode="split"
 />
 
 {/* Read-only markdown rendering */}
@@ -120,7 +121,7 @@ All visual elements use MCP Apps spec CSS variables:
 | Editor background | `--color-background-primary` |
 | Editor text | `--color-text-primary` |
 | Placeholder | `--color-text-tertiary` |
-| Border (when `bordered`) | `--color-border-primary` |
+| Border (when `bordered`) | `--color-border-primary` (or `--color-border-secondary` with `bordered="secondary"`) |
 | Focus ring (when `bordered`) | `--color-ring-primary` |
 | Toolbar background | `--color-background-secondary` |
 | Toolbar buttons | `--color-text-secondary` (idle), `--color-text-primary` (hover) |
@@ -139,6 +140,6 @@ All visual elements use MCP Apps spec CSS variables:
 - By default the editor has **no border or rounded corners**, making it easy to embed inside cards or other containers. Set `bordered` to add them.
 - Toolbar buttons execute real Milkdown/ProseMirror commands (toggle bold, wrap in heading, etc.) in WYSIWYG mode, not raw text insertion.
 - The editor is primarily **uncontrolled** for the WYSIWYG pane to avoid cursor jumps during typing. External updates should use the `EditorRef.setMarkdown()` method.
-- When `mode` is omitted, a mode toggle appears in the toolbar letting users switch between Rich/MD/Split.
+- When `mode` is omitted, a mode toggle appears in the toolbar letting users switch between Rich and MD.
 - The `toolbar` prop accepts an array of items. Use `"divider"` to add visual separators between groups.
 - Milkdown packages (`@milkdown/kit`, `@milkdown/react`, etc.) must be available in the app's dependency tree.

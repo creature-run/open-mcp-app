@@ -27,6 +27,7 @@
 @import "./tag-input.css";
 @import "./menu.css";
 @import "./editor.css";
+@import "./charts.css";
 
 /**
  * Ring color tokens mapped to the MCP Apps spec ring variables.

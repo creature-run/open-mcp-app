@@ -41,7 +41,7 @@ export interface AlertProps extends HTMLAttributes<HTMLDivElement> {
  * Outline uses a 1px border with the alert's semantic color.
  */
 const outlineColorClasses: Record<SemanticVariant, string> = {
-  info: "border-bdr-secondary text-txt-primary",
+  info: "border-bdr-info text-txt-info",
   danger: "border-bdr-danger text-txt-danger",
   success: "border-bdr-success text-txt-success",
   warning: "border-bdr-warning text-txt-warning",
@@ -52,7 +52,7 @@ const outlineColorClasses: Record<SemanticVariant, string> = {
  * Soft uses a tinted background with a subtle border.
  */
 const softColorClasses: Record<SemanticVariant, string> = {
-  info: "bg-bg-secondary border-bdr-secondary text-txt-primary",
+  info: "bg-bg-info border-bdr-info text-txt-info",
   danger: "bg-bg-danger border-bdr-danger text-txt-danger",
   success: "bg-bg-success border-bdr-success text-txt-success",
   warning: "bg-bg-warning border-bdr-warning text-txt-warning",
@@ -63,7 +63,7 @@ const softColorClasses: Record<SemanticVariant, string> = {
  * Solid uses a fully opaque semantic background.
  */
 const solidColorClasses: Record<SemanticVariant, string> = {
-  info: "bg-bg-tertiary text-txt-primary border-transparent",
+  info: "bg-bg-info text-txt-info border-transparent",
   danger: "bg-bg-danger text-txt-danger border-transparent",
   success: "bg-bg-success text-txt-success border-transparent",
   warning: "bg-bg-warning text-txt-warning border-transparent",

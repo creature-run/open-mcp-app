@@ -70,7 +70,7 @@ If you must write custom CSS, use `var(--color-*, fallback)` and avoid hardcoded
 
 ## Display Mode Tailwind Variants
 
-After importing `open-mcp-app-ui/styles/display-modes.css`, use variants:
+The SDK's Tailwind CSS includes display mode variants out of the box. Use them with the `data-display-mode` attribute set by `<AppLayout>`:
 
 ```tsx
 <div className="text-sm inline:text-xs fullscreen:text-base">Adaptive text</div>

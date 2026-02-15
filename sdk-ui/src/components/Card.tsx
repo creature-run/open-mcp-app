@@ -2,7 +2,8 @@
  * Card — Content container.
  *
  * A bordered surface for grouping related content.
- * Uses spec background and border variables.
+ * Uses real CSS border so Tailwind border classes work for overrides
+ * (e.g. className="border-bdr-info" to change the color).
  *
  * Variants:
  * - "default" — primary border color
@@ -34,14 +35,14 @@ const paddingClasses: Record<NonNullable<CardProps["padding"]>, string> = {
 };
 
 /**
- * Inset box-shadow strings used as borders.
- * Using inset box-shadow instead of CSS border avoids layout shift
- * and allows consistent 1px borders across variants.
+ * Border classes per variant.
+ * Uses real CSS border so consumers can override with Tailwind
+ * border-color classes (e.g. border-bdr-info, border-bdr-danger).
  */
-const variantShadow: Record<NonNullable<CardProps["variant"]>, string | undefined> = {
-  default: "inset 0 0 0 1px var(--color-border-primary, rgba(0,0,0,0.08))",
-  secondary: "inset 0 0 0 1px var(--color-border-secondary, rgba(0,0,0,0.04))",
-  ghost: undefined,
+const variantBorderClasses: Record<NonNullable<CardProps["variant"]>, string> = {
+  default: "border border-bdr-primary",
+  secondary: "border border-bdr-secondary",
+  ghost: "",
 };
 
 /**
@@ -52,6 +53,7 @@ const variantShadow: Record<NonNullable<CardProps["variant"]>, string | undefine
  * <Card>Default card with primary border</Card>
  * <Card variant="secondary">Subtle card with lighter border</Card>
  * <Card variant="ghost" padding="none">Borderless card</Card>
+ * <Card className="border-bdr-info">Custom border via Tailwind</Card>
  * ```
  */
 export const Card = ({
@@ -64,20 +66,15 @@ export const Card = ({
   const classes = [
     "rounded-lg",
     variant === "ghost" ? "bg-bg-ghost" : "bg-bg-primary",
+    variantBorderClasses[variant],
     paddingClasses[padding],
     className,
   ]
     .filter(Boolean)
     .join(" ");
 
-  const shadow = variantShadow[variant];
-
   return (
-    <div
-      className={classes}
-      style={shadow ? { boxShadow: shadow } : undefined}
-      {...rest}
-    >
+    <div className={classes} {...rest}>
       {children}
     </div>
   );

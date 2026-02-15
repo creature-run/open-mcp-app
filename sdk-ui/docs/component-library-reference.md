@@ -458,6 +458,7 @@ Underline-style tab bar.
 | value | `string` | — | Active tab value. |
 | onChange | `(value: string) => void` | — | Tab click handler. |
 | children | `ReactNode` | — | `Tabs.Tab` elements. |
+| borderVariant | `"default" \| "secondary"` | `"default"` | Bottom border color. |
 
 ```tsx
 <Tabs value={activeTab} onChange={setActiveTab}>
@@ -466,6 +467,12 @@ Underline-style tab bar.
 </Tabs>
 {activeTab === "overview" && <OverviewPanel />}
 {activeTab === "settings" && <SettingsPanel />}
+
+{/* Subtler border */}
+<Tabs value={activeTab} onChange={setActiveTab} borderVariant="secondary">
+  <Tabs.Tab value="general">General</Tabs.Tab>
+  <Tabs.Tab value="advanced">Advanced</Tabs.Tab>
+</Tabs>
 ```
 
 ---
@@ -474,16 +481,17 @@ Underline-style tab bar.
 
 ### Card
 
-Content container with border and shadow.
+Content container with border.
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| variant | `"default" \| "ghost"` | `"default"` | Ghost removes border/shadow. |
+| variant | `"default" \| "secondary" \| "ghost"` | `"default"` | `"secondary"` = subtler border, `"ghost"` = no border. |
 | padding | `"none" \| "sm" \| "md" \| "lg"` | `"md"` | Internal padding. |
 | children | `ReactNode` | — | Content. |
 
 ```tsx
-<Card><Text>Default card</Text></Card>
+<Card><Text>Default card (primary border)</Text></Card>
+<Card variant="secondary"><Text>Secondary border (subtler)</Text></Card>
 <Card variant="ghost" padding="lg"><Text>Ghost card, large padding</Text></Card>
 ```
 
@@ -509,10 +517,11 @@ Horizontal separator line.
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | spacing | `"none" \| "sm" \| "md" \| "lg"` | `"md"` | Vertical margin. |
+| variant | `"default" \| "secondary"` | `"default"` | Border color. |
 
 ```tsx
 <Divider />
-<Divider spacing="sm" />
+<Divider variant="secondary" spacing="sm" />
 ```
 
 ---
@@ -541,6 +550,7 @@ High-performance virtualized data table built on TanStack Table + TanStack Virtu
 | loading | `boolean` | `false` | Show skeleton rows. |
 | compact | `boolean` | `false` | Reduce row height. |
 | filterPlaceholder | `string` | `"Filter..."` | Filter input placeholder. |
+| borderVariant | `"default" \| "secondary"` | `"default"` | Outer border and header border color. |
 
 ```tsx
 const columns = [
@@ -551,12 +561,12 @@ const columns = [
 
 <DataTable columns={columns} data={users} sortable filterable />
 <DataTable columns={columns} data={largeDataset} sortable virtualized />
-<DataTable columns={columns} data={items} sortable pageSize={20} />
+<DataTable columns={columns} data={items} sortable pageSize={20} borderVariant="secondary" />
 ```
 
 ### Editor
 
-Markdown + rich text editor built on Milkdown (ProseMirror + Remark). Supports WYSIWYG, raw markdown, and split modes. No border by default — use `bordered` to add one.
+Markdown + rich text editor built on Milkdown (ProseMirror + Remark). Supports WYSIWYG and raw markdown modes. No border by default — use `bordered` to add one.
 
 **Import:** `import { Editor } from "open-mcp-app-ui/editor";`
 
@@ -564,11 +574,11 @@ Markdown + rich text editor built on Milkdown (ProseMirror + Remark). Supports W
 |------|------|---------|-------------|
 | value | `string` | `""` | Markdown string (source of truth). |
 | onChange | `(markdown: string) => void` | — | Content change handler. |
-| mode | `"wysiwyg" \| "markdown" \| "split"` | `"wysiwyg"` | Editing mode. Omit for a mode toggle in toolbar. |
+| mode | `"wysiwyg" \| "markdown"` | `"wysiwyg"` | Editing mode. Omit for a mode toggle in toolbar. |
 | placeholder | `string` | — | Placeholder text. |
 | toolbar | `ToolbarItem[] \| false` | Default set | Toolbar buttons, or `false` to hide. |
 | readOnly | `boolean` | `false` | View-only mode. |
-| bordered | `boolean` | `false` | Add border and rounded corners. |
+| bordered | `boolean \| "default" \| "secondary"` | `false` | Add border and rounded corners. `true`/`"default"` = primary, `"secondary"` = subtler. |
 | minHeight | `number` | `120` | Minimum height in pixels. |
 | maxHeight | `number` | — | Maximum height before scroll. |
 | autoFocus | `boolean` | `false` | Focus on mount. |
@@ -578,7 +588,7 @@ Markdown + rich text editor built on Milkdown (ProseMirror + Remark). Supports W
 ```tsx
 <Editor value={markdown} onChange={setMarkdown} placeholder="Start writing..." />
 <Editor value={markdown} onChange={setMarkdown} bordered />
-<Editor value={markdown} onChange={setMarkdown} mode="split" />
+<Editor value={markdown} onChange={setMarkdown} bordered="secondary" />
 <Editor value={content} readOnly />
 <Editor value="" toolbar={false} minHeight={200} placeholder="Clean writing surface..." />
 ```
@@ -600,7 +610,7 @@ editorRef.current?.focus();
 
 Themed chart components. **Separate import:** `import { ... } from "open-mcp-app-ui/charts"`.
 
-All charts auto-theme via CSS variables (axis labels, grid lines, tooltips, series colors).
+**Always use these wrappers instead of raw Recharts** — they auto-theme axis lines, tick marks, grid lines, tick labels, and tooltips from CSS variables so charts match the host theme in both light and dark mode. `borderVariant` controls axis lines, tick marks, AND grid lines (at 50% opacity) together. Default is `"default"` (`--color-border-primary`); use `"secondary"` for subtler borders.
 
 ### LineChart
 
@@ -663,7 +673,7 @@ import { RadarChart, Radar, PolarGrid, PolarAngleAxis } from "open-mcp-app-ui/ch
 import { ComposedChart, Bar, Line, Area } from "open-mcp-app-ui/charts";
 ```
 
-All chart types share props: `height` (default 300), `grid` (default true), `colorPalette` (custom series colors).
+All chart types share props: `height` (default 300), `grid` (default true), `colorPalette` (custom series colors), `borderVariant` ("default" | "secondary" — controls axis lines, tick marks, AND grid lines together).
 
 ---
 
@@ -750,34 +760,7 @@ const columns = [
 
 ## Anti-Patterns
 
-**Do NOT build custom tables — use DataTable:**
-
-```tsx
-{/* Bad — raw HTML table, no theming, no sorting, no pagination */}
-<table>
-  <thead><tr><th>Name</th><th>Status</th></tr></thead>
-  <tbody>{items.map(i => <tr key={i.id}><td>{i.name}</td><td>{i.status}</td></tr>)}</tbody>
-</table>
-
-{/* Bad — div grid pretending to be a table */}
-<div className="grid grid-cols-2 gap-2">
-  {items.map(i => <div key={i.id}>{i.name}</div>)}
-</div>
-
-{/* Good — DataTable handles theming, sorting, filtering, virtualization */}
-import { DataTable } from "open-mcp-app-ui/table";
-
-<DataTable
-  columns={[
-    { accessorKey: "name", header: "Name" },
-    { accessorKey: "status", header: "Status" },
-  ]}
-  data={items}
-  sortable
-/>
-```
-
-Any time data is displayed in rows and columns, a grid, or a structured list, **always reach for `<DataTable>` first**. It works for everything from simple 2-column key-value pairs to large sortable/filterable datasets.
+**Do NOT build custom tables** — always use `<DataTable>` for any tabular, grid, or structured list data. No raw `<table>`, div grids, or `.map()` loops.
 
 **Do NOT use AppLayout without displayMode:**
 

@@ -1,6 +1,6 @@
 {
   "name": "open-mcp-app-ui",
-  "version": "0.0.6",
+  "version": "0.0.8",
   "description": "UI component library for MCP Apps, built on the MCP Apps spec",
   "type": "module",
   "exports": {
