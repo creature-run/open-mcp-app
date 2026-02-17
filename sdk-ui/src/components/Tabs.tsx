@@ -109,11 +109,11 @@ const Tab = ({ value, children, disabled = false, className = "" }: TabProps) =>
       disabled={disabled}
       onClick={() => !disabled && onChange(value)}
       className={[
-        "px-3 py-2 text-xs font-normal transition-colors select-none",
+        "px-3 py-2 text-sm font-normal transition-colors select-none",
         "border-b-2 -mb-px",
         isActive
           ? "text-txt-primary"
-          : "border-transparent text-txt-tertiary hover:text-txt-primary",
+          : "border-transparent text-txt-secondary hover:text-txt-primary",
         disabled ? "opacity-40 cursor-not-allowed" : "cursor-pointer",
         className,
       ]

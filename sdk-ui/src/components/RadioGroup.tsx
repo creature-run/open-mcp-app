@@ -156,7 +156,7 @@ function RadioGroupItem({
         className="sr-only peer"
       />
       <div
-        className="omu-radio peer-focus-visible:[outline:2px_solid_var(--color-ring-primary)]"
+        className="omu-radio peer-focus-visible:[border-color:var(--color-text-primary)]"
         data-checked={isSelected || undefined}
         data-disabled={disabled || undefined}
         aria-hidden="true"

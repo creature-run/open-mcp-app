@@ -3,15 +3,15 @@
  *
  * Uses inset box-shadow instead of CSS border, following the same pattern
  * as OpenAI's apps-sdk-ui. This avoids all border+outline doubling,
- * provides smoother transitions, and keeps the focus indicator as a
- * single visual element (the shadow ring itself changes weight + color).
+ * provides smoother transitions and keeps focus treatment to a single
+ * border color change without changing perceived border thickness.
  *
  * Usage: add class="omu-control" and data-error for error state.
  *
  * States:
  *   default  → 1px inset ring using --color-border-secondary (subtle)
  *   hover    → ring darkens to --color-border-primary (more prominent)
- *   focus    → ring thickens to 2px and uses --color-ring-primary
+ *   focus    → 1px ring uses --color-text-primary (no thickness change)
  *   error    → ring uses --color-border-danger
  *   disabled → 50% opacity, not-allowed cursor
  */
@@ -36,15 +36,16 @@
 
 .omu-control:focus:not([data-error]),
 .omu-control:focus-within:not([data-error]) {
-  box-shadow: inset 0 0 0 2px var(--color-ring-primary);
+  box-shadow: inset 0 0 0 1px var(--color-text-primary);
 }
 
 .omu-control[data-error] {
   box-shadow: inset 0 0 0 1px var(--color-border-danger);
 }
 
+.omu-control[data-error]:focus,
 .omu-control[data-error]:focus-within {
-  box-shadow: inset 0 0 0 2px var(--color-border-danger);
+  box-shadow: inset 0 0 0 1px var(--color-text-primary);
 }
 
 .omu-control:where([data-disabled]),

@@ -388,7 +388,7 @@ export const DataTable = <T,>({
       <div
         ref={scrollRef}
         className={[
-          "overflow-auto rounded-lg flex-1 min-h-0",
+          "overflow-auto rounded-md flex-1 min-h-0",
           borderVariant === "secondary" ? "border border-bdr-secondary" : "border border-bdr-primary",
           virtualized ? "max-h-[600px]" : "",
         ].join(" ")}

@@ -51,9 +51,9 @@ export const Switch = forwardRef<HTMLButtonElement, SwitchProps>(
           disabled={disabled}
           onClick={handleClick}
           className={[
-            "relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors",
-            "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring-primary",
-            checked ? "bg-bg-inverse" : "bg-bg-tertiary",
+            "relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors",
+            "text-txt-primary focus-visible:outline-none focus-visible:border-current",
+            checked ? "bg-bg-inverse border-transparent" : "bg-bg-secondary border-bdr-secondary",
             disabled ? "cursor-not-allowed" : "cursor-pointer",
           ].join(" ")}
           {...rest}
@@ -61,8 +61,8 @@ export const Switch = forwardRef<HTMLButtonElement, SwitchProps>(
           <span
             aria-hidden="true"
             className={[
-              "pointer-events-none inline-block h-3.5 w-3.5 rounded-full bg-bg-primary shadow-sm transition-transform",
-              checked ? "translate-x-4.5" : "translate-x-0.5",
+              "pointer-events-none inline-block h-3.5 w-3.5 rounded-full shadow-sm transition-transform transition-colors",
+              checked ? "translate-x-4.5 bg-bg-primary" : "translate-x-0.5 bg-bg-inverse",
             ].join(" ")}
           />
         </button>

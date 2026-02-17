@@ -256,7 +256,7 @@ export const TagInput = forwardRef<HTMLInputElement, TagInputProps>(
               }}
               placeholder={tags.length === 0 ? placeholder : ""}
               disabled={disabled}
-              className="flex-1 min-w-[60px] bg-transparent border-none outline-none text-txt-primary placeholder:text-txt-tertiary"
+              className="flex-1 min-w-[60px] bg-transparent border-none outline-none text-txt-primary placeholder:text-txt-secondary"
             />
           )}
         </div>

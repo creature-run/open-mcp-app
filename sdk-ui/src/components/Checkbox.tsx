@@ -80,7 +80,7 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
           {...rest}
         />
         <div
-          className="omu-checkbox peer-focus-visible:[outline:2px_solid_var(--color-ring-primary)]"
+          className="omu-checkbox peer-focus-visible:[border-color:var(--color-text-primary)]"
           data-checked={visualChecked || undefined}
           data-disabled={disabled || undefined}
           aria-hidden="true"

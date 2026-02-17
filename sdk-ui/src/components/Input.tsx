@@ -66,7 +66,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           ref={ref}
           id={inputId}
           className={[
-            "omu-control block w-full rounded-lg bg-bg-primary text-txt-primary placeholder:text-txt-tertiary",
+            "omu-control block w-full rounded-lg bg-bg-primary text-txt-primary placeholder:text-txt-secondary",
             sizeClasses[size],
             className,
           ]

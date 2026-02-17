@@ -1,6 +1,6 @@
 {
   "name": "open-mcp-app-ui",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "description": "UI component library for MCP Apps, built on the MCP Apps spec",
   "type": "module",
   "exports": {
@@ -43,7 +43,7 @@
   },
   "peerDependenciesMeta": {
     "open-mcp-app": {
-      "optional": false
+      "optional": true
     }
   },
   "devDependencies": {

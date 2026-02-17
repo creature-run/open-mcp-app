@@ -66,7 +66,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
           ref={ref}
           id={inputId}
           className={[
-            "omu-control block w-full rounded-lg bg-bg-primary text-txt-primary placeholder:text-txt-tertiary",
+            "omu-control block w-full rounded-lg bg-bg-primary text-txt-primary placeholder:text-txt-secondary",
             "text-sm px-3 py-2",
             resizeClass,
             className,

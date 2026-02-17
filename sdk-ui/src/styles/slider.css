@@ -42,8 +42,8 @@
 }
 
 .omu-slider:focus-visible::-webkit-slider-thumb {
-  outline: 2px solid var(--color-ring-primary);
-  outline-offset: 2px;
+  outline: none;
+  border-color: var(--color-text-primary);
 }
 
 /* Firefox thumb */
@@ -55,6 +55,10 @@
   background: var(--color-background-primary);
   cursor: pointer;
   transition: box-shadow 150ms ease, transform 150ms ease;
+}
+
+.omu-slider:focus-visible::-moz-range-thumb {
+  border-color: var(--color-text-primary);
 }
 
 .omu-slider::-moz-range-thumb:hover {
