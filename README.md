@@ -11,6 +11,28 @@ Maintained by the team behind [Creature](https://creature.run).
 
 ---
 
+## Experimental Concepts (Beyond the Standard MCP Apps SDK)
+
+This SDK is **spec-first**: standard MCP Apps behavior works across hosts. It also includes a small set of **opt-in experimental concepts** for teams who want more capability while the ecosystem evolves.
+
+These concepts are what this SDK offers above a baseline MCP Apps implementation:
+
+1. **Namespaced host extensions**  
+   Non-standard options are isolated under `experimental` on tools/resources, so your base app contract stays MCP Apps-compatible.
+
+2. **Runtime UI behavior controls**  
+   Creature-specific extensions like `experimental.defaultDisplayMode`, `experimental.openInBackground`, and `experimental.websocket` allow richer tab/display and real-time UX when supported.
+
+3. **Project-scoped persistence primitives**  
+   The `exp` server APIs provide optional KV, file I/O, blob, and vector operations for app-local persistence and retrieval.
+
+4. **Graceful fallback by design**  
+   On hosts that do not support these extensions, experimental APIs resolve safely (`null`/`false`) so you can implement standard fallbacks without breaking portability.
+
+If you only need standard MCP Apps behavior, you can ignore all experimental APIs and stay fully portable.
+
+---
+
 ## Packages
 
 | Package | Description | Docs |
