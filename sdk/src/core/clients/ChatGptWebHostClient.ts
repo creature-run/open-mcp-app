@@ -161,6 +161,7 @@ export class ChatGptWebHostClient extends Subscribable implements UnifiedHostCli
         text: c.text || "",
       })),
       source: "ui",
+      toolName,
     };
 
     this.emit("tool-result", result as ToolResult);
@@ -228,7 +229,7 @@ export class ChatGptWebHostClient extends Subscribable implements UnifiedHostCli
   ): () => void {
     // theme-change and teardown are no-ops on ChatGPT
     if (event === "theme-change" || event === "teardown") {
-      return () => {};
+      return () => { };
     }
     return this.onEvent(
       event as "tool-input" | "tool-result" | "widget-state-change",
@@ -258,10 +259,10 @@ export class ChatGptWebHostClient extends Subscribable implements UnifiedHostCli
       },
 
       // MCP Apps-only (no-op on ChatGPT)
-      setTitle: (_title: string) => {},
+      setTitle: (_title: string) => { },
 
       // MCP Apps-only (no-op on ChatGPT)
-      sendNotification: (_method: string, _params: unknown) => {},
+      sendNotification: (_method: string, _params: unknown) => { },
 
       getInstanceId: () => {
         // ChatGPT may have widgetSessionId, but we don't expose it
@@ -327,9 +328,12 @@ export class ChatGptWebHostClient extends Subscribable implements UnifiedHostCli
     this.hasProcessedInitialData = true;
     this.setState({ isReady: true });
 
+
+
     if (openai.toolOutput) {
       this.emit("tool-input", openai.toolOutput);
-      this.emit("tool-result", { structuredContent: openai.toolOutput });
+      const toolName = (openai.toolOutput as Record<string, unknown>)?._toolName as string | undefined;
+      this.emit("tool-result", { structuredContent: openai.toolOutput, ...(toolName && { toolName }) });
     }
 
     if (openai.widgetState) {
@@ -356,7 +360,8 @@ export class ChatGptWebHostClient extends Subscribable implements UnifiedHostCli
         if (toolOutputJson !== this.lastToolOutputJson) {
           this.lastToolOutputJson = toolOutputJson;
           this.emit("tool-input", globals.toolOutput);
-          this.emit("tool-result", { structuredContent: globals.toolOutput });
+          const toolName = (globals.toolOutput as Record<string, unknown>)?._toolName as string | undefined;
+          this.emit("tool-result", { structuredContent: globals.toolOutput, ...(toolName && { toolName }) });
         }
       }
 
