@@ -160,9 +160,9 @@ export class ChatGptWebEmulator extends BaseHostEmulator {
 
       requestDisplayMode: async (params: { mode: string }) => {
         emulator.recordMessage("request-display-mode", params);
-        // ChatGPT may coerce pip to fullscreen on mobile
         const grantedMode = params.mode as "inline" | "pip" | "fullscreen";
         emulator._displayMode = grantedMode;
+        emulator.emitGlobalsChange({ displayMode: grantedMode });
         return { mode: grantedMode };
       },
 
