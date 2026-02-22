@@ -409,6 +409,20 @@ export interface AppConfig {
   onToolError?: (toolName: string, error: Error, args: unknown) => void;
 
   /**
+   * Called before a tool handler is invoked.
+   * Useful for logging, telemetry, or instrumentation.
+   * Must not throw — errors are silently ignored to avoid breaking tool calls.
+   */
+  onBeforeToolCall?: (info: ToolCallInfo) => void;
+
+  /**
+   * Called after a tool handler completes (success or failure).
+   * Receives the result or error, plus timing info.
+   * Must not throw — errors are silently ignored to avoid breaking tool calls.
+   */
+  onAfterToolCall?: (info: ToolCallResultInfo) => void;
+
+  /**
    * Called during graceful shutdown, before closing connections.
    * Use this to clean up resources (e.g., close database connections).
    */
@@ -427,6 +441,40 @@ export interface AppConfig {
    * Controls how long to wait for in-flight requests to complete.
    */
   keepAliveTimeout?: number;
+}
+
+// ============================================================================
+// Tool Call Hooks
+// ============================================================================
+
+/**
+ * Information passed to the onBeforeToolCall hook.
+ */
+export interface ToolCallInfo {
+  /** Name of the tool being called. */
+  toolName: string;
+  /** Raw arguments passed to the tool (before Zod parsing). */
+  args: unknown;
+}
+
+/**
+ * Information passed to the onAfterToolCall hook.
+ * Includes timing and error details so consumers can build
+ * telemetry without wrapping individual handlers.
+ */
+export interface ToolCallResultInfo {
+  /** Name of the tool that was called. */
+  toolName: string;
+  /** Raw arguments passed to the tool (before Zod parsing). */
+  args: unknown;
+  /** The tool result, if the handler succeeded. */
+  result?: ToolResult;
+  /** Wall-clock duration of the handler in milliseconds. */
+  durationMs: number;
+  /** Whether the handler threw an error. */
+  isError: boolean;
+  /** The error, if the handler threw. */
+  error?: Error;
 }
 
 // ============================================================================

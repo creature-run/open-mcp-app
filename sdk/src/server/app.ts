@@ -932,6 +932,7 @@ export class App {
           ...(Object.keys(toolMeta).length > 0 && { _meta: toolMeta }),
         },
         async (args: Record<string, unknown>) => {
+          let startMs = Date.now();
           try {
             const input = config.input ? config.input.parse(args) : args;
 
@@ -981,13 +982,23 @@ export class App {
               },
               websocketUrl,
             };
-            
+
+            try { this.config.onBeforeToolCall?.({ toolName: name, args }); } catch {}
+
+            startMs = Date.now();
             const result = await handler(input, context);
+            const durationMs = Date.now() - startMs;
+
+            try { this.config.onAfterToolCall?.({ toolName: name, args, result, durationMs, isError: false }); } catch {}
+
             return this.formatToolResult(result, instanceId, websocketUrl);
           } catch (error) {
             const err = error instanceof Error ? error : new Error(String(error));
+            const durationMs = Date.now() - startMs;
             console.error(`[MCP] Tool "${name}" failed:`, err.message);
             this.config.onToolError?.(name, err, args);
+
+            try { this.config.onAfterToolCall?.({ toolName: name, args, durationMs, isError: true, error: err }); } catch {}
 
             return {
               content: [{ type: "text" as const, text: err.message }],

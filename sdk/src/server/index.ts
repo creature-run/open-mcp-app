@@ -7,6 +7,8 @@ export type {
   ToolResult,
   ToolHandler,
   ToolContext,
+  ToolCallInfo,
+  ToolCallResultInfo,
   InstanceDestroyContext,
   DisplayMode,
   ToolVisibility,
