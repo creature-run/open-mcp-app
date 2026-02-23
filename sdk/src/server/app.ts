@@ -18,6 +18,8 @@ import type {
   InstanceDestroyContext,
   ResourceDefinition,
   TransportSessionInfo,
+  ServerLogger,
+  ServerLogLevel,
 } from "./types.js";
 import { MIME_TYPES } from "./types.js";
 import { svgToDataUri, isInitializeRequest, htmlLoader } from "./utils.js";
@@ -25,6 +27,64 @@ import { WebSocketManager } from "./websocket.js";
 import type { WebSocketConnection } from "./types.js";
 import { setCurrentServer } from "./storageRpc.js";
 
+
+// ============================================================================
+// HTTP Log Sink (for MCP_LOG_ENDPOINT auto-config)
+// ============================================================================
+
+interface LogEvent {
+  level: string;
+  logger: string;
+  data: unknown;
+  timestamp: string;
+}
+
+function createHttpLogSink(endpoint: string, sourceName: string): (event: LogEvent) => void {
+  const buffer: LogEvent[] = [];
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const MAX_BUFFER = 50;
+  const FLUSH_INTERVAL_MS = 2000;
+
+  const flush = () => {
+    if (buffer.length === 0) return;
+    const events = buffer.splice(0, buffer.length);
+    const body = JSON.stringify({
+      events: events.map((e) => ({
+        ts: e.timestamp,
+        level: e.level,
+        sourceType: "mcp_server",
+        sourceName,
+        eventType: typeof e.data === "object" && e.data !== null && "event" in e.data
+          ? (e.data as Record<string, unknown>).event
+          : "log",
+        message: typeof e.data === "string" ? e.data : JSON.stringify(e.data),
+      })),
+    });
+    fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+    }).catch(() => {});
+  };
+
+  const scheduleFlush = () => {
+    if (timer) return;
+    timer = setTimeout(() => {
+      timer = null;
+      flush();
+    }, FLUSH_INTERVAL_MS);
+  };
+
+  return (event: LogEvent) => {
+    buffer.push(event);
+    if (buffer.length >= MAX_BUFFER) {
+      if (timer) { clearTimeout(timer); timer = null; }
+      flush();
+    } else {
+      scheduleFlush();
+    }
+  };
+}
 
 // ============================================================================
 // App Class
@@ -39,6 +99,7 @@ export class App {
   private tools: Map<string, ToolDefinition> = new Map();
   private resources: Map<string, ResourceDefinition> = new Map();
   private transports: Map<string, StreamableHTTPServerTransport> = new Map();
+  private serverByTransport = new WeakMap<StreamableHTTPServerTransport, McpServer>();
   private websocketManager = new WebSocketManager();
   private instanceWebSockets = new Map<string, WebSocketConnection<unknown, unknown>>();
   private httpServer: Server | null = null;
@@ -56,6 +117,17 @@ export class App {
   /** The connected client type for format-specific responses. */
   private clientType: "creature" | "claude" | "chatgpt" | "unknown" = "unknown";
 
+  /**
+   * Server-side logger that sends `notifications/message` to connected MCP clients.
+   *
+   * @example
+   * ```typescript
+   * app.log("User authenticated");
+   * app.log.error("Query failed", { table: "users" });
+   * ```
+   */
+  public readonly log: ServerLogger;
+
 
   // ==========================================================================
   // Constructor
@@ -65,7 +137,11 @@ export class App {
     this.callerDir = callerDir || process.cwd();
     this.config = config;
     this.isDev = config.dev ?? process.env.NODE_ENV === "development";
-    
+    this.log = this.createServerLogger();
+
+    if (!this.config.onLog && process.env.MCP_LOG_ENDPOINT) {
+      this.config.onLog = createHttpLogSink(process.env.MCP_LOG_ENDPOINT, this.config.name);
+    }
   }
 
   // ==========================================================================
@@ -637,7 +713,7 @@ export class App {
 
   private createExpressApp(): express.Express {
     const app = express();
-    app.use(express.json());
+    app.use(express.json({ limit: '50mb' }));
 
     // CORS middleware
     app.use((req: Request, res: Response, next: () => void) => {
@@ -652,6 +728,11 @@ export class App {
       }
       next();
     });
+
+    // User-provided middleware (runs before built-in routes)
+    if (this.config.middleware) {
+      this.config.middleware(app);
+    }
 
     // Health check
     app.get("/health", (_req: Request, res: Response) => {
@@ -710,7 +791,8 @@ export class App {
         transport = this.createTransport();
         const server = this.createMcpServer();
         await server.connect(transport);
-        
+        this.serverByTransport.set(transport, server);
+
         // Set the current server for storage RPC access
         setCurrentServer(server);
         
@@ -984,12 +1066,18 @@ export class App {
             };
 
             try { this.config.onBeforeToolCall?.({ toolName: name, args }); } catch {}
+            if (this.config.logToolCalls) {
+              this.sendLog("info", `Tool call: ${name}`, { event: "tool_call", tool: name });
+            }
 
             startMs = Date.now();
             const result = await handler(input, context);
             const durationMs = Date.now() - startMs;
 
             try { this.config.onAfterToolCall?.({ toolName: name, args, result, durationMs, isError: false }); } catch {}
+            if (this.config.logToolCalls) {
+              this.sendLog("info", `Tool result: ${name} (${durationMs}ms)`, { event: "tool_result", tool: name, durationMs });
+            }
 
             return this.formatToolResult(result, instanceId, websocketUrl);
           } catch (error) {
@@ -999,6 +1087,9 @@ export class App {
             this.config.onToolError?.(name, err, args);
 
             try { this.config.onAfterToolCall?.({ toolName: name, args, durationMs, isError: true, error: err }); } catch {}
+            if (this.config.logToolCalls) {
+              this.sendLog("error", `Tool error: ${name} (${durationMs}ms) — ${err.message}`, { event: "tool_result", tool: name, durationMs, error: err.message });
+            }
 
             return {
               content: [{ type: "text" as const, text: err.message }],
@@ -1114,6 +1205,52 @@ export class App {
       ...(Object.keys(meta).length > 0 && { _meta: meta }),
       ...(result.isError && { isError: true }),
     };
+  }
+
+  // ==========================================================================
+  // Private: Server Logger
+  // ==========================================================================
+
+  /**
+   * Send a logging notification to all connected MCP clients,
+   * or route through onLog when configured.
+   */
+  private sendLog(level: ServerLogLevel, message: string, data?: unknown): void {
+    if (this.config.onLog) {
+      this.config.onLog({
+        level,
+        logger: this.config.name,
+        data: data ?? message,
+        timestamp: new Date().toISOString(),
+      });
+      return;
+    }
+    const params = {
+      level,
+      logger: this.config.name,
+      data: data !== undefined ? data : message,
+    };
+    for (const transport of this.transports.values()) {
+      const server = this.serverByTransport.get(transport);
+      if (server) {
+        server.sendLoggingMessage(params).catch(() => {});
+      }
+    }
+  }
+
+  /**
+   * Create a ServerLogger instance bound to this app.
+   */
+  private createServerLogger(): ServerLogger {
+    const logFn = (message: string, data?: unknown) => {
+      this.sendLog("info", message, data);
+    };
+    logFn.debug = (message: string, data?: unknown) => this.sendLog("debug", message, data);
+    logFn.info = (message: string, data?: unknown) => this.sendLog("info", message, data);
+    logFn.notice = (message: string, data?: unknown) => this.sendLog("notice", message, data);
+    logFn.warn = (message: string, data?: unknown) => this.sendLog("warning", message, data);
+    logFn.error = (message: string, data?: unknown) => this.sendLog("error", message, data);
+    return logFn as ServerLogger;
   }
 
   // ==========================================================================

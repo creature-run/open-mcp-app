@@ -428,6 +428,29 @@ export interface AppConfig {
    */
   onShutdown?: () => Promise<void> | void;
 
+  /**
+   * Automatically emit log messages for tool calls.
+   *
+   * When true, the SDK sends `notifications/message` before and after
+   * each tool call with structured data (tool name, args preview,
+   * duration, error status). This replaces manual telemetry hooks.
+   *
+   * @default false
+   */
+  logToolCalls?: boolean;
+
+  /**
+   * Custom log sink. When set, `sendLog()` calls this instead of
+   * sending `notifications/message` to MCP transports.
+   */
+  onLog?: (event: { level: string; logger: string; data: unknown; timestamp: string }) => void;
+
+  /**
+   * Hook to add custom Express middleware/routes before the built-in
+   * health-check and MCP endpoints.
+   */
+  middleware?: (app: import('express').Express) => void;
+
   // Timeouts
 
   /**
@@ -502,4 +525,43 @@ export interface WebSocketConnection<TServer = unknown, TClient = unknown> {
   close: () => void;
   /** Number of connected clients */
   readonly clientCount: number;
+}
+
+// ============================================================================
+// Server Logger
+// ============================================================================
+
+/**
+ * Log level for server-side logging.
+ * Maps to MCP protocol's LoggingLevel.
+ */
+export type ServerLogLevel = "debug" | "info" | "notice" | "warning" | "error";
+
+/**
+ * Server-side logger that sends `notifications/message` to connected MCP clients.
+ *
+ * The base function logs at "info" level. Use named methods for specific levels.
+ *
+ * @example
+ * ```typescript
+ * const app = createApp({ name: "my-app", version: "1.0.0" });
+ *
+ * app.log("Server started");                // info level
+ * app.log.debug("Verbose detail");          // debug level
+ * app.log.error("Something broke", { id }); // error level
+ * ```
+ */
+export interface ServerLogger {
+  /** Log at "info" level (default). */
+  (message: string, data?: unknown): void;
+  /** Log at "debug" level. */
+  debug: (message: string, data?: unknown) => void;
+  /** Log at "info" level. */
+  info: (message: string, data?: unknown) => void;
+  /** Log at "notice" level. */
+  notice: (message: string, data?: unknown) => void;
+  /** Log at "warning" level. */
+  warn: (message: string, data?: unknown) => void;
+  /** Log at "error" level. */
+  error: (message: string, data?: unknown) => void;
 }
