@@ -409,10 +409,47 @@ export interface AppConfig {
   onToolError?: (toolName: string, error: Error, args: unknown) => void;
 
   /**
+   * Called before a tool handler is invoked.
+   * Useful for logging, telemetry, or instrumentation.
+   * Must not throw — errors are silently ignored to avoid breaking tool calls.
+   */
+  onBeforeToolCall?: (info: ToolCallInfo) => void;
+
+  /**
+   * Called after a tool handler completes (success or failure).
+   * Receives the result or error, plus timing info.
+   * Must not throw — errors are silently ignored to avoid breaking tool calls.
+   */
+  onAfterToolCall?: (info: ToolCallResultInfo) => void;
+
+  /**
    * Called during graceful shutdown, before closing connections.
    * Use this to clean up resources (e.g., close database connections).
    */
   onShutdown?: () => Promise<void> | void;
+
+  /**
+   * Automatically emit log messages for tool calls.
+   *
+   * When true, the SDK sends `notifications/message` before and after
+   * each tool call with structured data (tool name, args preview,
+   * duration, error status). This replaces manual telemetry hooks.
+   *
+   * @default false
+   */
+  logToolCalls?: boolean;
+
+  /**
+   * Custom log sink. When set, `sendLog()` calls this instead of
+   * sending `notifications/message` to MCP transports.
+   */
+  onLog?: (event: { level: string; logger: string; data: unknown; timestamp: string }) => void;
+
+  /**
+   * Hook to add custom Express middleware/routes before the built-in
+   * health-check and MCP endpoints.
+   */
+  middleware?: (app: import('express').Express) => void;
 
   // Timeouts
 
@@ -427,6 +464,40 @@ export interface AppConfig {
    * Controls how long to wait for in-flight requests to complete.
    */
   keepAliveTimeout?: number;
+}
+
+// ============================================================================
+// Tool Call Hooks
+// ============================================================================
+
+/**
+ * Information passed to the onBeforeToolCall hook.
+ */
+export interface ToolCallInfo {
+  /** Name of the tool being called. */
+  toolName: string;
+  /** Raw arguments passed to the tool (before Zod parsing). */
+  args: unknown;
+}
+
+/**
+ * Information passed to the onAfterToolCall hook.
+ * Includes timing and error details so consumers can build
+ * telemetry without wrapping individual handlers.
+ */
+export interface ToolCallResultInfo {
+  /** Name of the tool that was called. */
+  toolName: string;
+  /** Raw arguments passed to the tool (before Zod parsing). */
+  args: unknown;
+  /** The tool result, if the handler succeeded. */
+  result?: ToolResult;
+  /** Wall-clock duration of the handler in milliseconds. */
+  durationMs: number;
+  /** Whether the handler threw an error. */
+  isError: boolean;
+  /** The error, if the handler threw. */
+  error?: Error;
 }
 
 // ============================================================================
@@ -454,4 +525,43 @@ export interface WebSocketConnection<TServer = unknown, TClient = unknown> {
   close: () => void;
   /** Number of connected clients */
   readonly clientCount: number;
+}
+
+// ============================================================================
+// Server Logger
+// ============================================================================
+
+/**
+ * Log level for server-side logging.
+ * Maps to MCP protocol's LoggingLevel.
+ */
+export type ServerLogLevel = "debug" | "info" | "notice" | "warning" | "error";
+
+/**
+ * Server-side logger that sends `notifications/message` to connected MCP clients.
+ *
+ * The base function logs at "info" level. Use named methods for specific levels.
+ *
+ * @example
+ * ```typescript
+ * const app = createApp({ name: "my-app", version: "1.0.0" });
+ *
+ * app.log("Server started");                // info level
+ * app.log.debug("Verbose detail");          // debug level
+ * app.log.error("Something broke", { id }); // error level
+ * ```
+ */
+export interface ServerLogger {
+  /** Log at "info" level (default). */
+  (message: string, data?: unknown): void;
+  /** Log at "debug" level. */
+  debug: (message: string, data?: unknown) => void;
+  /** Log at "info" level. */
+  info: (message: string, data?: unknown) => void;
+  /** Log at "notice" level. */
+  notice: (message: string, data?: unknown) => void;
+  /** Log at "warning" level. */
+  warn: (message: string, data?: unknown) => void;
+  /** Log at "error" level. */
+  error: (message: string, data?: unknown) => void;
 }

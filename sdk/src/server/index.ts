@@ -7,6 +7,8 @@ export type {
   ToolResult,
   ToolHandler,
   ToolContext,
+  ToolCallInfo,
+  ToolCallResultInfo,
   InstanceDestroyContext,
   DisplayMode,
   ToolVisibility,
@@ -14,6 +16,8 @@ export type {
   TransportType,
   TransportSessionInfo,
   WebSocketConnection,
+  ServerLogger,
+  ServerLogLevel,
 } from "./types.js";
 export { MIME_TYPES } from "./types.js";
 
