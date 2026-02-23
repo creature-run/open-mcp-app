@@ -22,6 +22,7 @@
 
 export { AppLayout, type AppLayoutProps } from "./components/AppLayout.js";
 export { Fullscreen, type FullscreenProps } from "./components/Fullscreen.js";
+export { Pip, type PipProps } from "./components/Pip.js";
 export { Show, type ShowProps } from "./components/Show.js";
 export { useDisplayMode, type UseDisplayModeReturn } from "./hooks/useDisplayMode.js";
 

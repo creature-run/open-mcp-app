@@ -1,11 +1,10 @@
 /**
- * Fullscreen — Expand button for entering fullscreen mode.
+ * Pip — Picture-in-picture button for entering pip mode.
  *
  * Reads the current display mode from AppLayout context and calls
  * `requestDisplayMode` (from the SDK's `useHost` hook) on click.
  *
- * Hidden when already in fullscreen or when the host doesn't
- * support fullscreen.
+ * Hidden when already in pip or when the host doesn't support pip.
  *
  * Must be rendered inside an <AppLayout> so it can read the
  * current display mode from context.
@@ -18,7 +17,7 @@
  *   displayMode={hostContext?.displayMode}
  *   availableDisplayModes={hostContext?.availableDisplayModes}
  * >
- *   <Fullscreen requestDisplayMode={requestDisplayMode} />
+ *   <Pip requestDisplayMode={requestDisplayMode} />
  *   <MyContent />
  * </AppLayout>
  * ```
@@ -28,26 +27,26 @@ import { useCallback, type HTMLAttributes } from "react";
 import { useDisplayMode } from "../hooks/useDisplayMode.js";
 import type { DisplayMode } from "../types.js";
 
-export interface FullscreenProps extends Omit<HTMLAttributes<HTMLButtonElement>, "onClick" | "children"> {
+export interface PipProps extends Omit<HTMLAttributes<HTMLButtonElement>, "onClick" | "children"> {
   /**
    * The `requestDisplayMode` function from the SDK's `useHost()` hook.
-   * Called with `{ mode: "fullscreen" }` when the user clicks.
+   * Called with `{ mode: "pip" }` when the user clicks.
    */
   requestDisplayMode: (params: { mode: DisplayMode }) => Promise<{ mode: DisplayMode }>;
 }
 
-export const Fullscreen = ({
+export const Pip = ({
   requestDisplayMode,
   className = "",
   ...rest
-}: FullscreenProps) => {
-  const { isFullscreen, availableDisplayModes } = useDisplayMode();
+}: PipProps) => {
+  const { isPip, availableDisplayModes } = useDisplayMode();
 
-  const expand = useCallback(() => {
-    requestDisplayMode({ mode: "fullscreen" });
+  const enter = useCallback(() => {
+    requestDisplayMode({ mode: "pip" });
   }, [requestDisplayMode]);
 
-  if (isFullscreen || !availableDisplayModes.includes("fullscreen")) {
+  if (isPip || !availableDisplayModes.includes("pip")) {
     return null;
   }
 
@@ -64,17 +63,15 @@ export const Fullscreen = ({
   return (
     <button
       type="button"
-      onClick={expand}
+      onClick={enter}
       className={classes}
-      aria-label="Enter fullscreen"
-      title="Fullscreen"
+      aria-label="Enter picture-in-picture"
+      title="Picture-in-picture"
       {...rest}
     >
       <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <polyline points="10 2 14 2 14 6" />
-        <polyline points="6 14 2 14 2 10" />
-        <line x1="14" y1="2" x2="9.5" y2="6.5" />
-        <line x1="2" y1="14" x2="6.5" y2="9.5" />
+        <rect x="1" y="2" width="14" height="12" rx="1.5" />
+        <rect x="8" y="8" width="6" height="5" rx="1" fill="currentColor" stroke="none" />
       </svg>
     </button>
   );
