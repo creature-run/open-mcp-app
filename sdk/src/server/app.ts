@@ -502,6 +502,7 @@ export class App {
           name,
           description: this.buildToolDescription(config, config.input || z.object({})),
           inputSchema: config.input ? this.zodToJsonSchema(config.input) : { type: "object" },
+          ...(config.annotations && { annotations: config.annotations }),
           ...(Object.keys(toolMeta).length > 0 && { _meta: toolMeta }),
         });
       }
@@ -1012,6 +1013,7 @@ export class App {
         {
           description,
           inputSchema,
+          ...(config.annotations && { annotations: config.annotations }),
           ...(Object.keys(toolMeta).length > 0 && { _meta: toolMeta }),
         },
         async (args: Record<string, unknown>) => {

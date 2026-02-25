@@ -4,6 +4,7 @@ export type {
   AppConfig,
   ResourceConfig,
   ToolConfig,
+  ToolAnnotations,
   ToolResult,
   ToolHandler,
   ToolContext,
