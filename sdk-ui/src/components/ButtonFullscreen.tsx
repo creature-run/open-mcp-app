@@ -1,5 +1,5 @@
 /**
- * Fullscreen — Expand button for entering fullscreen mode.
+ * ButtonFullscreen — Expand button for entering fullscreen mode.
  *
  * Reads the current display mode from AppLayout context and calls
  * `requestDisplayMode` (from the SDK's `useHost` hook) on click.
@@ -18,7 +18,7 @@
  *   displayMode={hostContext?.displayMode}
  *   availableDisplayModes={hostContext?.availableDisplayModes}
  * >
- *   <Fullscreen requestDisplayMode={requestDisplayMode} />
+ *   <ButtonFullscreen requestDisplayMode={requestDisplayMode} />
  *   <MyContent />
  * </AppLayout>
  * ```
@@ -28,7 +28,7 @@ import { useCallback, type HTMLAttributes } from "react";
 import { useDisplayMode } from "../hooks/useDisplayMode.js";
 import type { DisplayMode } from "../types.js";
 
-export interface FullscreenProps extends Omit<HTMLAttributes<HTMLButtonElement>, "onClick" | "children"> {
+export interface ButtonFullscreenProps extends Omit<HTMLAttributes<HTMLButtonElement>, "onClick" | "children"> {
   /**
    * The `requestDisplayMode` function from the SDK's `useHost()` hook.
    * Called with `{ mode: "fullscreen" }` when the user clicks.
@@ -36,11 +36,11 @@ export interface FullscreenProps extends Omit<HTMLAttributes<HTMLButtonElement>,
   requestDisplayMode: (params: { mode: DisplayMode }) => Promise<{ mode: DisplayMode }>;
 }
 
-export const Fullscreen = ({
+export const ButtonFullscreen = ({
   requestDisplayMode,
   className = "",
   ...rest
-}: FullscreenProps) => {
+}: ButtonFullscreenProps) => {
   const { isFullscreen, availableDisplayModes } = useDisplayMode();
 
   const expand = useCallback(() => {

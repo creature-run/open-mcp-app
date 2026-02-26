@@ -1,5 +1,5 @@
 /**
- * Pip — Picture-in-picture button for entering pip mode.
+ * ButtonPip — Picture-in-picture button for entering pip mode.
  *
  * Reads the current display mode from AppLayout context and calls
  * `requestDisplayMode` (from the SDK's `useHost` hook) on click.
@@ -17,7 +17,7 @@
  *   displayMode={hostContext?.displayMode}
  *   availableDisplayModes={hostContext?.availableDisplayModes}
  * >
- *   <Pip requestDisplayMode={requestDisplayMode} />
+ *   <ButtonPip requestDisplayMode={requestDisplayMode} />
  *   <MyContent />
  * </AppLayout>
  * ```
@@ -27,7 +27,7 @@ import { useCallback, type HTMLAttributes } from "react";
 import { useDisplayMode } from "../hooks/useDisplayMode.js";
 import type { DisplayMode } from "../types.js";
 
-export interface PipProps extends Omit<HTMLAttributes<HTMLButtonElement>, "onClick" | "children"> {
+export interface ButtonPipProps extends Omit<HTMLAttributes<HTMLButtonElement>, "onClick" | "children"> {
   /**
    * The `requestDisplayMode` function from the SDK's `useHost()` hook.
    * Called with `{ mode: "pip" }` when the user clicks.
@@ -35,11 +35,11 @@ export interface PipProps extends Omit<HTMLAttributes<HTMLButtonElement>, "onCli
   requestDisplayMode: (params: { mode: DisplayMode }) => Promise<{ mode: DisplayMode }>;
 }
 
-export const Pip = ({
+export const ButtonPip = ({
   requestDisplayMode,
   className = "",
   ...rest
-}: PipProps) => {
+}: ButtonPipProps) => {
   const { isPip, availableDisplayModes } = useDisplayMode();
 
   const enter = useCallback(() => {
