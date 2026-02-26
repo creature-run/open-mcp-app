@@ -1137,13 +1137,6 @@ export class App {
       if (config.experimental?.defaultDisplayMode) {
         experimental.defaultDisplayMode = config.experimental.defaultDisplayMode;
       }
-<<<<<<< HEAD
-=======
-      if (config.experimental?.openInBackground !== undefined) {
-        experimental.openInBackground = config.experimental.openInBackground;
-      }
-
->>>>>>> main
       toolMeta.ui = {
         resourceUri: config.ui,
         visibility,
