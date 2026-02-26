@@ -15,7 +15,7 @@
  *   import { DataTable } from "open-mcp-app-ui/table";
  */
 
-import {
+import React, {
   useState,
   useMemo,
   useRef,
@@ -69,6 +69,12 @@ export interface DataTableProps<T> {
   emptyMessage?: ReactNode;
   /** Called when a row is clicked. Receives the row's original data and index. */
   onRowClick?: (row: { original: T; index: number }) => void;
+  /**
+   * Render inline expansion content below a row. When provided, clicking
+   * a row toggles its expanded state and renders the returned ReactNode
+   * in a full-width `<tr>` beneath it. Overrides `onRowClick`.
+   */
+  renderSubRow?: (row: { original: T; index: number }) => ReactNode;
   /** Show a loading skeleton instead of data rows. */
   loading?: boolean;
   /** Reduce row height for tighter layouts (e.g. inline display mode). */
@@ -204,6 +210,7 @@ export const DataTable = <T,>({
   stickyHeader = true,
   emptyMessage = "No data",
   onRowClick,
+  renderSubRow,
   loading = false,
   compact = false,
   borderVariant = "default",
@@ -216,6 +223,7 @@ export const DataTable = <T,>({
 
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
+  const [expandedRowIds, setExpandedRowIds] = useState<Set<string>>(new Set());
 
   // -------------------------------------------------------------------------
   // Table instance
@@ -275,42 +283,74 @@ export const DataTable = <T,>({
    * Renders a single data row. Shared between virtualized and
    * non-virtualized modes to keep styling consistent.
    */
+  const toggleExpanded = useCallback((rowId: string) => {
+    setExpandedRowIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(rowId)) next.delete(rowId);
+      else next.add(rowId);
+      return next;
+    });
+  }, []);
+
   const renderRow = useCallback(
     (row: Row<T>, style?: CSSProperties) => {
-      const isClickable = onRowClick != null;
-      return (
-        <tr
-          key={row.id}
-          className={[
-            "border-b border-bdr-secondary last:border-b-0 transition-colors",
-            isClickable ? "cursor-pointer hover:bg-bg-secondary" : "",
-          ].join(" ")}
-          style={style}
-          onClick={isClickable ? () => onRowClick({ original: row.original, index: row.index }) : undefined}
-          role={isClickable ? "button" : undefined}
-          tabIndex={isClickable ? 0 : undefined}
-          onKeyDown={isClickable ? (e) => {
+      const isExpandable = renderSubRow != null;
+      const isClickable = isExpandable || onRowClick != null;
+      const isExpanded = isExpandable && expandedRowIds.has(row.id);
+
+      const handleClick = isExpandable
+        ? () => toggleExpanded(row.id)
+        : onRowClick
+          ? () => onRowClick({ original: row.original, index: row.index })
+          : undefined;
+
+      const handleKeyDown = isClickable
+        ? (e: React.KeyboardEvent) => {
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
-              onRowClick({ original: row.original, index: row.index });
+              handleClick?.();
             }
-          } : undefined}
-        >
-          {row.getVisibleCells().map((cell: Cell<T, unknown>) => (
-            <td
-              key={cell.id}
-              className={[
-                "text-txt-primary",
-                compact ? "px-3 py-1.5 text-xs" : "px-3 py-2.5 text-sm",
-              ].join(" ")}
-            >
-              {flexRender(cell.column.columnDef.cell, cell.getContext())}
-            </td>
-          ))}
-        </tr>
+          }
+        : undefined;
+
+      return (
+        <React.Fragment key={row.id}>
+          <tr
+            className={[
+              isExpanded ? "" : "border-b border-bdr-secondary last:border-b-0",
+              "transition-colors",
+              isClickable ? "cursor-pointer hover:bg-bg-secondary" : "",
+              isExpanded ? "bg-bg-secondary" : "",
+            ].join(" ")}
+            style={style}
+            onClick={handleClick}
+            role={isClickable ? "button" : undefined}
+            tabIndex={isClickable ? 0 : undefined}
+            onKeyDown={handleKeyDown}
+          >
+            {row.getVisibleCells().map((cell: Cell<T, unknown>) => (
+              <td
+                key={cell.id}
+                className={[
+                  "text-txt-primary",
+                  compact ? "px-3 py-1.5 text-xs" : "px-3 py-2.5 text-sm",
+                ].join(" ")}
+              >
+                {flexRender(cell.column.columnDef.cell, cell.getContext())}
+              </td>
+            ))}
+          </tr>
+          {isExpanded && (
+            <tr className="border-b border-bdr-secondary">
+              <td colSpan={columns.length} className="p-0">
+                {renderSubRow({ original: row.original, index: row.index })}
+              </td>
+            </tr>
+          )}
+        </React.Fragment>
       );
     },
-    [onRowClick, compact]
+    [onRowClick, renderSubRow, compact, expandedRowIds, toggleExpanded, columns.length]
   );
 
   // -------------------------------------------------------------------------

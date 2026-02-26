@@ -177,6 +177,7 @@ export class ClaudeDesktopHostClient extends Subscribable implements UnifiedHost
       structuredContent: sdkResult.structuredContent as T,
       isError: sdkResult.isError,
       source: "ui",
+      toolName,
     };
 
     this.emit("tool-result", result as ToolResult);
@@ -226,7 +227,7 @@ export class ClaudeDesktopHostClient extends Subscribable implements UnifiedHost
     this.app.notification({
       method: "ui/update-model-context",
       params: { content },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
   }
 
@@ -281,7 +282,7 @@ export class ClaudeDesktopHostClient extends Subscribable implements UnifiedHost
       },
 
       // Not supported on Claude Desktop
-      setTitle: (_title: string) => {},
+      setTitle: (_title: string) => { },
 
       sendNotification: (method: string, params: unknown) => {
         this.sendNotification(method, params);
@@ -301,13 +302,13 @@ export class ClaudeDesktopHostClient extends Subscribable implements UnifiedHost
       },
 
       // ChatGPT-only APIs (no-op on MCP Apps hosts)
-      sendFollowUpMessage: async (_prompt: string) => {},
+      sendFollowUpMessage: async (_prompt: string) => { },
 
       requestModal: async (_options: { title?: string; params?: Record<string, unknown> }) => {
         return null;
       },
 
-      requestClose: async () => {},
+      requestClose: async () => { },
     };
   }
 

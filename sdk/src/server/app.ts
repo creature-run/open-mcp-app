@@ -107,10 +107,10 @@ export class App {
   private callerDir: string;
   private shutdownRegistered = false;
   private isShuttingDown = false;
-  
+
   /** Server-side instance state, keyed by instanceId. */
   private instanceState = new Map<string, unknown>();
-  
+
   /** Callbacks to invoke when an instance is destroyed. */
   private instanceDestroyCallbacks: Array<(ctx: InstanceDestroyContext) => void> = [];
 
@@ -155,14 +155,14 @@ export class App {
     if (!config.uri.startsWith("ui://")) {
       throw new Error(`Resource URI must start with "ui://": ${config.uri}`);
     }
-    
+
     const normalizedConfig: ResourceConfig = {
       ...config,
       html: typeof config.html === "string"
         ? htmlLoader(config.html, this.getCallerDir())
         : config.html,
     };
-    
+
     this.resources.set(config.uri, { config: normalizedConfig });
     return this;
   }
@@ -227,7 +227,7 @@ export class App {
 
     // Close all MCP transports with timeout
     const transportClosePromises = [...this.transports.values()].map((transport) =>
-      transport.close().catch(() => {})
+      transport.close().catch(() => { })
     );
 
     await Promise.race([
@@ -275,7 +275,7 @@ export class App {
     onConnect?: (handler: () => void) => void;
   } {
     const instanceId = this.generateInstanceId();
-    
+
     if (options.websocket) {
       const ws = this.websocketManager.createWebSocket<TServer, TClient>(
         instanceId,
@@ -283,7 +283,7 @@ export class App {
         this.getPort()
       );
       this.instanceWebSockets.set(instanceId, ws as WebSocketConnection<unknown, unknown>);
-      
+
       return {
         instanceId,
         websocketUrl: ws.websocketUrl,
@@ -292,7 +292,7 @@ export class App {
         onConnect: ws.onConnect,
       };
     }
-    
+
     return { instanceId };
   }
 
@@ -310,7 +310,7 @@ export class App {
     const state = this.instanceState.get(instanceId);
     const hasState = state !== undefined || this.instanceState.has(instanceId);
     const hasWebSocket = this.instanceWebSockets.has(instanceId);
-    
+
     if (hasState || hasWebSocket) {
       // Invoke destroy callbacks
       for (const callback of this.instanceDestroyCallbacks) {
@@ -320,20 +320,20 @@ export class App {
           console.error(`[MCP] onInstanceDestroy callback error for ${instanceId}:`, error);
         }
       }
-      
+
       // Close WebSocket
       const ws = this.instanceWebSockets.get(instanceId);
       if (ws) {
         ws.close();
         this.instanceWebSockets.delete(instanceId);
       }
-      
+
       // Clear state
       this.instanceState.delete(instanceId);
       console.log(`[MCP] Instance destroyed: ${instanceId}`);
       return true;
     }
-    
+
     return false;
   }
 
@@ -371,14 +371,14 @@ export class App {
     if (this.instanceWebSockets.has(instanceId)) {
       return this.instanceWebSockets.get(instanceId) as WebSocketConnection<TServer, TClient>;
     }
-    
+
     const ws = this.websocketManager.createWebSocket<TServer, TClient>(
       instanceId,
       {},
       this.getPort()
     );
     this.instanceWebSockets.set(instanceId, ws as WebSocketConnection<unknown, unknown>);
-    
+
     return ws;
   }
 
@@ -434,7 +434,7 @@ export class App {
   closeTransportSession(sessionId: string): boolean {
     const transport = this.transports.get(sessionId);
     if (transport) {
-      transport.close().catch(() => {});
+      transport.close().catch(() => { });
       this.transports.delete(sessionId);
       return true;
     }
@@ -502,6 +502,7 @@ export class App {
           name,
           description: this.buildToolDescription(config, config.input || z.object({})),
           inputSchema: config.input ? this.zodToJsonSchema(config.input) : { type: "object" },
+          ...(config.annotations && { annotations: config.annotations }),
           ...(Object.keys(toolMeta).length > 0 && { _meta: toolMeta }),
         });
       }
@@ -527,14 +528,14 @@ export class App {
         instanceId,
         getState: <T>() => this.instanceState.get(instanceId) as T | undefined,
         setState: <T>(state: T) => { this.instanceState.set(instanceId, state); },
-        send: () => {},
-        onMessage: () => {},
-        onConnect: () => {},
+        send: () => { },
+        onMessage: () => { },
+        onConnect: () => { },
         websocketUrl: undefined,
       };
 
       const result = await handler(input, context);
-      return { jsonrpc: "2.0", result: this.formatToolResult(result, instanceId), id };
+      return { jsonrpc: "2.0", result: this.formatToolResult(result, instanceId, undefined, toolName), id };
     }
 
     // List resources
@@ -619,7 +620,7 @@ export class App {
         const shape = def.shape?.() || {};
         const properties: Record<string, unknown> = {};
         const required: string[] = [];
-        
+
         for (const [key, value] of Object.entries(shape)) {
           const fieldDef = (value as any)._def;
           if (fieldDef?.typeName === "ZodString") {
@@ -638,12 +639,12 @@ export class App {
           } else {
             properties[key] = { type: "string" };
           }
-          
+
           if (fieldDef?.typeName !== "ZodOptional") {
             required.push(key);
           }
         }
-        
+
         return {
           type: "object",
           properties,
@@ -699,7 +700,7 @@ export class App {
   private isFieldRequired(schema: z.ZodType, fieldName: string): boolean {
     const shape = this.getSchemaShape(schema);
     if (!shape || !(fieldName in shape)) return false;
-    
+
     const field = shape[fieldName] as z.ZodType;
     if ("_def" in field && (field as any)._def?.typeName === "ZodOptional") {
       return false;
@@ -790,6 +791,7 @@ export class App {
         } else {
           this.clientType = "unknown";
         }
+
         console.log(`[MCP] Client: ${clientName}, type: ${this.clientType}`);
 
         transport = this.createTransport();
@@ -799,7 +801,7 @@ export class App {
 
         // Set the current server for storage RPC access
         setCurrentServer(server);
-        
+
         await transport.handleRequest(req, res, req.body);
         return;
       } else {
@@ -1015,6 +1017,7 @@ export class App {
         {
           description,
           inputSchema,
+          ...(config.annotations && { annotations: config.annotations }),
           ...(Object.keys(toolMeta).length > 0 && { _meta: toolMeta }),
         },
         async (args: Record<string, unknown>) => {
@@ -1083,7 +1086,7 @@ export class App {
               this.sendLog("info", `Tool result: ${name} (${durationMs}ms)`, { event: "tool_result", tool: name, durationMs });
             }
 
-            return this.formatToolResult(result, instanceId, websocketUrl);
+            return this.formatToolResult(result, instanceId, websocketUrl, name);
           } catch (error) {
             const err = error instanceof Error ? error : new Error(String(error));
             const durationMs = Date.now() - startMs;
@@ -1115,7 +1118,7 @@ export class App {
     if (existing) {
       return existing;
     }
-    
+
     // Create new WebSocket
     const ws = this.websocketManager.createWebSocket(instanceId, {}, this.getPort());
     this.instanceWebSockets.set(instanceId, ws as WebSocketConnection<unknown, unknown>);
@@ -1125,15 +1128,22 @@ export class App {
 
   private buildToolMeta(config: ToolConfig): Record<string, unknown> {
     const toolMeta: Record<string, unknown> = {};
-    
+
     if (config.ui) {
       const visibility = config.visibility || ["model", "app"];
-      
+
       // Build experimental metadata (non-standard extensions)
       const experimental: Record<string, unknown> = {};
       if (config.experimental?.defaultDisplayMode) {
         experimental.defaultDisplayMode = config.experimental.defaultDisplayMode;
       }
+<<<<<<< HEAD
+=======
+      if (config.experimental?.openInBackground !== undefined) {
+        experimental.openInBackground = config.experimental.openInBackground;
+      }
+
+>>>>>>> main
       toolMeta.ui = {
         resourceUri: config.ui,
         visibility,
@@ -1147,7 +1157,7 @@ export class App {
       // TODO: Remove this once Claude.ai follows the spec correctly.
       toolMeta["ui/resourceUri"] = config.ui;
     }
-    
+
     if (config.loadingMessage) {
       toolMeta["openai/toolInvocation/invoking"] = config.loadingMessage;
     }
@@ -1160,12 +1170,12 @@ export class App {
 
   private buildToolDescription(config: ToolConfig, inputSchema: z.ZodType): string {
     let description = config.description;
-    
+
     if (config.ui) {
       const schemaShape = this.getSchemaShape(inputSchema);
       const hasInstanceIdInSchema = schemaShape && "instanceId" in schemaShape;
       const isInstanceIdRequired = this.isFieldRequired(inputSchema, "instanceId");
-      
+
       if (isInstanceIdRequired) {
         description += " Requires instanceId from a previous tool response.";
       } else if (hasInstanceIdInSchema) {
@@ -1183,7 +1193,7 @@ export class App {
    * 
    * SDK manages instanceId and websocketUrl automatically.
    */
-  private formatToolResult(result: ToolResult, instanceId?: string, websocketUrl?: string) {
+  private formatToolResult(result: ToolResult, instanceId?: string, websocketUrl?: string, toolName?: string) {
     const text = result.text || JSON.stringify(result.data || {});
 
     const structuredContent: Record<string, unknown> = {
@@ -1192,6 +1202,7 @@ export class App {
       ...(result.inlineHeight && { inlineHeight: result.inlineHeight }),
       ...(instanceId && { instanceId }),
       ...(websocketUrl && { websocketUrl }),
+      ...(toolName && { _toolName: toolName }),
     };
 
     const meta: Record<string, unknown> = {};
@@ -1311,7 +1322,7 @@ function getCallerDirectory(): string {
   for (const frame of stack) {
     const filename = frame.getFileName();
     if (filename && !isSDKPath(filename)) {
-      return filename.startsWith("file://") 
+      return filename.startsWith("file://")
         ? path.dirname(fileURLToPath(filename))
         : path.dirname(filename);
     }

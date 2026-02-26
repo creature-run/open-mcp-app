@@ -208,6 +208,25 @@ export interface ToolExperimentalConfig {
 }
 
 /**
+ * MCP tool annotations.
+ *
+ * Hints that describe tool behavior without affecting protocol semantics.
+ * Hosts use these to make UI/UX decisions (e.g. confirmation prompts).
+ */
+export interface ToolAnnotations {
+  /** Human-readable title for the tool. */
+  title?: string;
+  /** If true, the tool does not modify any state (default: false). */
+  readOnlyHint?: boolean;
+  /** If true, the tool may perform destructive/irreversible operations (default: true). */
+  destructiveHint?: boolean;
+  /** If true, calling the tool repeatedly with the same args has no additional effect (default: false). */
+  idempotentHint?: boolean;
+  /** If true, the tool may interact with the world outside the MCP server (default: true). */
+  openWorldHint?: boolean;
+}
+
+/**
  * Tool configuration.
  */
 export interface ToolConfig<TInput extends z.ZodType = z.ZodType> {
@@ -221,6 +240,8 @@ export interface ToolConfig<TInput extends z.ZodType = z.ZodType> {
   visibility?: ToolVisibility[];
   /** Supported display modes for this tool */
   displayModes?: DisplayMode[];
+  /** MCP tool annotations (readOnlyHint, destructiveHint, etc.) */
+  annotations?: ToolAnnotations;
   /** Loading message shown while tool is running (used by ChatGPT) */
   loadingMessage?: string;
   /** Completion message shown when tool finishes (used by ChatGPT) */
