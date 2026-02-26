@@ -21,6 +21,8 @@
 // ============================================================================
 
 export { AppLayout, type AppLayoutProps } from "./components/AppLayout.js";
+export { ButtonFullscreen, type ButtonFullscreenProps } from "./components/ButtonFullscreen.js";
+export { ButtonPip, type ButtonPipProps } from "./components/ButtonPip.js";
 export { Show, type ShowProps } from "./components/Show.js";
 export { useDisplayMode, type UseDisplayModeReturn } from "./hooks/useDisplayMode.js";
 

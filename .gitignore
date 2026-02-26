@@ -52,3 +52,5 @@ yarn-error.log*
 
 # TypeScript
 *.tsbuildinfo
+
+dasha

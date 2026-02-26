@@ -178,6 +178,7 @@ export class CreatureDesktopHostClient extends Subscribable implements UnifiedHo
       structuredContent: sdkResult.structuredContent as T,
       isError: sdkResult.isError,
       source: "ui",
+      toolName,
     };
 
     // Extract instanceId from structuredContent if present
@@ -234,7 +235,7 @@ export class CreatureDesktopHostClient extends Subscribable implements UnifiedHo
     this.app.notification({
       method: "ui/update-model-context",
       params: { content },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
   }
 
@@ -309,13 +310,13 @@ export class CreatureDesktopHostClient extends Subscribable implements UnifiedHo
       },
 
       // ChatGPT-only APIs (no-op on MCP Apps hosts)
-      sendFollowUpMessage: async (_prompt: string) => {},
+      sendFollowUpMessage: async (_prompt: string) => { },
 
       requestModal: async (_options: { title?: string; params?: Record<string, unknown> }) => {
         return null;
       },
 
-      requestClose: async () => {},
+      requestClose: async () => { },
     };
   }
 

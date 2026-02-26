@@ -26,8 +26,12 @@ import type {
  * Available on `window.openai` when running inside ChatGPT.
  */
 interface OpenAIBridge {
+  // Readable state properties
+  theme?: string;
+  displayMode?: string;
   toolOutput?: Record<string, unknown>;
   widgetState?: WidgetState;
+  // Methods
   setWidgetState?: (state: WidgetState) => void;
   callTool?: (
     name: string,
@@ -68,6 +72,12 @@ export class ChatGptWebHostClient extends Subscribable implements UnifiedHostCli
   private globalsHandler: ((event: Event) => void) | null = null;
   private lastToolOutputJson: string | null = null;
   private lastWidgetStateJson: string | null = null;
+  private hostContext: HostContext = {
+    theme: "light",
+    displayMode: "inline",
+    availableDisplayModes: ["inline", "pip", "fullscreen"],
+    platform: "web",
+  };
 
   constructor(config: HostClientConfig) {
     super();
@@ -102,10 +112,10 @@ export class ChatGptWebHostClient extends Subscribable implements UnifiedHostCli
   }
 
   /**
-   * Get host context - returns null for ChatGPT as it doesn't use MCP Apps protocol.
+   * Get host context synthesized from window.openai properties.
    */
   getHostContext(): HostContext | null {
-    return null;
+    return this.hostContext;
   }
 
   subscribe(listener: StateListener): () => void {
@@ -161,6 +171,7 @@ export class ChatGptWebHostClient extends Subscribable implements UnifiedHostCli
         text: c.text || "",
       })),
       source: "ui",
+      toolName,
     };
 
     this.emit("tool-result", result as ToolResult);
@@ -169,16 +180,30 @@ export class ChatGptWebHostClient extends Subscribable implements UnifiedHostCli
 
   /**
    * Request a display mode change from the ChatGPT host.
+   * Updates internal host context and triggers re-render on success.
+   *
+   * Note: ChatGPT requires this to be called from a synchronous user event
+   * (e.g. click handler). Calling it programmatically on mount will warn
+   * and may return undefined.
    */
   async requestDisplayMode(params: { mode: DisplayMode }): Promise<{ mode: DisplayMode }> {
     const openai = window.openai;
 
+    let grantedMode: DisplayMode = params.mode;
+
     if (openai?.requestDisplayMode) {
-      const result = await openai.requestDisplayMode({ mode: params.mode });
-      return { mode: result.mode as DisplayMode };
+      try {
+        const result = await openai.requestDisplayMode({ mode: params.mode });
+        if (result?.mode) {
+          grantedMode = result.mode as DisplayMode;
+        }
+      } catch {
+        // Host may reject the request; fall through with the requested mode
+      }
     }
 
-    return { mode: params.mode };
+    this.updateHostContext({ displayMode: grantedMode });
+    return { mode: grantedMode };
   }
 
   /**
@@ -228,7 +253,7 @@ export class ChatGptWebHostClient extends Subscribable implements UnifiedHostCli
   ): () => void {
     // theme-change and teardown are no-ops on ChatGPT
     if (event === "theme-change" || event === "teardown") {
-      return () => {};
+      return () => { };
     }
     return this.onEvent(
       event as "tool-input" | "tool-result" | "widget-state-change",
@@ -258,10 +283,10 @@ export class ChatGptWebHostClient extends Subscribable implements UnifiedHostCli
       },
 
       // MCP Apps-only (no-op on ChatGPT)
-      setTitle: (_title: string) => {},
+      setTitle: (_title: string) => { },
 
       // MCP Apps-only (no-op on ChatGPT)
-      sendNotification: (_method: string, _params: unknown) => {},
+      sendNotification: (_method: string, _params: unknown) => { },
 
       getInstanceId: () => {
         // ChatGPT may have widgetSessionId, but we don't expose it
@@ -313,6 +338,16 @@ export class ChatGptWebHostClient extends Subscribable implements UnifiedHostCli
   }
 
   /**
+   * Merge new values into the tracked host context and trigger a re-render
+   * so React components see the updated displayMode / theme.
+   */
+  private updateHostContext(patch: Partial<HostContext>): void {
+    this.hostContext = { ...this.hostContext, ...patch };
+    // Trigger re-render — setState creates a new reference even if values are the same
+    this.setState({});
+  }
+
+  /**
    * Process initial data from `window.openai`.
    */
   private processInitialData(): void {
@@ -325,11 +360,25 @@ export class ChatGptWebHostClient extends Subscribable implements UnifiedHostCli
     }
 
     this.hasProcessedInitialData = true;
+
+    // Seed host context from window.openai readable properties
+    const contextPatch: Partial<HostContext> = {};
+    if (openai.displayMode) {
+      contextPatch.displayMode = openai.displayMode as DisplayMode;
+    }
+    if (openai.theme) {
+      contextPatch.theme = openai.theme as "light" | "dark";
+    }
+    if (Object.keys(contextPatch).length > 0) {
+      this.hostContext = { ...this.hostContext, ...contextPatch };
+    }
+
     this.setState({ isReady: true });
 
     if (openai.toolOutput) {
       this.emit("tool-input", openai.toolOutput);
-      this.emit("tool-result", { structuredContent: openai.toolOutput });
+      const toolName = (openai.toolOutput as Record<string, unknown>)?._toolName as string | undefined;
+      this.emit("tool-result", { structuredContent: openai.toolOutput, ...(toolName && { toolName }) });
     }
 
     if (openai.widgetState) {
@@ -347,6 +396,8 @@ export class ChatGptWebHostClient extends Subscribable implements UnifiedHostCli
         globals?: {
           toolOutput?: Record<string, unknown>;
           widgetState?: WidgetState;
+          displayMode?: string;
+          theme?: string;
         };
       }>;
       const globals = customEvent.detail?.globals;
@@ -356,7 +407,8 @@ export class ChatGptWebHostClient extends Subscribable implements UnifiedHostCli
         if (toolOutputJson !== this.lastToolOutputJson) {
           this.lastToolOutputJson = toolOutputJson;
           this.emit("tool-input", globals.toolOutput);
-          this.emit("tool-result", { structuredContent: globals.toolOutput });
+          const toolName = (globals.toolOutput as Record<string, unknown>)?._toolName as string | undefined;
+          this.emit("tool-result", { structuredContent: globals.toolOutput, ...(toolName && { toolName }) });
         }
       }
 
@@ -367,6 +419,18 @@ export class ChatGptWebHostClient extends Subscribable implements UnifiedHostCli
           this.setState({ widgetState: globals.widgetState });
           this.emit("widget-state-change", globals.widgetState);
         }
+      }
+
+      // Track display mode and theme changes from the host
+      const contextPatch: Partial<HostContext> = {};
+      if (globals?.displayMode && globals.displayMode !== this.hostContext.displayMode) {
+        contextPatch.displayMode = globals.displayMode as DisplayMode;
+      }
+      if (globals?.theme && globals.theme !== this.hostContext.theme) {
+        contextPatch.theme = globals.theme as "light" | "dark";
+      }
+      if (Object.keys(contextPatch).length > 0) {
+        this.updateHostContext(contextPatch);
       }
     };
 
