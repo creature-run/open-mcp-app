@@ -205,11 +205,6 @@ export interface ToolExperimentalConfig {
    * Note: defaultDisplayMode is a Creature extension. Not part of MCP Apps spec.
    */
   defaultDisplayMode?: DisplayMode;
-  /**
-   * Whether a new pip should open in background when another pip is already active.
-   * Note: openInBackground is a Creature extension.
-   */
-  openInBackground?: boolean;
 }
 
 /**
@@ -402,6 +397,12 @@ export interface AppConfig {
   port?: number;
   /** Enable dev mode (default: auto-detect from NODE_ENV) */
   dev?: boolean;
+  /**
+   * Enable built-in CORS headers (default: true).
+   * Set to `false` when behind a reverse proxy that handles CORS
+   * to avoid duplicate Access-Control-Allow-Origin headers.
+   */
+  cors?: boolean;
 
   // Transport Session Lifecycle Callbacks
 

@@ -716,19 +716,23 @@ export class App {
     const app = express();
     app.use(express.json({ limit: '50mb' }));
 
-    // CORS middleware
-    app.use((req: Request, res: Response, next: () => void) => {
-      res.setHeader("Access-Control-Allow-Origin", "*");
-      res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
-      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Accept, Mcp-Session-Id");
-      res.setHeader("Access-Control-Expose-Headers", "Mcp-Session-Id");
+    // CORS middleware — sets permissive defaults for standalone use.
+    // Disable with `cors: false` when behind a reverse proxy (e.g. Daytona)
+    // that injects its own CORS headers to avoid duplicate-header browser errors.
+    if (this.config.cors !== false) {
+      app.use((req: Request, res: Response, next: () => void) => {
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
+        res.setHeader("Access-Control-Allow-Headers", "Content-Type, Accept, Mcp-Session-Id");
+        res.setHeader("Access-Control-Expose-Headers", "Mcp-Session-Id");
 
-      if (req.method === "OPTIONS") {
-        res.status(204).end();
-        return;
-      }
-      next();
-    });
+        if (req.method === "OPTIONS") {
+          res.status(204).end();
+          return;
+        }
+        next();
+      });
+    }
 
     // User-provided middleware (runs before built-in routes)
     if (this.config.middleware) {
@@ -1133,10 +1137,13 @@ export class App {
       if (config.experimental?.defaultDisplayMode) {
         experimental.defaultDisplayMode = config.experimental.defaultDisplayMode;
       }
+<<<<<<< HEAD
+=======
       if (config.experimental?.openInBackground !== undefined) {
         experimental.openInBackground = config.experimental.openInBackground;
       }
 
+>>>>>>> main
       toolMeta.ui = {
         resourceUri: config.ui,
         visibility,
