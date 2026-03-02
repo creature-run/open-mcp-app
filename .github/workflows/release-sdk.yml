@@ -39,7 +39,7 @@ jobs:
       - name: Install dependencies
         run: |
           cd sdk
-          npm ci
+          npm i
 
       - name: Check version and bump if needed
         id: version
