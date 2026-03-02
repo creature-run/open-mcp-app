@@ -429,6 +429,14 @@ export class App {
   }
 
   /**
+   * Get the Express application for serverless wrapping (e.g. Lambda).
+   * Does NOT start listening on a port.
+   */
+  toExpressApp(): express.Express {
+    return this.createExpressApp();
+  }
+
+  /**
    * Close a specific transport session.
    */
   closeTransportSession(sessionId: string): boolean {
