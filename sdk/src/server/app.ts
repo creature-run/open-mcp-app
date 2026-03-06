@@ -1,15 +1,20 @@
 import { randomUUID } from "node:crypto";
 import path from "node:path";
+import { Readable, Writable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import { fileURLToPath } from "node:url";
 import type { Server } from "node:http";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import express from "express";
-import type { Request, Response } from "express";
+import type { Request as ExpressRequest, Response as ExpressResponse } from "express";
 import { z } from "zod";
 import type {
   AppConfig,
+  AwsLambdaHandler,
   ResourceConfig,
+  ServerlessAdapterOptions,
   ToolConfig,
   ToolDefinition,
   ToolHandler,
@@ -26,6 +31,46 @@ import { svgToDataUri, isInitializeRequest, htmlLoader } from "./utils.js";
 import { WebSocketManager } from "./websocket.js";
 import type { WebSocketConnection } from "./types.js";
 import { setCurrentServer } from "./storageRpc.js";
+
+interface RuntimeRequestOptions {
+  serverless?: ServerlessAdapterOptions;
+}
+
+interface AwsLambdaFunctionUrlEvent {
+  version?: string;
+  rawPath?: string;
+  rawQueryString?: string;
+  headers?: Record<string, string | undefined>;
+  cookies?: string[];
+  body?: string | null;
+  isBase64Encoded?: boolean;
+  requestContext?: {
+    domainName?: string;
+    http?: {
+      method?: string;
+    };
+  };
+}
+
+declare const awslambda: {
+  streamifyResponse: (
+    handler: (
+      event: AwsLambdaFunctionUrlEvent,
+      responseStream: Writable,
+      context: unknown,
+    ) => Promise<void>,
+  ) => AwsLambdaHandler;
+  HttpResponseStream: {
+    from: (
+      responseStream: Writable,
+      metadata: {
+        statusCode?: number;
+        headers?: Record<string, string>;
+        cookies?: string[];
+      },
+    ) => Writable;
+  };
+};
 
 
 // ============================================================================
@@ -329,7 +374,7 @@ export class App {
       }
 
       // Clear state
-      this.instanceState.delete(instanceId);
+      this.deleteInstanceState(instanceId);
       console.log(`[MCP] Instance destroyed: ${instanceId}`);
       return true;
     }
@@ -432,8 +477,37 @@ export class App {
    * Get the Express application for serverless wrapping (e.g. Lambda).
    * Does NOT start listening on a port.
    */
-  toExpressApp(): express.Express {
-    return this.createExpressApp();
+  toExpressApp(options?: ServerlessAdapterOptions): express.Express {
+    return this.createExpressApp({ serverless: options });
+  }
+
+  toAwsLambda(options?: ServerlessAdapterOptions): AwsLambdaHandler {
+    const serverlessOptions: ServerlessAdapterOptions = {
+      transportMode: "stateless",
+      ...options,
+    };
+
+    if (serverlessOptions.transportMode !== "stateless") {
+      throw new Error("app.toAwsLambda() currently requires transportMode: 'stateless'");
+    }
+
+    const lambdaRuntime = (globalThis as typeof globalThis & {
+      awslambda?: typeof awslambda;
+    }).awslambda;
+    if (!lambdaRuntime) {
+      throw new Error("app.toAwsLambda() is only available inside the AWS Lambda runtime");
+    }
+
+    return lambdaRuntime.streamifyResponse(async (event, responseStream) => {
+      const request = this.lambdaEventToRequest(event);
+      const { response, cleanup } = await this.handleLambdaHttpRequest(request, serverlessOptions);
+
+      try {
+        await this.writeLambdaResponse(response, responseStream);
+      } finally {
+        await cleanup();
+      }
+    });
   }
 
   /**
@@ -461,6 +535,121 @@ export class App {
 
   private getCallerDir(): string {
     return this.callerDir;
+  }
+
+  private lambdaEventToRequest(event: AwsLambdaFunctionUrlEvent): globalThis.Request {
+    const headers = new Headers();
+    for (const [key, value] of Object.entries(event.headers ?? {})) {
+      if (value !== undefined) {
+        headers.set(key, value);
+      }
+    }
+
+    if (event.cookies?.length) {
+      headers.set("cookie", event.cookies.join("; "));
+    }
+
+    const method = event.requestContext?.http?.method || "GET";
+    const scheme = headers.get("x-forwarded-proto") || "https";
+    const host = headers.get("host") || event.requestContext?.domainName || "localhost";
+    const rawPath = event.rawPath || "/mcp";
+    const query = event.rawQueryString ? `?${event.rawQueryString}` : "";
+    const url = `${scheme}://${host}${rawPath}${query}`;
+
+    const hasBody = event.body !== undefined && event.body !== null && method !== "GET" && method !== "HEAD";
+    const body = hasBody
+      ? Buffer.from(event.body!, event.isBase64Encoded ? "base64" : "utf8")
+      : undefined;
+
+    return new Request(url, {
+      method,
+      headers,
+      body,
+    });
+  }
+
+  private async handleLambdaHttpRequest(
+    request: globalThis.Request,
+    options: ServerlessAdapterOptions,
+  ): Promise<{ response: globalThis.Response; cleanup: () => Promise<void> }> {
+    const transport = new WebStandardStreamableHTTPServerTransport({
+      sessionIdGenerator: undefined,
+      enableJsonResponse: options.enableJsonResponse ?? false,
+    });
+    const server = this.createMcpServer({ serverless: options });
+    await server.connect(transport);
+    setCurrentServer(server);
+
+    return {
+      response: await transport.handleRequest(request),
+      cleanup: async () => {
+        await server.close().catch(() => {});
+      },
+    };
+  }
+
+  private async writeLambdaResponse(response: globalThis.Response, responseStream: Writable): Promise<void> {
+    const headers: Record<string, string> = {};
+    response.headers.forEach((value, key) => {
+      if (key.toLowerCase() !== "set-cookie") {
+        headers[key] = value;
+      }
+    });
+
+    const getSetCookie = (response.headers as Headers & { getSetCookie?: () => string[] }).getSetCookie;
+    const cookies = typeof getSetCookie === "function" ? getSetCookie.call(response.headers) : undefined;
+    const writable = awslambda.HttpResponseStream.from(responseStream, {
+      statusCode: response.status,
+      headers,
+      ...(cookies && cookies.length > 0 ? { cookies } : {}),
+    });
+
+    if (!response.body) {
+      writable.end();
+      return;
+    }
+
+      await pipeline(Readable.fromWeb(response.body as import("node:stream/web").ReadableStream), writable);
+  }
+
+  private isStatelessTransport(options?: RuntimeRequestOptions): boolean {
+    return options?.serverless?.transportMode === "stateless";
+  }
+
+  private getStateAdapter(options?: RuntimeRequestOptions) {
+    return options?.serverless?.stateAdapter;
+  }
+
+  private async loadInstanceState(instanceId: string, options?: RuntimeRequestOptions): Promise<unknown> {
+    const adapter = this.getStateAdapter(options);
+    if (adapter) {
+      return adapter.get(instanceId);
+    }
+    return this.instanceState.get(instanceId);
+  }
+
+  private async persistInstanceState(
+    instanceId: string,
+    state: unknown,
+    options?: RuntimeRequestOptions,
+  ): Promise<void> {
+    const adapter = this.getStateAdapter(options);
+    if (adapter) {
+      await adapter.set(instanceId, state);
+      return;
+    }
+    this.instanceState.set(instanceId, state);
+  }
+
+  private deleteInstanceState(instanceId: string, options?: RuntimeRequestOptions): void {
+    const adapter = this.getStateAdapter(options);
+    if (adapter) {
+      void adapter.delete(instanceId).catch((error) => {
+        console.error(`[MCP] Failed to delete state for ${instanceId}:`, error);
+      });
+      return;
+    }
+    this.instanceState.delete(instanceId);
   }
 
   // ==========================================================================
@@ -720,7 +909,7 @@ export class App {
   // Private: Express Server
   // ==========================================================================
 
-  private createExpressApp(): express.Express {
+  private createExpressApp(options?: RuntimeRequestOptions): express.Express {
     const app = express();
     app.use(express.json({ limit: '50mb' }));
 
@@ -728,7 +917,7 @@ export class App {
     // Disable with `cors: false` when behind a reverse proxy (e.g. Daytona)
     // that injects its own CORS headers to avoid duplicate-header browser errors.
     if (this.config.cors !== false) {
-      app.use((req: Request, res: Response, next: () => void) => {
+      app.use((req: ExpressRequest, res: ExpressResponse, next: () => void) => {
         res.setHeader("Access-Control-Allow-Origin", "*");
         res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
         res.setHeader("Access-Control-Allow-Headers", "Content-Type, Accept, Mcp-Session-Id");
@@ -748,7 +937,7 @@ export class App {
     }
 
     // Health check
-    app.get("/health", (_req: Request, res: Response) => {
+    app.get("/health", (_req: ExpressRequest, res: ExpressResponse) => {
       res.json({
         status: "ok",
         server: this.config.name,
@@ -759,14 +948,14 @@ export class App {
     });
 
     // MCP endpoints
-    app.post("/mcp", (req, res) => this.handleMcpPost(req, res));
-    app.get("/mcp", (req, res) => this.handleMcpGet(req, res));
-    app.delete("/mcp", (req, res) => this.handleMcpDelete(req, res));
+    app.post("/mcp", (req, res) => this.handleMcpPost(req, res, options));
+    app.get("/mcp", (req, res) => this.handleMcpGet(req, res, options));
+    app.delete("/mcp", (req, res) => this.handleMcpDelete(req, res, options));
 
     return app;
   }
 
-  private async handleMcpPost(req: Request, res: Response): Promise<void> {
+  private async handleMcpPost(req: ExpressRequest, res: ExpressResponse, options?: RuntimeRequestOptions): Promise<void> {
     const transportSessionId = req.headers["mcp-session-id"] as string | undefined;
 
     try {
@@ -785,6 +974,15 @@ export class App {
 
       let transport: StreamableHTTPServerTransport;
 
+      if (this.isStatelessTransport(options)) {
+        transport = this.createTransport(options);
+        const server = this.createMcpServer(options);
+        await server.connect(transport);
+        setCurrentServer(server);
+        await transport.handleRequest(req, res, req.body);
+        return;
+      }
+
       if (transportSessionId && this.transports.has(transportSessionId)) {
         transport = this.transports.get(transportSessionId)!;
       } else if (!transportSessionId && isInitializeRequest(req.body)) {
@@ -802,8 +1000,8 @@ export class App {
 
         console.log(`[MCP] Client: ${clientName}, type: ${this.clientType}`);
 
-        transport = this.createTransport();
-        const server = this.createMcpServer();
+        transport = this.createTransport(options);
+        const server = this.createMcpServer(options);
         await server.connect(transport);
         this.serverByTransport.set(transport, server);
 
@@ -834,8 +1032,17 @@ export class App {
     }
   }
 
-  private async handleMcpGet(req: Request, res: Response): Promise<void> {
+  private async handleMcpGet(req: ExpressRequest, res: ExpressResponse, options?: RuntimeRequestOptions): Promise<void> {
     const transportSessionId = req.headers["mcp-session-id"] as string | undefined;
+
+    if (this.isStatelessTransport(options)) {
+      const transport = this.createTransport(options);
+      const server = this.createMcpServer(options);
+      await server.connect(transport);
+      setCurrentServer(server);
+      await transport.handleRequest(req, res);
+      return;
+    }
 
     if (!transportSessionId || !this.transports.has(transportSessionId)) {
       res.status(400).send("Invalid or missing transport session ID");
@@ -846,8 +1053,17 @@ export class App {
     await transport.handleRequest(req, res);
   }
 
-  private async handleMcpDelete(req: Request, res: Response): Promise<void> {
+  private async handleMcpDelete(req: ExpressRequest, res: ExpressResponse, options?: RuntimeRequestOptions): Promise<void> {
     const transportSessionId = req.headers["mcp-session-id"] as string | undefined;
+
+    if (this.isStatelessTransport(options)) {
+      const transport = this.createTransport(options);
+      const server = this.createMcpServer(options);
+      await server.connect(transport);
+      setCurrentServer(server);
+      await transport.handleRequest(req, res);
+      return;
+    }
 
     if (!transportSessionId || !this.transports.has(transportSessionId)) {
       res.status(400).send("Invalid or missing transport session ID");
@@ -862,18 +1078,24 @@ export class App {
   // Private: MCP Server & Transport
   // ==========================================================================
 
-  private createTransport(): StreamableHTTPServerTransport {
+  private createTransport(options?: RuntimeRequestOptions): StreamableHTTPServerTransport {
+    const stateless = this.isStatelessTransport(options);
     const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: () => randomUUID(),
-      onsessioninitialized: (newSessionId: string) => {
-        this.transports.set(newSessionId, transport);
-        console.log(`[MCP] Transport session created: ${newSessionId}`);
-        this.config.onTransportSessionCreated?.({
-          id: newSessionId,
-          transport: "streamable-http",
-        });
-      },
-    });
+      sessionIdGenerator: stateless
+        ? undefined
+        : (() => randomUUID()),
+      enableJsonResponse: options?.serverless?.enableJsonResponse ?? false,
+      onsessioninitialized: stateless
+        ? undefined
+        : (newSessionId: string) => {
+            this.transports.set(newSessionId, transport);
+            console.log(`[MCP] Transport session created: ${newSessionId}`);
+            this.config.onTransportSessionCreated?.({
+              id: newSessionId,
+              transport: "streamable-http",
+            });
+          },
+    } as ConstructorParameters<typeof StreamableHTTPServerTransport>[0]);
 
     transport.onerror = (error: Error) => {
       const sid = transport.sessionId || "unknown";
@@ -899,7 +1121,7 @@ export class App {
     return transport;
   }
 
-  private createMcpServer(): McpServer {
+  private createMcpServer(options?: RuntimeRequestOptions): McpServer {
     const server = new McpServer(
       {
         name: this.config.name,
@@ -910,7 +1132,7 @@ export class App {
     );
 
     this.registerResources(server);
-    this.registerTools(server);
+    this.registerTools(server, options);
 
     return server;
   }
@@ -1007,7 +1229,7 @@ export class App {
     }
   }
 
-  private registerTools(server: McpServer): void {
+  private registerTools(server: McpServer, options?: RuntimeRequestOptions): void {
     for (const [name, { config, handler }] of this.tools) {
       const toolMeta = this.buildToolMeta(config);
       const baseSchema = config.input || z.object({});
@@ -1030,13 +1252,14 @@ export class App {
         },
         async (args: Record<string, unknown>) => {
           let startMs = Date.now();
+          let instanceId: string | undefined;
+          let stateDirty = false;
           try {
             const input = config.input ? config.input.parse(args) : args;
 
             // Determine instanceId for tools with UI
             // Host (control plane) passes _instanceId for routing; SDK uses it for state
             // Note: Uses underscore prefix to avoid collision with tool-defined arguments
-            let instanceId: string | undefined;
             if (hasUi && config.ui) {
               instanceId = this.resolveInstanceId(args._instanceId);
             }
@@ -1048,17 +1271,26 @@ export class App {
             // Get or create WebSocket if resource has websocket: true
             let ws: WebSocketConnection<unknown, unknown> | undefined;
             let websocketUrl: string | undefined;
-            if (hasWebSocket && instanceId) {
+            if (hasWebSocket && instanceId && !options?.serverless) {
               ws = this.getOrCreateWebSocket(instanceId);
               websocketUrl = ws?.websocketUrl;
+            }
+
+            let currentState = instanceId
+              ? await this.loadInstanceState(instanceId, options)
+              : undefined;
+            if (instanceId && currentState !== undefined) {
+              this.instanceState.set(instanceId, currentState);
             }
 
             // Build handler context
             const context: ToolContext = {
               instanceId: instanceId || "",
-              getState: <T>() => instanceId ? this.instanceState.get(instanceId) as T : undefined,
+              getState: <T>() => currentState as T | undefined,
               setState: <T>(state: T) => {
                 if (instanceId) {
+                  currentState = state;
+                  stateDirty = true;
                   this.instanceState.set(instanceId, state);
                 }
               },
@@ -1089,6 +1321,10 @@ export class App {
             const result = await handler(input, context);
             const durationMs = Date.now() - startMs;
 
+            if (instanceId && stateDirty) {
+              await this.persistInstanceState(instanceId, currentState, options);
+            }
+
             try { this.config.onAfterToolCall?.({ toolName: name, args, result, durationMs, isError: false }); } catch {}
             if (this.config.logToolCalls) {
               this.sendLog("info", `Tool result: ${name} (${durationMs}ms)`, { event: "tool_result", tool: name, durationMs });
@@ -1100,6 +1336,10 @@ export class App {
             const durationMs = Date.now() - startMs;
             console.error(`[MCP] Tool "${name}" failed:`, err.message);
             this.config.onToolError?.(name, err, args);
+
+            if (instanceId && stateDirty) {
+              await this.persistInstanceState(instanceId, this.instanceState.get(instanceId), options);
+            }
 
             try { this.config.onAfterToolCall?.({ toolName: name, args, durationMs, isError: true, error: err }); } catch {}
             if (this.config.logToolCalls) {

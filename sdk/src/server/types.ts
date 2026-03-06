@@ -370,6 +370,39 @@ export interface TransportSessionInfo {
   transport: TransportType;
 }
 
+export type ServerlessTransportMode = "stateful" | "stateless";
+
+export interface StateAdapter {
+  get: (instanceId: string) => Promise<unknown | undefined>;
+  set: (instanceId: string, state: unknown) => Promise<void>;
+  delete: (instanceId: string) => Promise<void>;
+}
+
+export interface ServerlessAdapterOptions {
+  /**
+   * Controls whether MCP transport sessions are persisted between requests.
+   *
+   * - `"stateful"` keeps normal MCP session semantics and expects sticky routing.
+   * - `"stateless"` disables MCP transport session IDs so each request stands alone.
+   *
+   * For AWS Lambda and other serverless deployments, `"stateless"` is usually the
+   * safest default because requests may land on different warm instances.
+   */
+  transportMode?: ServerlessTransportMode;
+  /**
+   * Enables JSON POST responses for stateless streamable-http mode.
+   * This avoids relying on SSE session continuity in serverless environments.
+   */
+  enableJsonResponse?: boolean;
+  /**
+   * Optional backing store for `context.getState()` / `context.setState()`.
+   * This is only needed for tools that rely on server-side state across requests.
+   */
+  stateAdapter?: StateAdapter;
+}
+
+export type AwsLambdaHandler = (...args: unknown[]) => Promise<unknown>;
+
 // ============================================================================
 // App Configuration
 // ============================================================================
