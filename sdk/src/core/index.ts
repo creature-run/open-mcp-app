@@ -118,7 +118,17 @@ export const createHostAsync = async (config: HostClientConfig): Promise<Unified
   // 1. ChatGPT Web (detected synchronously via window.openai)
   if (ChatGptWebHostClient.detect()) {
     const host = ChatGptWebHostClient.create(config);
-    host.connect();
+
+    await new Promise<void>((resolve) => {
+      const unsub = host.subscribe((state) => {
+        if (state.isReady) {
+          unsub();
+          resolve();
+        }
+      });
+      host.connect();
+    });
+
     return host;
   }
 
